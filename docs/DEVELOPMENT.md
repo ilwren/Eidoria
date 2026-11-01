@@ -41,7 +41,7 @@
 
 ### 1.1 产品定位
 
-MdExplorer 是一款**仅面向本地磁盘**的跨平台文件资源管理器：一套共享 UI 与业务逻辑，同时交付 Windows、Linux 桌面端与 Android 移动端；三端提供一致的心智模型（浏览 → 选择 → 操作/预览），但按屏幕尺寸与输入方式呈现**不同的布局形态**（见 §7 与配套布局文档），而不是把同一个窗口拉伸缩放。
+MdExplorer 当前发布是一款**仅面向本地磁盘与 Android SAF 授权位置**的跨平台文件资源管理器：一套共享 UI 与业务逻辑，同时交付 Windows、Linux 桌面端与 Android 移动端；三端提供一致的心智模型（浏览 → 选择 → 操作/预览），但按屏幕尺寸与输入方式呈现**不同的布局形态**（见 §7 与配套布局文档），而不是把同一个窗口拉伸缩放。未来可评估通过受限的文件系统 Provider 接入 WebDAV 等远程位置；那是单独的架构与安全阶段，不代表当前已支持网络访问。
 
 同时，MdExplorer 是 `Md3.Avalonia` 组件库的**旗舰验证应用**：文件管理器对导航、搜索、列表虚拟化、对话框、菜单、Snackbar、底部工作表（Bottom Sheet）等组件有高频、真实的压力，适合反哺组件库在真机与 AOT 场景下的缺陷。因此选型上优先使用 `Md3.Avalonia` 已有组件；缺口组件（如面包屑的紧凑形态、大列表的分组头）先在 MdExplorer 内部实现，成熟后再评估回流组件库（见 §17 R-01）。
 
@@ -57,7 +57,7 @@ MdExplorer 是一款**仅面向本地磁盘**的跨平台文件资源管理器�
 
 **非目标（明确不做，避免范围蔓延）：**
 
-- ❌ 网络存储：WebDAV、SMB、FTP、NFS、云盘——本期一律不做。但抽象层**不得把「文件 = 本地路径字符串」写死**，以便未来增加 Provider 时不推翻核心（见 §5.2 `FileLocator` 设计；注意：仅预留定位符抽象，不预留任何网络代码）。
+- ❌ 网络存储：WebDAV、SMB、FTP、NFS、云盘——当前发布一律不做，也不发起网络请求。架构目标是避免把文件语义永久写死为本地路径；将来只有在 `FileLocator`、Provider、凭据、冲突/原子性与 AOT/Android 门槛另行评审后，才考虑以显式授权方式加入（见 §5.2.1 与 `docs/PLUGIN-SYSTEM.md`）。目前 `IFileSystemService` 仍大量使用 `string`，Android SAF 是已有特例，不能误称为通用 Provider API。
 - ❌ 完整编辑器：文本/代码仅做预览 + 轻量编辑（小文件）；图片不做编辑；Office 文档只做常见 OOXML 子集的有界只读渲染，不做编辑或像素级完整排版（见 §6.5 降级策略）。
 - ❌ 同步、备份、重复文件清理、磁盘清理类「管家」功能。
 - ❌ root / 提权浏览系统目录；需要权限时引导用户走系统授权（Android SAF）或给出明确的无权限提示，不绕过系统安全模型。
@@ -277,7 +277,7 @@ View 定位禁止约定反射（`ViewLocator` 按类型名拼字符串 + `Activa
 
 ## 5. 核心抽象设计
 
-本节给出**规范性接口草案**（命名空间示例）。实现时允许增减参数，但职责边界与「定位符不等于路径」「写操作必经任务队列」两条不可动。
+本节给出**接口职责草案**（命名空间示例）。文件系统定位符与文件 I/O 签名曾按目标形态编写，但当前仓库实现仍以字符串为主；在 D-10 迁移 ADR 通过前，涉及文件 Provider 的代码须以 `src/MdExplorer.Domain/Files.cs` 与 `src/MdExplorer.Platform.Abstractions/FileSystemPorts.cs` 为现状依据，不可把下方目标签名当作已存在 API。职责边界「定位符不等于本地路径」与「写操作必经任务队列」仍是演进要求。
 
 ### 5.1 基线值对象与错误模型
 
@@ -360,6 +360,20 @@ public interface IKnownFoldersService
 - **桌面实现**（Infrastructure）：`System.IO.Directory.EnumerateFileSystemEntries` + `FileInfo`/`DirectoryInfo` 惰性枚举；排序与隐藏过滤在应用层管道完成，服务只负责「如实地快速吐条目」。
 - **Android 实现**（平台层）：定位符为 SAF 文档 → 经 `DocumentFile`/目录游标枚举；定位符为应用专属目录真实路径 → 回落 `System.IO`。一个实现类内按定位符 scheme 分发，对上透明。
 - 软链接/联接点：`IsSymlink` 如实上报；跟随策略（打开时跟随、批量删除只删链接本体、搜索默认不穿越目录链接）由应用层统一规定，防止循环与误删（§13）。
+
+### 5.2.1 Provider 扩展路线（未来设计，不是当前 API）
+
+目标是让浏览器、预览和文件任务依赖宿主统一门面，再由定位符路由到显式注册的本地、SAF 或未来远程 Provider。Provider 不能注入自定义 UI，也不能绕开宿主的任务、权限与冲突策略。建议按以下顺序演进：
+
+1. **先稳定定位符**：从现有 `FileLocator(string Path)` + 可选 `content://` `StorageUri`，演进为带 `providerId`、`connectionProfileId` 与不透明 item key 的强类型定位符；它不能包含密码/令牌。路径分段和授权 scope 必须可单独验证，不能用裸字符串拼接。
+2. **保留统一门面**：浏览器与 Application 仍只依赖 `IFileSystemService`、文件操作只依赖统一的 operation/plan API。Provider registry 只允许组合根显式注册或经固定版本协议启动的受限桌面 worker，不用反射扫描 DLL。
+3. **按项声明能力**：列举、属性、读流、写流、建文件/夹、重命名、删除、服务端复制/移动、监视、范围读取等分别声明。元数据可未知；无能力就返回可见 `Unsupported`，不伪造本地磁盘语义。
+4. **统一错误与写操作计划**：网络超时/离线/鉴权失效/限流/ETag 变化映射成结构化错误；写操作先计划、预览与冲突确认，再进入既有串行任务队列。跨 Provider move 是“复制→验证→删除源”的非原子两阶段事务。
+5. **凭据与网络单独授权**：连接 profile 只保存端点和非机密选项；密钥交未来 `ICredentialStore`，不得写入普通设置、工作流或日志。远程访问是明确选择加入，不改变默认离线/本地优先。
+
+**重要现状差异**：本节 5.1/5.2 的 `FileLocator`/接口示例是目标设计稿；仓库当前真实类型在 `src/MdExplorer.Domain/Files.cs`，是 `FileLocator(string Path)` 并附可选 `StorageUri`，`IFileSystemService` 在 `FileSystemPorts.cs` 仍以字符串为主，实际 SAF 适配在 UI 服务层。实施 WebDAV 前必须先做迁移 ADR 与兼容策略，而不是直接将 `webdav://` 塞进 `Path` 再假定全链路已支持。
+
+Provider 能力矩阵、WebDAV 安全细节、Worker 边界与 conformance tests 详见 `docs/PLUGIN-SYSTEM.md`。这段路线尚未实现，也不代表已批准某个 WebDAV 库。
 
 ### 5.3 平台 Shell 端口
 
@@ -647,7 +661,7 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 >
 > 平台抽象新增 `ISystemNotificationService` 与 `Sent/Unsupported/PermissionDenied/Failed` 结果；UI 的 `MdSystemNotificationServiceAdapter` 懒创建 `Md3.Avalonia.Notifications` 后端并串行化宿主准备。桌面项目仅在 Windows 构建机切到 `net10.0-windows10.0.19041.0` 并直接引用通知包，进程创建窗口前设置 `MdExplorer.Eidoria` AppUserModelID，首次真正发送时才为当前用户创建同 ID 的开始菜单快捷方式；Linux 继续普通 `net10.0`，运行时需要 `libnotify.so.4` 与 freedesktop 通知服务；从 Linux 交叉发布的普通 Windows 产物不得声称 WinRT Toast 可用。Android 宿主直接引用 android 资产、声明 `POST_NOTIFICATIONS`，由前台 `MainActivity` 在首次发送时请求 Android 13+ 运行时权限。设置中的任务通知默认关闭，开启后失败任务立即通知、成功任务仅运行时长至少 3 秒才通知、取消不通知；测试通知可显式发送。通知只有标题+正文，没有点击回跳、按钮或进度更新，且通知结果不得并入 `OperationOutcome`。
 >
-> 自动化定义以 Domain 的 `AutomationWorkflowDefinition` 类型化嵌入 `AppSettings`，经既有源生成 JSON 与原子写持久化。Application 校验器只接受恰好一个 `CurrentFolder`、零或多个 `KindFilter`/`NameContains`、恰好一个 `TransferToSubfolder`、至多一个终点 `SystemNotification` 的单链，并拒绝重复 ID、多入多出、环、未连节点、文件夹类型筛选、路径型目标名与未知通知占位符。执行器只读取运行瞬间主浏览器的本地当前文件夹顶层文件（拒绝 `content:` SAF 定位串），先过滤、仅有匹配时建一级目标夹，再以 `ConflictPolicy.KeepBoth` 复用 `IFileOperationService`；整体经 Shell 任务队列运行，文件结果与流程内通知结果分开呈现。NodifyM 画布只在自动化页局部注册 Md3 主题，节点 VM 对连线再做单入单出与终点限制，并禁用连接分裂/Knot；默认示例为图片复制到“图片整理”后通知。分支、条件、循环、多工作流、定时/监听触发、递归、任意目标路径和 SAF 自动化仍未实现。
+> 自动化定义以 Domain 的 `AutomationWorkflowDefinition` 类型化嵌入 `AppSettings`，经既有源生成 JSON 与原子写持久化。Application 校验器只接受恰好一个 `CurrentFolder`、零或多个 `KindFilter`/`NameContains`、恰好一个 `TransferToSubfolder`、至多一个终点 `SystemNotification` 的单链，并拒绝重复 ID、多入多出、环、未连节点、文件夹类型筛选、路径型目标名与未知通知占位符。执行器只读取运行瞬间主浏览器的本地当前文件夹顶层文件（拒绝 `content:` SAF 定位串），先过滤、仅有匹配时建一级目标夹，再以 `ConflictPolicy.KeepBoth` 复用 `IFileOperationService`；整体经 Shell 任务队列运行，文件结果与流程内通知结果分开呈现。NodifyM 画布只在自动化页局部注册 Md3 主题，节点 VM 对连线再做单入单出与终点限制，并禁用连接分裂/Knot；默认示例为图片复制到“图片整理”后通知。条件/分支、循环、多工作流、定时/监听触发、任意目标路径与 SAF 自动化仍未实现；可编程节点候选与安全预算转见 §6.9 和 `docs/PLUGIN-SYSTEM.md`。
 
 > **v0.22 文档工作台第二切片（PDF 连续阅读 + 关闭守卫，已落地到代码与无头验证）**：`DocumentWorkbenchViewModel` 新增单页/连续阅读模式。连续面继续遵守 Md3-only 主题下的 `MdList` 不变量，以每页已知宽高比预留纸面尺寸，容器进入视口后才通过既有串行 PDFium 收口层按当前缩放与旋转渲染整页；当前页附近会预取相邻页，滚动锚点反向同步 `PdfPageIndex`、缩略图轨、页码输入与翻页命令。缩放或旋转会以视觉代次废弃旧渲染，整页位图同时受最多 10 页与约 96 MiB 未压缩像素估算双预算约束，优先释放远离当前页者；单页模式、密码仅驻内存与 64/128 MiB 输入上限不变。桌面 `MainWindow.OnClosing` 统一拦截脏文本与正在保存状态：前者必须明确选择放弃并关闭，后者直接阻止关闭，避免窗口自绘关闭按钮和系统关闭路径出现不同语义。本版 CI 证据包括 Ubuntu/Windows 单元测试各 165/165、无头 UI 测试 52/52、正式截图 47 张，以及 Windows/Linux 自包含、Linux Native AOT 与 Android trimming/AOT 发布覆盖。目录/书签、文本层提取、文档内搜索/命中高亮与 Android SAF 安全写回仍未实现。
 
@@ -751,11 +765,25 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 
 ### 6.9 Phase 2 候选池（先定边界不排期）
 
-双窗格第二切片（B 侧地址编辑、搜索与详细信息 parity）、校验和计算与校验文件、批量重命名、文件夹大小常显、文档工作台后续切片（PDF 目录/文搜与 SAF 文本安全写回）、OpenDocument 保真度（图片/图形/分页）与 KDBX 的第二切片（密钥文件/硬件密钥登录、KDBX 2 与 Twofish 外层加密；都要先另立密钥文件的安全模型）、自动化第二切片（多工作流、显式来源文件夹与 SAF 安全原语；分支/定时触发须先另立安全模型）、图片动图播放、系统托盘与长任务后台运行、桌面右键菜单与 Shell 集成（发到/属性跳转系统面板）。
+双窗格第二切片（B 侧地址编辑、搜索与详细信息 parity）、校验和计算与校验文件、批量重命名、文件夹大小常显、文档工作台后续切片（PDF 目录/文搜与 SAF 文本安全写回）、OpenDocument 保真度（图片/图形/分页）与 KDBX 的第二切片（密钥文件/硬件密钥登录、KDBX 2 与 Twofish 外层加密；都要先另立密钥文件的安全模型）、自动化安全增强与条件工作流、Provider-aware 文件操作（含 WebDAV 候选，须先完成 §5.2.1 / D-10 Spike）、图片动图播放、系统托盘与长任务后台运行、桌面右键菜单与 Shell 集成（发到/属性跳转系统面板）。
+
+#### 自动化/节点编辑器建议能力（规划，非现有实现）
+
+当前 v0.21 仅有 `CurrentFolder`、`KindFilter`、`NameContains`、`TransferToSubfolder`、`SystemNotification`，执行一条本地顶层文件线性链。建议把节点编辑器发展为**有类型、有预算、可预览的文件任务规划器**：
+
+| 优先级 | 候选可编程任务 | 例子 |
+|---|---|---|
+| A：低风险先做 | 多个命名工作流；手动/选中项/当前目录/用户选择根作为来源；扩展名、名称 glob、文件大小、日期、隐藏项筛选；匹配数量/存在性条件；重命名模板；预览计划、dry-run 与结果清单 | “把选中图片按拍摄年月复制到子目录”；“给大于 1 GB 的视频建立清单”；“按扩展名规划重命名但先预览” |
+| B：有界流程 | If/Else、Switch、成功/失败分支、合流；确定性排序/分组；按类型/日期建目录；压缩/解压、计算 SHA-256、写出 CSV/JSON；逐文件处理但设文件数/总字节/时间上限 | “若目标存在则保留两者，否则复制”；“先校验再移动，失败时通知” |
+| C：外部触发与 Provider 节点 | 文件变更触发、定时运行、经授权的 WebDAV/其他 Provider 源与目标、本地 AI 分类节点 | 需要网络与凭据授权、后台生命周期/平台调度评估；Android 能力单独验收，默认不在后台常驻 |
+
+执行模型先扩展多工作流/显式来源与计划预览，再在**无环 DAG**中增加条件和分支。每次运行需设置最大节点数、输入文件数、总字节、耗时与并发；循环仅以受这些预算约束的“逐项处理”呈现，不开放任意循环/递归。文件动作最终由宿主转成 `OperationPlan`，过冲突、授权与用户确认后进入任务队列。过滤/转换节点可先纯计算；无节点能直接调用 Shell、任意 URL、任意脚本、主机文件 API 或静默删除。
+
+未来节点/插件规范：稳定的 `pluginId + nodeTypeId + schemaVersion`，类型化输入输出（例如 `FileSet`、`FileRef`、`Boolean`、`Text`、`OperationPlan`/`OperationResult`），能力按最小范围声明；持久化图与 NodifyM UI 解耦，缺少插件时保留节点与配置并显示不可执行。详细契约草案见 `docs/PLUGIN-SYSTEM.md`。这些均是文档规划，当前仅运行已有单链示例。
 
 ### 6.10 不做清单（防止 PR 夹带）
 
-网络位置、媒体服务器、root 浏览、APK 安装器/应用管理、图片编辑、PDF 编辑、Office 编辑、云同步、广告与统计 SDK。评审时先比对「功能是否在 §6 中有编号」，无编号默认拒绝合入并先走文档变更。
+当前版本不实现网络位置（WebDAV/SMB/FTP/NFS）、媒体服务器、root 浏览、APK 安装器/应用管理、图片编辑、PDF 编辑、Office 编辑、云同步、广告与统计 SDK。WebDAV 仅作为未来 Provider 设计候选，不是本期例外；任何远程文件支持必须先在 §6 明确编号、通过 D-10/安全与 AOT Spike，再另行排期。评审时先比对「功能是否在 §6 中有编号」，无编号默认拒绝合入并先走文档变更。
 
 ---
 
@@ -949,7 +977,7 @@ Md3 尚无或不够用时自写控件的清单（实现收在 `MdExplorer.UI/Con
 1. XAML：全部编译绑定 + `x:DataType`；禁止 `ReflectionBinding`、禁止运行时 `XamlReader.Load` 拼界面、禁止 `DynamicResource` 之外的动态类型查找式资源约定。
 2. 代码：禁止 `dynamic`、禁止 `Assembly.Load*`/`Activator.CreateInstance(Type)` 的字符串/扫描式用法、禁止 `Expression<T>.Compile()`、禁止反射批遍历类型图（`GetProperties()` 式序列化/映射）；许用的反射限于可分析模式且标注 `[DynamicallyAccessedMembers]` 的极少数点（要有理由登记表）。
 3. 序列化只准源生成（JSON Context）；互操作只准 `[LibraryImport]` / `[ComInterface]` 源生成；Android 绑定回调走显式 Java 接口实现类。
-4. DI 只准显式注册（§3.1）；导航/View 定位只准显式映射表（§4.3）；路由、预览提供者、缩略图生成器等「插件点」全部**编译期清单**在组合根显式列举注册——本项目无运行时第三方插件机制（将来要做也必须是同仓编译进来的提供者，不是外置 DLL 加载）。
+4. DI 只准显式注册（§3.1）；导航/View 定位只准显式映射表（§4.3）；当前路由、预览提供者、缩略图生成器等 in-process 扩展点全部由组合根编译期显式注册。禁止运行时发现/加载第三方程序集；已实现的 P1 仅是宿主解释的无代码数据包。未来 P2 若批准，只能走独立桌面 worker 协议，不得用 worker 之名在主进程装载 DLL；进程外不等同 OS 沙箱，约束见 `docs/PLUGIN-SYSTEM.md`。
 5. `TrimmerRootAssembly` / `TrimmerRootDescriptor(rd.xml)` / `DynamicDependency` 只作最后手段：使用须在 `docs/adr/` 留一条 ADR 记录「保什么、为什么保、体积代价」，且每项进发布检查表复核（上游在 12.1 时代理论上只剩零星项，逐条收敛）。
 
 ### 11.4 Avalonia 特要点
@@ -1130,13 +1158,14 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | D-04 | 详细信息视图实现 | DataGrid 若 Trim 零警告则用之省两周工，否则自实现虚拟化表——**以 S-01 实测裁决**，自实现的骨架在 S-01 里顺带搭出作保底 |
 | D-05 | Linux 首发包形态 | AppImage（单文件易发、桌面集成弱）vs tar.gz+`.desktop` 安装脚本——**推荐先 tar.gz**（AOT 已是单 exe，附加集成文件即可)，AppImage 待用户呼声 |
 | D-06 | 双窗格进 MVP 的程度 | ✅ **第一切片已落地（v0.18）**：双 `BrowserViewModel` 实例、活动窗格焦点/预览语义、跨窗格显式传输与拖放、XL 回落后保留 B 会话并收为后台标签；B 侧地址编辑、搜索、详细信息 parity 与跨启动历史/选集留在第二切片 |
-| D-07 | 插件机制形态 | **已采纳并开始实施**`docs/PLUGIN-SYSTEM.md` 路线：P0 编译期提供者注册表 → P1 声明式 MEPX → P2 进程外工作者 → P3 Lua（先过 AOT/Android spike）；程序集插件与 AOT 冲突不进主线。2026-10-31 首个 P1 纵切仅安装/应用无代码主题包。 |
+| D-07 | 插件机制形态 | **已采纳并开始实施**`docs/PLUGIN-SYSTEM.md` 路线：P0 编译期显式注册 → P1 宿主解释声明式 MEPX → P2 桌面进程外 Worker（节点/Provider 协议待 ADR）→ P3 Lua 仅在 AOT/Android spike 通过后再评估。禁止主进程动态加载程序集；进程外不等同 OS 沙箱。当前 P1 仍仅安装/应用无代码主题包，节点与可执行扩展均未开放。 |
 | D-08 | 本地 AI 运行时与模型目录 | **推荐**运行时以 ONNX Runtime 为主线、sherpa-onnx 担语音、llama.cpp 备线；模型目录只收 Apache-2.0/MIT/BSD 权重（`docs/LOCAL-AI.md` §4），全部按需下载不打包。待维护者确认首发模型（建议 SigLIP 2 Base int8） |
 | D-09 | 向量检索存储实现 | **推荐**SQLite BLOB + 内存全扫起步（≤10 万张），ANN 引擎（sqlite-vec 等）待 D-08 首发模型维度锁定后 Spike 定 |
+| D-10 | 文件系统 Provider 与远程位置 | **维护者已提出目标：未来可通过扩展机制读写 WebDAV 等非本地文件系统**；推荐保留统一宿主 `IFileSystemService` 门面，迁移强类型 `FileLocator`，按能力注册 Local/SAF/Remote Provider；WebDAV 作为首个 Spike 候选。当前版本仍不支持、不联网。实现前要 ADR 定义凭据库、权限 scope、跨 Provider copy/move 非原子语义、Worker 信任/AOT/Android 边界，并完成依赖许可证与 Native AOT + Android trim/AOT 验证。 |
 
 ### 17.3 已定版决策（摘要，防反复）
 
-① 无网络存储（本期）；② 删除默认回收站语义；③ 一切写盘经任务队列；④ 不做运行时插件；⑤ AOT 最严禁口径统领共享代码；⑥ 预览永不执行文件内容；⑦ 无默认遥测。推翻以上任一条须以 ADR 形式记入 `docs/adr/` 并更新本章。
+① 当前版本无网络存储；② 删除默认回收站语义；③ 一切写盘经任务队列；④ 不做主进程内运行时程序集插件；⑤ AOT 最严禁口径统领共享代码；⑥ 预览永不执行文件内容；⑦ 无默认遥测。未来远程 Provider / 桌面 Worker 属新增能力，须按 D-07/D-10 与 ADR 评审，不改变当前默认离线与 Android 不下载可执行代码的边界。推翻以上任一条须以 ADR 形式记入 `docs/adr/` 并更新本章。
 
 ---
 
@@ -1230,3 +1259,4 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | 2026-10-29 | **v0.29 对照窗格搜索 + 四项可调设置**：B 的搜索岛进入标题行、面板只覆盖文件区，`Ctrl+F/K` 改为编辑活动窗格；设置页新增自动续页距离、下拉刷新总开关、搜索上限与应用内回收站配额/保留期（运行期生效）。 | push run `40891503960` / PR run `40891518679` 六 Job 全绿，206 单元测试、70 截图测试、60→61 张正式 PNG |
 | 2026-10-31 | **P1 声明式插件首切：本地 MEPX v1 主题包 + 扩展中心**：新增受限 ZIP 包解析/大小限额/严格 JSON 与未知字段拒绝，只允许一个 `manifest.json` 和 `theme` 能力；校验 ID、semver、发布信息与 `#RRGGBB`，扫描重复/坏包、原子安装/替换/移除。扩展中心支持本地文件选择、显示能力和 SHA-256、安装前确认、应用宿主 Material 3 种子色及卸载；包无签名且只把哈希作为标识，UI 明确提示来源风险。禁止包内 DLL、Lua、资源、XAML 或其他执行内容；不含市场/网络下载。新增包安全回归与扩展中心截图。外部命令/打开方式、P2 worker、Lua 执行仍未开放。 | CI run `41189496170` 全绿：Ubuntu 构建/测试、Windows 测试、Linux/Windows 自包含发布、Linux Native AOT、Android APK、无头截图、缓存模型语义搜索均通过 |
 | 2026-10-31 | **MEPX v1 清单解析加固**：对 JSON 清单增加重复属性拒绝（顶层与嵌套对象）和 8 层最大嵌套约束，避免重复键在不同解析器中的取值解释不一致；新增顶层 ID 与主题色字段重复键回归测试。 | CI run `41203819757` 全绿：Ubuntu 构建/单测、Windows 测试、Linux/Windows 自包含发布、Linux Native AOT、Android APK、无头截图、缓存模型语义搜索均通过 |
+| 2026-11-01 | **自动化节点与 Provider 插件开发规范（文档提案）**：整理从线性任务节点到有界 DAG/触发器的候选目录、typed ports 与任务预算；明确当前 `FileLocator`/`IFileSystemService` 尚非通用 Provider API，新增 Local/SAF/Remote Provider 目标模型、WebDAV 候选协议/凭据/冲突语义与 AOT/Android/Worker 安全门。仅更新文档，未加入网络代码、凭据存储、节点或远程文件系统实现。 | 文档一致性与 `git diff --check`；实现前需维护者评审 D-10/ADR 与协议 Spike |
