@@ -135,7 +135,7 @@ MVP 发布须同时满足：三端功能清单 §6 中全部 `MVP` 项在真机/
 | 文件监控 | `System.IO.FileSystemWatcher`（桌）/ Android 平台层 `FileObserver` | MIT / 系统 API | AOT 安全；Linux inotify 上限需处理 | **首选**，封装为 `IDirectoryWatcher` 并做防抖与降级（§9） |
 | 哈希（Phase 2） | `System.Security.Cryptography`（SHA-256 等） | MIT | AOT 安全 | 自写流式计算纳入任务队列可取消（§6.10） |
 | 全文索引（可选） | SQLite **FTS5** | Public Domain（SQLite） | 随 `e_sqlite3` 原生支持 | **首选**；拒绝 Lucene.NET（AOT 下编解码工厂反射扫描会报 IL2026，且体积过重） |
-| 节点编辑器（自动化） | `Md3.Avalonia.NodifyM 0.5.0-preview.2` + 上游 `NodifyM.Avalonia 12.0.0` | Apache-2.0 / MIT | Md3 包装目标 `net10.0` 并声明 `IsTrimmable` / `IsAotCompatible`；上游目标 `net8.0`、显式 `IsAotCompatible=true`，依赖 Avalonia 12、CommunityToolkit.Mvvm 与 `System.Reactive`；声明不替代本项目 Linux Native AOT + Android trimming/AOT 发布门 | **v0.21 已采用但收窄使用面**：只用 Node/Connector/Connection 线性单链与页面局部 `MaterialNodifyMTheme`，不用上游 `ControlStyles`、连线文本标签、连接分裂或 Knot；图定义、校验和执行均由 Domain/Application 自有模型收口，编辑器退出时可替换画布而不迁移数据模型 |
+| 节点编辑器（自动化） | `Md3.Avalonia.NodifyM 0.5.0-preview.2` + 上游 `NodifyM.Avalonia 12.0.0` | Apache-2.0 / MIT | Md3 包装目标 `net10.0` 并声明 `IsTrimmable` / `IsAotCompatible`；上游目标 `net8.0`、显式 `IsAotCompatible=true`，依赖 Avalonia 12、CommunityToolkit.Mvvm 与 `System.Reactive`；声明不替代本项目 Linux Native AOT + Android trimming/AOT 发布门 | **v0.21 起采用并收窄使用面**：使用 Node/Connector/Connection 与页面局部 `MaterialNodifyMTheme`，不使用上游 `ControlStyles`、连接分裂或 Knot；图定义、校验和执行均由 Domain/Application 自有模型收口。当前开发分支新增了单个匹配数量条件的双端口 DAG 与通知合流，仍保留 16 节点/20 连线等上限；编辑器退出时可替换画布而不迁移数据模型 |
 | 系统通知 | `Md3.Avalonia.Notifications 0.5.0-preview.2` | Apache-2.0 | 项目声明 `IsTrimmable` / `IsAotCompatible` 且开启 Trim Analyzer；Windows 资产要求宿主 `net10.0-windows10.0.19041.0`，Android 资产要求宿主直接引用包，Linux 运行时依赖 `libnotify.so.4` 与 freedesktop 通知服务 | **v0.21 已采用并隔离**：Application/UI 只依赖 `ISystemNotificationService` 的标题+正文和四态结果；Windows AppUserModelID 快捷方式与 Android 运行时权限由宿主懒准备。第一版不支持点击回跳、按钮、进度更新、替换/关闭通知；发送失败不得改判已完成的文件任务 |
 
 **禁用清单（PR 检查项，CI 以 `PackageReference` 黑名单脚本拦截）：** `ReactiveUI.*`、`Newtonsoft.Json`、EF Core 全家、`ImageSharp`、`iText.*`（AGPL）、任何 GPL/AGPL 许可的包、Avalonia Accelerate 商业组件（许可证与离线发布约束与本项目开源定位冲突）、依赖 `Assembly.Load*`/代码生成加载插件的框架。Avalonia 官方 `DataGrid` / `TreeDataGrid` 历史上有 Trim 警告（IL2104）——仅当 Spike 证明在 12.1 下零警告时才允许在详细信息视图中使用，否则详细信息视图用虚拟化 `ListBox` + 表头行自实现（§14 亦有对称测试要求）。
@@ -661,7 +661,9 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 >
 > 平台抽象新增 `ISystemNotificationService` 与 `Sent/Unsupported/PermissionDenied/Failed` 结果；UI 的 `MdSystemNotificationServiceAdapter` 懒创建 `Md3.Avalonia.Notifications` 后端并串行化宿主准备。桌面项目仅在 Windows 构建机切到 `net10.0-windows10.0.19041.0` 并直接引用通知包，进程创建窗口前设置 `MdExplorer.Eidoria` AppUserModelID，首次真正发送时才为当前用户创建同 ID 的开始菜单快捷方式；Linux 继续普通 `net10.0`，运行时需要 `libnotify.so.4` 与 freedesktop 通知服务；从 Linux 交叉发布的普通 Windows 产物不得声称 WinRT Toast 可用。Android 宿主直接引用 android 资产、声明 `POST_NOTIFICATIONS`，由前台 `MainActivity` 在首次发送时请求 Android 13+ 运行时权限。设置中的任务通知默认关闭，开启后失败任务立即通知、成功任务仅运行时长至少 3 秒才通知、取消不通知；测试通知可显式发送。通知只有标题+正文，没有点击回跳、按钮或进度更新，且通知结果不得并入 `OperationOutcome`。
 >
-> 自动化定义以 Domain 的 `AutomationWorkflowDefinition` 类型化嵌入 `AppSettings`，经既有源生成 JSON 与原子写持久化。Application 校验器只接受恰好一个 `CurrentFolder`、零或多个 `KindFilter`/`NameContains`、恰好一个 `TransferToSubfolder`、至多一个终点 `SystemNotification` 的单链，并拒绝重复 ID、多入多出、环、未连节点、文件夹类型筛选、路径型目标名与未知通知占位符。执行器只读取运行瞬间主浏览器的本地当前文件夹顶层文件（拒绝 `content:` SAF 定位串），先过滤、仅有匹配时建一级目标夹，再以 `ConflictPolicy.KeepBoth` 复用 `IFileOperationService`；整体经 Shell 任务队列运行，文件结果与流程内通知结果分开呈现。NodifyM 画布只在自动化页局部注册 Md3 主题，节点 VM 对连线再做单入单出与终点限制，并禁用连接分裂/Knot；默认示例为图片复制到“图片整理”后通知。条件/分支、循环、多工作流、定时/监听触发、任意目标路径与 SAF 自动化仍未实现；可编程节点候选与安全预算转见 §6.9 和 `docs/PLUGIN-SYSTEM.md`。
+> 自动化定义以 Domain 的 `AutomationWorkflowDefinition` 类型化嵌入 `AppSettings`，经既有源生成 JSON 与原子写持久化。v0.21 首发只接受恰好一个 `CurrentFolder`、零或多个 `KindFilter`/`NameContains`、恰好一个 `TransferToSubfolder`、至多一个终点 `SystemNotification` 的单链；执行器只读取运行瞬间主浏览器的本地当前文件夹顶层文件（拒绝 `content:` SAF 定位串），先过滤、仅有匹配时建一级目标夹，再以 `ConflictPolicy.KeepBoth` 复用 `IFileOperationService`；整体经 Shell 任务队列运行，文件结果与流程内通知结果分开呈现。NodifyM 画布只在自动化页局部注册 Md3 主题，禁用连接分裂/Knot；默认示例为图片复制到“图片整理”后通知。
+>
+> **2026-11-02 节点图续作（代码已改，验证待 CI）**：在原单链数据兼容基础上新增 `MatchCountCondition`，按前置过滤后的文件数量选择 `matched/unmatched` 两个显式端口；命中分支唯一连到传输，未命中分支可结束或直接汇入系统通知，传输分支可与之合流。校验器以 Kahn 拓扑排序拒绝环，限制 16 节点/20 连线/1 条条件/1 个传输/1 个通知，仅接受受限图形，不执行循环、嵌套分支、递归或脚本。执行仍只经既有任务队列、顶层本地文件枚举和 `KeepBoth` 传输；单次枚举最多 100000 条目、匹配数据合计最多 20 GiB，大小未知时 fail-closed；未达阈值或超预算时不建目标目录。新增逻辑与测试尚未在本地编译或运行，不能视为已验证；多工作流、触发器、任意目标路径与 SAF 自动化仍未实现。
 
 > **v0.22 文档工作台第二切片（PDF 连续阅读 + 关闭守卫，已落地到代码与无头验证）**：`DocumentWorkbenchViewModel` 新增单页/连续阅读模式。连续面继续遵守 Md3-only 主题下的 `MdList` 不变量，以每页已知宽高比预留纸面尺寸，容器进入视口后才通过既有串行 PDFium 收口层按当前缩放与旋转渲染整页；当前页附近会预取相邻页，滚动锚点反向同步 `PdfPageIndex`、缩略图轨、页码输入与翻页命令。缩放或旋转会以视觉代次废弃旧渲染，整页位图同时受最多 10 页与约 96 MiB 未压缩像素估算双预算约束，优先释放远离当前页者；单页模式、密码仅驻内存与 64/128 MiB 输入上限不变。桌面 `MainWindow.OnClosing` 统一拦截脏文本与正在保存状态：前者必须明确选择放弃并关闭，后者直接阻止关闭，避免窗口自绘关闭按钮和系统关闭路径出现不同语义。本版 CI 证据包括 Ubuntu/Windows 单元测试各 165/165、无头 UI 测试 52/52、正式截图 47 张，以及 Windows/Linux 自包含、Linux Native AOT 与 Android trimming/AOT 发布覆盖。目录/书签、文本层提取、文档内搜索/命中高亮与 Android SAF 安全写回仍未实现。
 
@@ -765,11 +767,11 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 
 ### 6.9 Phase 2 候选池（先定边界不排期）
 
-双窗格第二切片（B 侧地址编辑、搜索与详细信息 parity）、校验和计算与校验文件、批量重命名、文件夹大小常显、文档工作台后续切片（PDF 目录/文搜与 SAF 文本安全写回）、OpenDocument 保真度（图片/图形/分页）与 KDBX 的第二切片（密钥文件/硬件密钥登录、KDBX 2 与 Twofish 外层加密；都要先另立密钥文件的安全模型）、自动化安全增强与条件工作流、Provider-aware 文件操作（含 WebDAV 候选，须先完成 §5.2.1 / D-10 Spike）、图片动图播放、系统托盘与长任务后台运行、桌面右键菜单与 Shell 集成（发到/属性跳转系统面板）。
+双窗格第二切片（B 侧地址编辑、搜索与详细信息 parity）、校验和计算与校验文件、批量重命名、文件夹大小常显、文档工作台后续切片（PDF 目录/文搜与 SAF 文本安全写回）、OpenDocument 保真度（图片/图形/分页）与 KDBX 的第二切片（密钥文件/硬件密钥登录、KDBX 2 与 Twofish 外层加密；都要先另立密钥文件的安全模型）、自动化安全增强（多工作流、计划预览、扩展节点；当前仅完成单匹配数量条件图）、Provider-aware 文件操作（含 WebDAV 候选，须先完成 §5.2.1 / D-10 Spike）、图片动图播放、系统托盘与长任务后台运行、桌面右键菜单与 Shell 集成（发到/属性跳转系统面板）。
 
-#### 自动化/节点编辑器建议能力（规划，非现有实现）
+#### 自动化/节点编辑器后续能力规划
 
-当前 v0.21 仅有 `CurrentFolder`、`KindFilter`、`NameContains`、`TransferToSubfolder`、`SystemNotification`，执行一条本地顶层文件线性链。建议把节点编辑器发展为**有类型、有预算、可预览的文件任务规划器**：
+当前代码支持 `CurrentFolder`、`KindFilter`、`NameContains`、单个 `MatchCountCondition`、`TransferToSubfolder`、`SystemNotification`，可执行本地顶层文件线性链或单条件分支图。把节点编辑器继续发展为**有类型、有预算、可预览的文件任务规划器**；以下 A/B/C 仅部分能力已实现：
 
 | 优先级 | 候选可编程任务 | 例子 |
 |---|---|---|
@@ -777,9 +779,9 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 | B：有界流程 | If/Else、Switch、成功/失败分支、合流；确定性排序/分组；按类型/日期建目录；压缩/解压、计算 SHA-256、写出 CSV/JSON；逐文件处理但设文件数/总字节/时间上限 | “若目标存在则保留两者，否则复制”；“先校验再移动，失败时通知” |
 | C：外部触发与 Provider 节点 | 文件变更触发、定时运行、经授权的 WebDAV/其他 Provider 源与目标、本地 AI 分类节点 | 需要网络与凭据授权、后台生命周期/平台调度评估；Android 能力单独验收，默认不在后台常驻 |
 
-执行模型先扩展多工作流/显式来源与计划预览，再在**无环 DAG**中增加条件和分支。每次运行需设置最大节点数、输入文件数、总字节、耗时与并发；循环仅以受这些预算约束的“逐项处理”呈现，不开放任意循环/递归。文件动作最终由宿主转成 `OperationPlan`，过冲突、授权与用户确认后进入任务队列。过滤/转换节点可先纯计算；无节点能直接调用 Shell、任意 URL、任意脚本、主机文件 API 或静默删除。
+当前已实现一个有界 If/Else 切片：条件只比较过滤后的匹配数量，达到阈值走唯一传输分支，未达阈值安全终止或与传输结果合流到一个通知节点。尚未实现一般 If/Else/Switch、错误分支、合流执行语义、多工作流与用户选定来源。当前静态图限制为最多 16 节点、20 连线、一个条件、一个传输、一个通知；单次枚举顶层条目上限 100000（文件夹也计入预算），匹配输入数据合计上限 20 GiB，大小未知时停止；不开放循环/递归。若后续增加其他节点/并发，需另加字节与耗时预算，并继续保持文件动作最终由宿主转成 `OperationPlan`，过冲突、授权与用户确认后进入任务队列。过滤/转换节点可先纯计算；无节点能直接调用 Shell、任意 URL、任意脚本、主机文件 API 或静默删除。
 
-未来节点/插件规范：稳定的 `pluginId + nodeTypeId + schemaVersion`，类型化输入输出（例如 `FileSet`、`FileRef`、`Boolean`、`Text`、`OperationPlan`/`OperationResult`），能力按最小范围声明；持久化图与 NodifyM UI 解耦，缺少插件时保留节点与配置并显示不可执行。详细契约草案见 `docs/PLUGIN-SYSTEM.md`。这些均是文档规划，当前仅运行已有单链示例。
+未来节点/插件规范：稳定的 `pluginId + nodeTypeId + schemaVersion`，类型化输入输出（例如 `FileSet`、`FileRef`、`Boolean`、`Text`、`OperationPlan`/`OperationResult`），能力按最小范围声明；持久化图与 NodifyM UI 解耦，缺少插件时保留节点与配置并显示不可执行。详细契约草案见 `docs/PLUGIN-SYSTEM.md`。目前条件节点和 UI/执行器改动尚未编译测试，不能视为验收通过。
 
 ### 6.10 不做清单（防止 PR 夹带）
 
@@ -932,7 +934,7 @@ Md3 尚无或不够用时自写控件的清单（实现收在 `MdExplorer.UI/Con
 - `granted_scopes(scope_id TEXT PK, locator, display_name, persisted_at)`（Android 授权登记；桌面恒空）
 - `folder_view_state(locator TEXT PK, view_mode, sort_field, sort_dir)`（「按文件夹记住」开启时用）
 
-访问层薄 Repository + 手写参数化 SQL；单写者队列（actor 式）串行写、读可并发；全部表可被「清除全部本地数据」一键删（附设置重置后保持一致）。索引与缓存均为**可重建数据**：DB 损坏只降级重建，绝不阻塞浏览主流程。
+当前尚未落地 `state.db`：现有设置/收藏及文件名索引持久化仍是 JSON/文件，不引入 ORM。实现时采用薄 Repository + 参数化 SQL；可评估 `Dapper.AOT`（不是普通 Dapper）作为映射层，以编译期拦截/生成替代运行期反射和 IL 发射。正式采用前须确认调用点都被生成器拦截，并在 .NET 10 Windows/Linux Native AOT 与 Android Trim/AOT 下验证真实 SQLite 查询；SQLite provider/native `e_sqlite3` 也要单独验证。手写 ADO.NET 是回退方案。单写者队列（actor 式）串行写、读可并发；全部表可被「清除全部本地数据」一键删（附设置重置后保持一致）。索引与缓存均为**可重建数据**：DB 损坏只降级重建，绝不阻塞浏览主流程。
 
 ### 10.4 缩略图磁盘缓存
 

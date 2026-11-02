@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,18 +16,25 @@ namespace MdExplorer.UI.ViewModels;
 /// <summary>带所属节点回指的连接器；NodifyM 上游连接器本身只保存锚点与流向。</summary>
 public sealed class AutomationConnectorViewModel : ConnectorViewModelBase
 {
-    public AutomationConnectorViewModel(AutomationNodeViewModel owner, ConnectorFlow flow)
+    public AutomationConnectorViewModel(AutomationNodeViewModel owner, ConnectorFlow flow, string portId = AutomationPortIds.Default)
     {
         Owner = owner;
         Flow = flow;
-        Title = flow == ConnectorFlow.Input ? "输入" : "输出";
+        PortId = portId;
+        Title = flow == ConnectorFlow.Input ? "输入" : portId switch
+        {
+            AutomationPortIds.Matched => "达到阈值",
+            AutomationPortIds.Unmatched => "未达阈值",
+            _ => "输出",
+        };
         CanConnect = true;
     }
 
     public AutomationNodeViewModel Owner { get; }
+    public string PortId { get; }
 }
 
-/// <summary>自动化连接。禁止上游的 Knot 分裂语义，避免画布生成无法映射回线性定义的中继节点。</summary>
+/// <summary>自动化连接。禁止上游的 Knot 分裂语义，避免画布生成协议未定义的中继节点。</summary>
 public sealed class AutomationConnectionViewModel : ConnectionViewModelBase
 {
     private readonly AutomationViewModel _editor;
@@ -69,8 +77,15 @@ public sealed partial class AutomationNodeViewModel : NodeViewModelBase
 
         if (definition.Kind != AutomationNodeKind.CurrentFolder)
             Input.Add(new AutomationConnectorViewModel(this, ConnectorViewModelBase.ConnectorFlow.Input));
-        if (definition.Kind != AutomationNodeKind.SystemNotification)
+        if (definition.Kind == AutomationNodeKind.MatchCountCondition)
+        {
+            Output.Add(new AutomationConnectorViewModel(this, ConnectorViewModelBase.ConnectorFlow.Output, AutomationPortIds.Matched));
+            Output.Add(new AutomationConnectorViewModel(this, ConnectorViewModelBase.ConnectorFlow.Output, AutomationPortIds.Unmatched));
+        }
+        else if (definition.Kind != AutomationNodeKind.SystemNotification)
+        {
             Output.Add(new AutomationConnectorViewModel(this, ConnectorViewModelBase.ConnectorFlow.Output));
+        }
 
         RefreshFooter();
         _initializing = false;
@@ -84,14 +99,20 @@ public sealed partial class AutomationNodeViewModel : NodeViewModelBase
         Input.OfType<AutomationConnectorViewModel>().FirstOrDefault();
 
     public AutomationConnectorViewModel? OutputConnector =>
-        Output.OfType<AutomationConnectorViewModel>().FirstOrDefault();
+        Output.OfType<AutomationConnectorViewModel>().FirstOrDefault(connector => connector.PortId == AutomationPortIds.Default)
+        ?? Output.OfType<AutomationConnectorViewModel>().FirstOrDefault();
+
+    public AutomationConnectorViewModel? GetOutputConnector(string portId) =>
+        Output.OfType<AutomationConnectorViewModel>().FirstOrDefault(connector => connector.PortId == portId);
 
     public bool IsCurrentFolder => Kind == AutomationNodeKind.CurrentFolder;
     public bool IsKindFilter => Kind == AutomationNodeKind.KindFilter;
     public bool IsNameFilter => Kind == AutomationNodeKind.NameContains;
+    public bool IsMatchCountCondition => Kind == AutomationNodeKind.MatchCountCondition;
     public bool IsTransfer => Kind == AutomationNodeKind.TransferToSubfolder;
     public bool IsNotification => Kind == AutomationNodeKind.SystemNotification;
-    public bool CanDelete => Kind is AutomationNodeKind.KindFilter or AutomationNodeKind.NameContains or AutomationNodeKind.SystemNotification;
+    public bool CanDelete => Kind is AutomationNodeKind.KindFilter or AutomationNodeKind.NameContains or
+        AutomationNodeKind.MatchCountCondition or AutomationNodeKind.SystemNotification;
 
     public FileKind? FilterKind
     {
@@ -128,6 +149,29 @@ public sealed partial class AutomationNodeViewModel : NodeViewModelBase
             value,
             Definition.NameQuery ?? string.Empty,
             static (definition, text) => definition.NameQuery = text);
+    }
+
+    public int MinimumMatchCount
+    {
+        get => Definition.MinimumMatchCount;
+        set
+        {
+            if (Definition.MinimumMatchCount == value)
+                return;
+            Definition.MinimumMatchCount = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MinimumMatchCountText));
+            RefreshFooter();
+            NotifyChanged();
+        }
+    }
+
+    public string MinimumMatchCountText
+    {
+        get => MinimumMatchCount.ToString(CultureInfo.InvariantCulture);
+        set => MinimumMatchCount = int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : 0;
     }
 
     public string DestinationSubfolder
@@ -193,6 +237,7 @@ public sealed partial class AutomationNodeViewModel : NodeViewModelBase
         AutomationNodeKind.CurrentFolder => "当前文件夹",
         AutomationNodeKind.KindFilter => "类型筛选",
         AutomationNodeKind.NameContains => "名称筛选",
+        AutomationNodeKind.MatchCountCondition => "匹配数量条件",
         AutomationNodeKind.TransferToSubfolder => "传输到子文件夹",
         AutomationNodeKind.SystemNotification => "系统通知",
         _ => "未知节点",
@@ -240,6 +285,7 @@ public sealed partial class AutomationNodeViewModel : NodeViewModelBase
             AutomationNodeKind.NameContains => string.IsNullOrWhiteSpace(NameQuery)
                 ? "名称不限"
                 : $"名称包含：{NameQuery.Trim()}",
+            AutomationNodeKind.MatchCountCondition => $"匹配数 ≥ {MinimumMatchCount} 继续",
             AutomationNodeKind.TransferToSubfolder =>
                 $"{(TransferMode == AutomationTransferMode.Move ? "移动" : "复制")} → {DestinationSubfolder.Trim()}",
             AutomationNodeKind.SystemNotification => string.IsNullOrWhiteSpace(NotificationTitle)
@@ -324,9 +370,11 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
     public bool IsCurrentFolderSelected => SelectedNode?.IsCurrentFolder == true;
     public bool IsKindFilterSelected => SelectedNode?.IsKindFilter == true;
     public bool IsNameFilterSelected => SelectedNode?.IsNameFilter == true;
+    public bool IsMatchCountConditionSelected => SelectedNode?.IsMatchCountCondition == true;
     public bool IsTransferSelected => SelectedNode?.IsTransfer == true;
     public bool IsNotificationSelected => SelectedNode?.IsNotification == true;
     public bool CanDeleteSelectedNode => SelectedNode?.CanDelete == true;
+    public bool CanAddMatchCountCondition => AutomationNodes.All(node => !node.IsMatchCountCondition);
     public bool CanAddNotificationNode => AutomationNodes.All(node => !node.IsNotification);
     public string SelectedNodeTitle => SelectedNode?.Title ?? "未选择节点";
     public string SelectedNodeDescription => SelectedNode?.Kind switch
@@ -334,8 +382,9 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         AutomationNodeKind.CurrentFolder => "运行时读取主浏览器当前文件夹中的顶层文件，不递归、不处理文件夹。",
         AutomationNodeKind.KindFilter => "只保留选定类型；选“任意”时不按类型收窄。",
         AutomationNodeKind.NameContains => "只保留文件名包含指定文本的文件（不区分大小写）。",
+        AutomationNodeKind.MatchCountCondition => "按前置筛选后的匹配数量分支：达到阈值时传输；未达到时安全终止，或连接到通知节点。",
         AutomationNodeKind.TransferToSubfolder => "在当前文件夹下创建一级子文件夹并传输；同名始终保留两份。",
-        AutomationNodeKind.SystemNotification => "传输结束后把摘要发送到操作系统；通知失败不会改判文件结果。",
+        AutomationNodeKind.SystemNotification => "所连分支结束后把摘要发送到操作系统；通知失败不会改判文件结果。",
         _ => "点击画布中的节点以编辑参数。",
     };
 
@@ -399,13 +448,33 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         }
         if (Connections.Any(connection => ReferenceEquals(connection.Source, output)))
         {
-            StatusText = $"“{output.Owner.Title}”已有一条出线；第一版是单链，请先断开原连线。";
+            StatusText = $"“{output.Owner.Title}”的“{output.Title}”端口已有一条出线，请先断开原连线。";
             return;
         }
-        if (Connections.Any(connection => ReferenceEquals(connection.Target, input)))
+        if (input.Owner.IsNotification && !output.Owner.IsTransfer &&
+            !(output.Owner.IsMatchCountCondition && output.PortId == AutomationPortIds.Unmatched))
         {
-            StatusText = $"“{input.Owner.Title}”已有一条入线；第一版是单链，请先断开原连线。";
+            StatusText = "系统通知只接收传输结果或条件的未达标分支。";
             return;
+        }
+        var targetConnections = Connections.Where(connection => ReferenceEquals(connection.Target, input)).ToArray();
+        if (targetConnections.Length >= (input.Owner.IsNotification ? 2 : 1) ||
+            (targetConnections.Length > 0 && !input.Owner.IsNotification))
+        {
+            StatusText = $"“{input.Owner.Title}”的入线已达安全上限。";
+            return;
+        }
+        if (input.Owner.IsNotification && targetConnections.Length == 1)
+        {
+            var existingSource = targetConnections[0].Source as AutomationConnectorViewModel;
+            var isValidMerge = existingSource is not null &&
+                ((existingSource.Owner.IsTransfer && output.Owner.IsMatchCountCondition && output.PortId == AutomationPortIds.Unmatched) ||
+                 (existingSource.Owner.IsMatchCountCondition && existingSource.PortId == AutomationPortIds.Unmatched && output.Owner.IsTransfer));
+            if (!isValidMerge)
+            {
+                StatusText = "系统通知合流只允许传输节点与条件的未达标分支。";
+                return;
+            }
         }
         if (WouldCreateCycle(output.Owner, input.Owner))
         {
@@ -441,6 +510,17 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
 
     [RelayCommand]
     private void AddNameFilterNode() => AddNode(AutomationNodeKind.NameContains);
+
+    [RelayCommand]
+    private void AddMatchCountConditionNode()
+    {
+        if (!CanAddMatchCountCondition)
+        {
+            StatusText = "当前只支持一个匹配数量条件节点。";
+            return;
+        }
+        AddNode(AutomationNodeKind.MatchCountCondition);
+    }
 
     [RelayCommand]
     private void AddNotificationNode()
@@ -501,11 +581,13 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         var filters = AutomationNodes
             .Where(node => node.Kind is AutomationNodeKind.KindFilter or AutomationNodeKind.NameContains)
             .ToArray();
+        var condition = AutomationNodes.FirstOrDefault(node => node.IsMatchCountCondition);
         var transfer = AutomationNodes.FirstOrDefault(node => node.IsTransfer);
         var notification = AutomationNodes.FirstOrDefault(node => node.IsNotification);
         var ordered = new List<AutomationNodeViewModel>();
         if (source is not null) ordered.Add(source);
         ordered.AddRange(filters);
+        if (condition is not null) ordered.Add(condition);
         if (transfer is not null) ordered.Add(transfer);
         if (notification is not null) ordered.Add(notification);
         ordered.AddRange(AutomationNodes.Where(node => !ordered.Contains(node)));
@@ -515,7 +597,46 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
             ordered[i].Location = new Point(24 + i * 226, 128);
             ordered[i].NotifyLocationChanged();
         }
-        StatusText = "已按线性流水线顺序整理节点。";
+        StatusText = "已按来源、筛选、条件、传输与通知的常见顺序整理节点；可再拖动微调分支布局。";
+    }
+
+    [RelayCommand]
+    private async Task LoadExampleAsync(string? exampleId)
+    {
+        if (IsRunning || string.IsNullOrWhiteSpace(exampleId))
+            return;
+
+        AutomationWorkflowDefinition example;
+        try
+        {
+            example = AutomationWorkflowDefinition.CreateExample(exampleId);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            StatusText = "未知的工作流示例。";
+            return;
+        }
+
+        if (!await _dialogs.ConfirmAsync(
+                "载入节点示例？",
+                $"当前画布「{WorkflowName}」将被示例「{example.Name}」替换；文件不会立即改动，只有点击“运行”后才会先进入计划确认。",
+                "载入示例").ConfigureAwait(true))
+            return;
+
+        _buildingGraph = true;
+        try
+        {
+            _settingsStore.Settings.AutomationWorkflow = example;
+            WorkflowName = example.Name;
+        }
+        finally
+        {
+            _buildingGraph = false;
+        }
+        RebuildGraph();
+        await PersistNowAsync().ConfigureAwait(true);
+        StatusText = $"已载入「{example.Name}」示例；先检查节点与连线，再运行。";
+        LastResultText = "尚未运行；示例只保存计划，不会自动操作文件。";
     }
 
     [RelayCommand]
@@ -611,9 +732,12 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
                         : $"系统通知未发送：{result.Notification.Message}";
                 LastResultText = outcome.Cancelled
                     ? "运行已取消。"
-                    : result.MatchedFiles.Count == 0
-                        ? "运行完成：当前文件夹顶层没有匹配文件，未创建目标子文件夹。"
-                        : $"运行完成：匹配 {result.MatchedFiles.Count}，成功 {outcome.SucceededCount}，失败 {outcome.Errors.Count}，跳过 {outcome.SkippedCount}；目标：{result.DestinationPath ?? "—"}；{notificationText}。";
+                    : result.Operation.Success && result.DestinationPath is null &&
+                      definition.Nodes.Any(node => node.Kind == AutomationNodeKind.MatchCountCondition) && result.MatchedFiles.Count > 0
+                        ? $"未达到匹配数量阈值：筛选匹配 {result.MatchedFiles.Count}，未创建目标子文件夹；{notificationText}。"
+                        : result.MatchedFiles.Count == 0
+                            ? "运行完成：当前文件夹顶层没有匹配文件，未创建目标子文件夹。"
+                            : $"运行完成：匹配 {result.MatchedFiles.Count}，成功 {outcome.SucceededCount}，失败 {outcome.Errors.Count}，跳过 {outcome.SkippedCount}；目标：{result.DestinationPath ?? "—"}；{notificationText}。";
             }
             else
             {
@@ -646,6 +770,7 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         OnPropertyChanged(nameof(IsCurrentFolderSelected));
         OnPropertyChanged(nameof(IsKindFilterSelected));
         OnPropertyChanged(nameof(IsNameFilterSelected));
+        OnPropertyChanged(nameof(IsMatchCountConditionSelected));
         OnPropertyChanged(nameof(IsTransferSelected));
         OnPropertyChanged(nameof(IsNotificationSelected));
         OnPropertyChanged(nameof(CanDeleteSelectedNode));
@@ -671,7 +796,9 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         var node = CreateNodeViewModel(definition);
         Nodes.Add(node);
         SelectNode(node);
-        StatusText = $"已加入“{node.Title}”；请把它连入单链，并确认位置在传输节点{(kind == AutomationNodeKind.SystemNotification ? "之后" : "之前")}。";
+        StatusText = kind == AutomationNodeKind.MatchCountCondition
+            ? "已加入条件节点：将筛选节点连接到条件输入；“达到阈值”必须连接唯一传输节点，“未达阈值”可留空或连接通知。"
+            : $"已加入“{node.Title}”；请连接到工作流中，并检查图校验提示。";
     }
 
     private AutomationNodeViewModel CreateNodeViewModel(AutomationNodeDefinition definition)
@@ -713,7 +840,9 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
                 if (connection is null ||
                     !nodeMap.TryGetValue(connection.SourceNodeId ?? string.Empty, out var source) ||
                     !nodeMap.TryGetValue(connection.TargetNodeId ?? string.Empty, out var target) ||
-                    source.OutputConnector is not { } output ||
+                    source.GetOutputConnector(string.IsNullOrWhiteSpace(connection.SourcePortId)
+                        ? AutomationPortIds.Default
+                        : connection.SourcePortId) is not { } output ||
                     target.InputConnector is not { } input)
                 {
                     continue;
@@ -779,11 +908,13 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
                 definition.Connections.Add(new AutomationConnectionDefinition
                 {
                     SourceNodeId = source.Owner.Id,
+                    SourcePortId = source.PortId,
                     TargetNodeId = target.Owner.Id,
                 });
             }
         }
         OnPropertyChanged(nameof(CanAddNotificationNode));
+        OnPropertyChanged(nameof(CanAddMatchCountCondition));
     }
 
     private static AutomationWorkflowDefinition CloneDefinition(AutomationWorkflowDefinition source) => new()
@@ -797,6 +928,7 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
             Y = node.Y,
             FilterKind = node.FilterKind,
             NameQuery = node.NameQuery,
+            MinimumMatchCount = node.MinimumMatchCount,
             DestinationSubfolder = node.DestinationSubfolder,
             TransferMode = node.TransferMode,
             NotificationTitle = node.NotificationTitle,
@@ -805,24 +937,28 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         Connections = source.Connections.Select(static connection => new AutomationConnectionDefinition
         {
             SourceNodeId = connection.SourceNodeId,
+            SourcePortId = connection.SourcePortId,
             TargetNodeId = connection.TargetNodeId,
         }).ToList(),
     };
 
     private bool WouldCreateCycle(AutomationNodeViewModel outputOwner, AutomationNodeViewModel inputOwner)
     {
-        var current = inputOwner;
+        var pending = new Stack<AutomationNodeViewModel>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        while (current is not null)
+        pending.Push(inputOwner);
+        while (pending.TryPop(out var current))
         {
             if (ReferenceEquals(current, outputOwner))
                 return true;
             if (!visited.Add(current.Id))
-                return true;
-            var nextConnection = current.OutputConnector is { } output
-                ? Connections.FirstOrDefault(connection => ReferenceEquals(connection.Source, output))
-                : null;
-            current = nextConnection?.Target is AutomationConnectorViewModel next ? next.Owner : null;
+                continue;
+            foreach (var connection in Connections.Where(connection =>
+                         connection.Source is AutomationConnectorViewModel source && ReferenceEquals(source.Owner, current)))
+            {
+                if (connection.Target is AutomationConnectorViewModel target)
+                    pending.Push(target.Owner);
+            }
         }
         return false;
     }
@@ -833,6 +969,7 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         {
             AutomationNodeKind.KindFilter => "kind-filter",
             AutomationNodeKind.NameContains => "name-filter",
+            AutomationNodeKind.MatchCountCondition => "count-condition",
             AutomationNodeKind.SystemNotification => "notify",
             _ => "node",
         };
@@ -850,8 +987,8 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         {
             if (node.InputConnector is not null)
                 node.InputConnector.IsConnected = false;
-            if (node.OutputConnector is not null)
-                node.OutputConnector.IsConnected = false;
+            foreach (var output in node.Output.OfType<AutomationConnectorViewModel>())
+                output.IsConnected = false;
         }
         foreach (var connection in Connections)
         {
@@ -866,7 +1003,7 @@ public sealed partial class AutomationViewModel : NodifyEditorViewModelBase
         var validation = AutomationWorkflowValidator.Validate(_settingsStore.Settings.AutomationWorkflow);
         IsWorkflowValid = validation.IsValid;
         ValidationText = validation.IsValid
-            ? "流程有效：单链顺序与节点参数均可执行。"
+            ? $"流程有效：有界 DAG（最多 {AutomationWorkflowValidator.MaximumNodes} 个节点），无循环；仅一条条件分支可产生传输计划。"
             : string.Join("；", validation.Errors);
     }
 

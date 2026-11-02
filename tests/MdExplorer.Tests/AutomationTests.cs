@@ -10,7 +10,7 @@ using Xunit;
 
 namespace MdExplorer.Tests;
 
-/// <summary>v0.21 自动化单链校验、真实本地执行、通知隔离与 Shell 任务通知策略。</summary>
+/// <summary>自动化线性/有界条件图校验、真实本地执行、通知隔离与 Shell 任务通知策略。</summary>
 public sealed class AutomationTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("eidoria-automation-").FullName;
@@ -62,6 +62,37 @@ public sealed class AutomationTests : IDisposable
         return workflow;
     }
 
+    private static AutomationWorkflowDefinition ConditionalWorkflow(int minimumMatchCount = 2)
+    {
+        var workflow = AutomationWorkflowDefinition.CreateDefault();
+        var transfer = workflow.Nodes.Single(node => node.Kind == AutomationNodeKind.TransferToSubfolder);
+        var notification = workflow.Nodes.Single(node => node.Kind == AutomationNodeKind.SystemNotification);
+        var condition = new AutomationNodeDefinition
+        {
+            Id = "match-count",
+            Kind = AutomationNodeKind.MatchCountCondition,
+            MinimumMatchCount = minimumMatchCount,
+        };
+        workflow.Nodes.Insert(workflow.Nodes.IndexOf(transfer), condition);
+        workflow.Connections.Clear();
+        workflow.Connections.Add(new AutomationConnectionDefinition { SourceNodeId = "source", TargetNodeId = "kind-filter" });
+        workflow.Connections.Add(new AutomationConnectionDefinition { SourceNodeId = "kind-filter", TargetNodeId = condition.Id });
+        workflow.Connections.Add(new AutomationConnectionDefinition
+        {
+            SourceNodeId = condition.Id,
+            SourcePortId = AutomationPortIds.Matched,
+            TargetNodeId = transfer.Id,
+        });
+        workflow.Connections.Add(new AutomationConnectionDefinition
+        {
+            SourceNodeId = condition.Id,
+            SourcePortId = AutomationPortIds.Unmatched,
+            TargetNodeId = notification.Id,
+        });
+        workflow.Connections.Add(new AutomationConnectionDefinition { SourceNodeId = transfer.Id, TargetNodeId = notification.Id });
+        return workflow;
+    }
+
     private string WriteStartFile(string name, string content = "x")
     {
         var path = Path.Combine(_startDir, name);
@@ -81,6 +112,14 @@ public sealed class AutomationTests : IDisposable
     }
 
     [Fact]
+    public void AddingConditionNode_PreservesPersistedLegacyEnumValues()
+    {
+        Assert.Equal(3, (int)AutomationNodeKind.TransferToSubfolder);
+        Assert.Equal(4, (int)AutomationNodeKind.SystemNotification);
+        Assert.Equal(5, (int)AutomationNodeKind.MatchCountCondition);
+    }
+
+    [Fact]
     public void DefaultWorkflow_IsAValidLinearPipeline()
     {
         var validation = AutomationWorkflowValidator.Validate(AutomationWorkflowDefinition.CreateDefault());
@@ -94,6 +133,75 @@ public sealed class AutomationTests : IDisposable
                 AutomationNodeKind.SystemNotification,
             ],
             validation.OrderedNodes.Select(node => node.Kind).ToArray());
+    }
+
+    [Fact]
+    public void Validator_AcceptsBoundedConditionalDagAndRejectsUnboundedShapes()
+    {
+        var conditional = ConditionalWorkflow();
+        var validation = AutomationWorkflowValidator.Validate(conditional);
+        Assert.True(validation.IsValid, string.Join("；", validation.Errors));
+        Assert.Equal(5, validation.OrderedNodes.Count);
+        Assert.Equal(2, conditional.Connections.Count(connection => connection.TargetNodeId == "notify"));
+
+        var nestedCondition = ConditionalWorkflow();
+        nestedCondition.Nodes.Add(new AutomationNodeDefinition
+        {
+            Id = "second-condition",
+            Kind = AutomationNodeKind.MatchCountCondition,
+            MinimumMatchCount = 1,
+        });
+        Assert.False(AutomationWorkflowValidator.Validate(nestedCondition).IsValid);
+
+        var cycle = ConditionalWorkflow();
+        cycle.Connections.Add(new AutomationConnectionDefinition
+        {
+            SourceNodeId = "notify",
+            TargetNodeId = "kind-filter",
+        });
+        Assert.False(AutomationWorkflowValidator.Validate(cycle).IsValid);
+
+        var tooLarge = AutomationWorkflowDefinition.CreateDefault();
+        for (var i = 0; i < AutomationWorkflowValidator.MaximumNodes; i++)
+            tooLarge.Nodes.Add(new AutomationNodeDefinition { Id = $"extra-{i}", Kind = AutomationNodeKind.NameContains });
+        Assert.False(AutomationWorkflowValidator.Validate(tooLarge).IsValid);
+    }
+
+    [Theory]
+    [InlineData("images", "整理图片", FileKind.Image, "图片整理", 4)]
+    [InlineData("videos", "归档视频", FileKind.Video, "视频归档", 4)]
+    [InlineData("documents", "收纳文档", FileKind.Document, "发票归档", 5)]
+    [InlineData("code", "整理代码说明", FileKind.Code, "代码说明", 5)]
+    public void ExampleWorkflows_AreEditableValidLinearGraphs(
+        string exampleId,
+        string name,
+        FileKind kind,
+        string destination,
+        int expectedNodes)
+    {
+        var workflow = AutomationWorkflowDefinition.CreateExample(exampleId);
+        var validation = AutomationWorkflowValidator.Validate(workflow);
+
+        Assert.Equal(name, workflow.Name);
+        Assert.True(validation.IsValid, string.Join("；", validation.Errors));
+        Assert.Equal(expectedNodes, workflow.Nodes.Count);
+        Assert.Contains(workflow.Nodes, node => node.Kind == AutomationNodeKind.KindFilter && node.FilterKind == kind);
+        Assert.Contains(workflow.Nodes, node => node.Kind == AutomationNodeKind.TransferToSubfolder && node.DestinationSubfolder == destination);
+        Assert.Equal(workflow.Nodes.Count - 1, workflow.Connections.Count);
+    }
+
+    [Fact]
+    public void ThresholdExample_IsAValidConditionalWorkflowWithExplicitPorts()
+    {
+        var workflow = AutomationWorkflowDefinition.CreateExample("threshold");
+        var validation = AutomationWorkflowValidator.Validate(workflow);
+
+        Assert.True(validation.IsValid, string.Join("；", validation.Errors));
+        Assert.Equal("至少两张图片才归档", workflow.Name);
+        Assert.Contains(workflow.Connections, connection =>
+            connection.SourcePortId == AutomationPortIds.Matched && connection.TargetNodeId == "transfer");
+        Assert.Contains(workflow.Connections, connection =>
+            connection.SourcePortId == AutomationPortIds.Unmatched && connection.TargetNodeId == "notify");
     }
 
     [Fact]
@@ -159,6 +267,66 @@ public sealed class AutomationTests : IDisposable
         var sent = Assert.Single(notifications.Sent);
         Assert.Contains("0/0", sent.Body, StringComparison.Ordinal);
         Assert.Contains("未创建目标文件夹", sent.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Executor_ConditionalGraph_SkipsWritesAndUsesFalseBranchWhenBelowThreshold()
+    {
+        WriteStartFile("one.png", "image");
+        var notifications = new FakeNotificationService();
+
+        var result = await CreateExecutor(notifications).ExecuteAsync(
+            ConditionalWorkflow(minimumMatchCount: 2),
+            _startDir,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Operation.Success);
+        Assert.Single(result.MatchedFiles);
+        Assert.Null(result.DestinationPath);
+        Assert.False(Directory.Exists(Path.Combine(_startDir, "图片整理")));
+        var sent = Assert.Single(notifications.Sent);
+        Assert.Contains("0/1", sent.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Executor_ConditionalGraph_TransfersOnlyOnMatchedBranch()
+    {
+        WriteStartFile("one.png", "first");
+        WriteStartFile("two.jpg", "second");
+        var notifications = new FakeNotificationService();
+
+        var result = await CreateExecutor(notifications).ExecuteAsync(
+            ConditionalWorkflow(minimumMatchCount: 2),
+            _startDir,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Operation.Success);
+        Assert.Equal(2, result.Operation.SucceededCount);
+        Assert.True(File.Exists(Path.Combine(_startDir, "图片整理", "one.png")));
+        Assert.True(File.Exists(Path.Combine(_startDir, "图片整理", "two.jpg")));
+        Assert.Single(notifications.Sent);
+    }
+
+    [Fact]
+    public async Task Executor_ConditionalFalseBranchMaySafelyTerminateWithoutNotification()
+    {
+        WriteStartFile("one.png", "image");
+        var workflow = ConditionalWorkflow(minimumMatchCount: 2);
+        workflow.Connections.RemoveAll(connection =>
+            connection.SourceNodeId == "match-count" && connection.SourcePortId == AutomationPortIds.Unmatched);
+        var notifications = new FakeNotificationService();
+
+        var result = await CreateExecutor(notifications).ExecuteAsync(
+            workflow,
+            _startDir,
+            null,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Operation.Success);
+        Assert.Null(result.DestinationPath);
+        Assert.Empty(notifications.Sent);
     }
 
     [Fact]
@@ -299,6 +467,45 @@ public sealed class AutomationTests : IDisposable
         restored.Automation.DeleteSelectedNodeCommand.Execute(null);
         Assert.Equal(4, restored.Automation.Nodes.Count);
         Assert.False(restored.Automation.IsWorkflowValid); // 删除中间节点后必须由用户重新连线
+    }
+
+    [Fact]
+    public async Task AutomationEditor_ConditionalPortsPersistAndMergeAtNotification()
+    {
+        var shell = AppHost.CreateShell(AppHost.Build(
+            dataDirectory: _dataDir,
+            startFolder: _startDir,
+            systemNotifications: new FakeNotificationService()));
+        var automation = shell.Automation;
+        automation.AddMatchCountConditionNodeCommand.Execute(null);
+
+        var nodes = automation.Nodes.OfType<AutomationNodeViewModel>().ToArray();
+        var filter = Assert.Single(nodes, node => node.IsKindFilter);
+        var condition = Assert.Single(nodes, node => node.IsMatchCountCondition);
+        var transfer = Assert.Single(nodes, node => node.IsTransfer);
+        var notification = Assert.Single(nodes, node => node.IsNotification);
+        var previousEdge = Assert.Single(automation.Connections, connection =>
+            connection.Source is AutomationConnectorViewModel source && ReferenceEquals(source.Owner, filter) &&
+            connection.Target is AutomationConnectorViewModel target && ReferenceEquals(target.Owner, transfer));
+        automation.Disconnect(previousEdge);
+
+        automation.Connect(filter.OutputConnector!, condition.InputConnector!);
+        automation.Connect(condition.GetOutputConnector(AutomationPortIds.Matched)!, transfer.InputConnector!);
+        automation.Connect(condition.GetOutputConnector(AutomationPortIds.Unmatched)!, notification.InputConnector!);
+
+        Assert.True(automation.IsWorkflowValid, automation.ValidationText);
+        Assert.Equal(5, automation.Connections.Count);
+        await shell.SettingsStore.SaveSettingsAsync(TestContext.Current.CancellationToken);
+
+        var restored = AppHost.CreateShell(AppHost.Build(
+            dataDirectory: _dataDir,
+            startFolder: _startDir,
+            systemNotifications: new FakeNotificationService()));
+        var restoredCondition = Assert.Single(
+            restored.Automation.Nodes.OfType<AutomationNodeViewModel>(), node => node.IsMatchCountCondition);
+        Assert.Equal(2, restoredCondition.Output.Count);
+        Assert.True(restored.Automation.IsWorkflowValid, restored.Automation.ValidationText);
+        Assert.Equal(1, restoredCondition.MinimumMatchCount);
     }
 
     [Fact]

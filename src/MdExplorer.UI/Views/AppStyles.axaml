@@ -309,6 +309,29 @@
     <Setter Property="Padding" Value="6,2" />
   </Style>
 
+  <!-- 设置页响应式分类导航：宽屏为 Android Settings 式左侧目的地列表，窄屏为可换行的分类芯片。 -->
+  <Style Selector="md|MdButton.settings-nav-item">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-item.selected">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-chip">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Margin" Value="0,0,6,0" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-chip.selected">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
   <!-- 设置页的分段选择：文字按钮只靠 selected 底色表达当前值，不额外造控件。 -->
   <Style Selector="md|MdButton.segmented-choice">
     <Setter Property="MinHeight" Value="36" />

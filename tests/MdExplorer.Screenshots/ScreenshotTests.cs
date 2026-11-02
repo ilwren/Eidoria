@@ -341,11 +341,17 @@ public sealed class ScreenshotTests
     }, afterShow: window =>
     {
         var settings = window.GetVisualDescendants().OfType<SettingsView>().Single();
-        var columns = settings.FindControl<Grid>("SettingsColumns")!;
-        var secondary = settings.FindControl<StackPanel>("SettingsSecondaryColumn")!;
-        Assert.True(columns.Bounds.Width >= 860);
-        Assert.Equal(1, Grid.GetColumn(secondary));
-        Assert.Equal(0, Grid.GetRow(secondary));
+        var layout = settings.FindControl<Grid>("SettingsResponsiveLayout")!;
+        Assert.True(layout.Bounds.Width >= 980);
+        Assert.True(settings.FindControl<Border>("WideSettingsNavigation")!.IsVisible);
+        Assert.False(settings.FindControl<WrapPanel>("CompactSettingsNavigation")!.IsVisible);
+        Assert.True(settings.FindControl<Border>("SettingsCardAppearance")!.IsVisible);
+        Assert.False(settings.FindControl<Border>("SettingsCardBrowse")!.IsVisible);
+
+        settings.SelectCategory("browse");
+        Assert.True(settings.FindControl<Border>("SettingsCardBrowse")!.IsVisible);
+        Assert.False(settings.FindControl<Border>("SettingsCardAppearance")!.IsVisible);
+        settings.SelectCategory("appearance");
         return Task.CompletedTask;
     });
 
@@ -383,6 +389,8 @@ public sealed class ScreenshotTests
         },
         afterShow: async window =>
         {
+            var settings = window.GetVisualDescendants().OfType<SettingsView>().Single();
+            settings.SelectCategory("ai-search");
             // 端侧 AI 卡在设置页中段：把卡片**最后**一个入口滚进视口，
             // 卡片本身就会整体落在视口里（只 BringIntoView 标题会把卡片挤到屏幕外）。
             var lastEntry = window.GetVisualDescendants().OfType<Button>()
@@ -1193,11 +1201,11 @@ public sealed class ScreenshotTests
         afterShow: window =>
         {
             var settings = window.GetVisualDescendants().OfType<SettingsView>().Single();
-            var columns = settings.FindControl<Grid>("SettingsColumns")!;
-            var secondary = settings.FindControl<StackPanel>("SettingsSecondaryColumn")!;
-            Assert.True(columns.Bounds.Width < 860);
-            Assert.Equal(0, Grid.GetColumn(secondary));
-            Assert.Equal(1, Grid.GetRow(secondary));
+            var layout = settings.FindControl<Grid>("SettingsResponsiveLayout")!;
+            Assert.True(layout.Bounds.Width < 980);
+            Assert.False(settings.FindControl<Border>("WideSettingsNavigation")!.IsVisible);
+            Assert.True(settings.FindControl<WrapPanel>("CompactSettingsNavigation")!.IsVisible);
+            Assert.True(settings.FindControl<Border>("SettingsCardAppearance")!.IsVisible);
             return Task.CompletedTask;
         });
     /// <summary>弹出层验证：上下文菜单（依赖 ContextMenu/MenuItem 主题齐备）。</summary>

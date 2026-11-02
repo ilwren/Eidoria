@@ -101,6 +101,13 @@
             <TextBlock Text="名称筛选" VerticalAlignment="Center" />
           </StackPanel>
         </md:MdButton>
+        <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddMatchCountConditionNodeCommand}"
+                     IsEnabled="{Binding Automation.CanAddMatchCountCondition}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.AccountTree}" Size="18" />
+            <TextBlock Text="匹配数条件" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
         <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddNotificationNodeCommand}"
                      IsEnabled="{Binding Automation.CanAddNotificationNode}">
           <StackPanel Orientation="Horizontal" Spacing="7">
@@ -115,6 +122,26 @@
           </StackPanel>
         </md:MdButton>
       </WrapPanel>
+
+      <Border Padding="12,10" CornerRadius="14"
+              Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+              BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="caption" Text="载入可编辑示例（会替换当前画布；载入前确认，运行时仍先检查校验结果）" />
+          <WrapPanel Orientation="Horizontal">
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="图片整理"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="images" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="视频归档"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="videos" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="文档收纳"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="documents" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="代码说明"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="code" />
+            <md:MdButton Variant="Outlined" Content="匹配数条件"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="threshold" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
 
       <Grid x:Name="AutomationLayoutGrid" ColumnDefinitions="*,16,340">
         <Border x:Name="AutomationCanvasCard" Classes="card" Padding="12">
@@ -260,6 +287,14 @@
                 <TextBlock Classes="caption" TextWrapping="Wrap" Text="不区分大小写；留空表示不按名称筛选。" />
               </StackPanel>
 
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsMatchCountConditionSelected}">
+                <TextBlock Classes="h3" Text="分支阈值" />
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.MinimumMatchCountText}" Variant="Outlined"
+                              Label="至少匹配数量" AutomationProperties.Name="自动化至少匹配数量" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="按前面筛选后的顶层文件数量判断。达到阈值走“达到阈值”端口；不足走“未达阈值”端口，留空则安全结束。限制 1–100000。" />
+              </StackPanel>
+
               <StackPanel Spacing="10" IsVisible="{Binding Automation.IsTransferSelected}">
                 <TextBlock Classes="h3" Text="传输方式" />
                 <Grid ColumnDefinitions="*,8,*">
@@ -315,7 +350,7 @@
                 </md:MdButton>
               </WrapPanel>
               <TextBlock Classes="caption" TextWrapping="Wrap"
-                         Text="第一版只支持一条链：当前文件夹 → 筛选 → 传输 → 可选通知。分支、循环和任意目标路径不会被执行。" />
+                         Text="支持有界 DAG：当前文件夹 → 顺序筛选 → 可选“匹配数条件”；达到阈值才传输，未达阈值可安全结束或汇入通知。最多 16 节点、1 个条件与 1 个传输；拒绝循环、嵌套分支和任意目标路径。" />
             </StackPanel>
           </md:MdScrollViewer>
         </Border>

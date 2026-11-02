@@ -210,6 +210,47 @@ jobs:
           name: mdexplorer-linux-x64-aot
           path: artifacts/linux-x64-aot
 
+  lua-runtime-aot-spike:
+    name: Lua runtime spike (informational AOT gate)
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true # MoonSharp is not integrated into the app unless every platform gate passes.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install Linux AOT toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Run Lua sandbox tests
+        run: dotnet test tests/MdExplorer.LuaRuntime.Tests -c Release
+      - name: Publish and execute Native AOT probe (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          dotnet publish spikes/LuaPluginRuntime.Lab -c Release -r ${{ matrix.rid }} \
+            --self-contained true -p:PublishAot=true -o artifacts/lua-${{ matrix.rid }}
+          ./artifacts/lua-${{ matrix.rid }}/MdExplorer.LuaPluginRuntime.Lab
+      - name: Publish and execute Native AOT probe (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet publish spikes/LuaPluginRuntime.Lab -c Release -r ${{ matrix.rid }} `
+            --self-contained true -p:PublishAot=true -o artifacts/lua-${{ matrix.rid }}
+          ./artifacts/lua-${{ matrix.rid }}/MdExplorer.LuaPluginRuntime.Lab.exe
+      - name: Upload Lua probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-runtime-probe-${{ matrix.rid }}
+          path: artifacts/lua-${{ matrix.rid }}
+
   android:
     name: Android APK (debug-signed)
     runs-on: ubuntu-latest
@@ -221,6 +262,38 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Install Android workload
         run: dotnet workload install android
+      - name: Publish trimmed and AOT-compiled Lua Android probe
+        run: |
+          set -o pipefail
+          dotnet publish spikes/LuaPluginRuntime.Android -c Release \
+            -p:PublishTrimmed=true -p:TrimMode=full -p:RunAOTCompilation=true \
+            -o artifacts/lua-android 2>&1 | tee lua-android-output.txt
+      - name: Execute Lua Android probe in emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          script: |
+            adb logcat -c
+            adb install artifacts/lua-android/*.apk
+            adb shell monkey -p dev.mdexplorer.luaspike 1
+            for attempt in $(seq 1 30); do
+              if adb logcat -d -s LuaRuntimeSpike:I | grep -Fq 'PASS:'; then
+                adb logcat -d -s LuaRuntimeSpike:I
+                exit 0
+              fi
+              sleep 1
+            done
+            adb logcat -d -s LuaRuntimeSpike:*
+            exit 1
+      - name: Upload Lua Android probe APK and build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-runtime-android-spike
+          path: |
+            artifacts/lua-android/*.apk
+            lua-android-output.txt
       - name: Publish APK
         run: |
           set -o pipefail

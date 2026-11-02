@@ -4,29 +4,155 @@
              xmlns:vm="using:MdExplorer.UI.ViewModels"
              x:Class="MdExplorer.UI.Views.SettingsView"
              x:DataType="vm:ShellViewModel">
-  <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
-    <StackPanel MaxWidth="1200" HorizontalAlignment="Center" Margin="24,18,24,32" Spacing="18">
-      <Border Classes="settings-hero" Padding="22" CornerRadius="28"
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0" Margin="24,14,24,8" Padding="18,14" CornerRadius="22"
+            Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+            BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+        <Border Width="44" Height="44" CornerRadius="16" VerticalAlignment="Center"
+                Background="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Settings}" Size="23" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Classes="h1" Text="设置" />
+          <TextBlock Classes="caption" Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"
+                     Text="偏好设置会即时生效，并保存在本机。" TextWrapping="Wrap" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid x:Name="SettingsResponsiveLayout" Grid.Row="1" ColumnDefinitions="0,*"
+          ColumnSpacing="18" Margin="24,4,24,24" SizeChanged="OnSettingsLayoutSizeChanged">
+      <Border x:Name="WideSettingsNavigation" Grid.Column="0" IsVisible="False" Padding="12"
+              CornerRadius="20" VerticalAlignment="Stretch"
               Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
               BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
-          <Border Width="56" Height="56" CornerRadius="20" VerticalAlignment="Center"
-                  Background="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}">
-            <md:MdIcon Glyph="{x:Static md:MdSymbols.Settings}" Size="28" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="caption" Text="设置分类" Margin="10,6,0,8"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+      <md:MdButton x:Name="WideNavAppearance" Classes="settings-nav-item" Variant="Text"
+                   Tag="appearance" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Tune}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
           </Border>
-          <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-            <TextBlock Classes="h1" Text="设置" />
-            <TextBlock Classes="body" Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"
-                       Text="调整外观、文件浏览、媒体与本地 AI 偏好。更改会即时生效。" TextWrapping="Wrap" />
-          </StackPanel>
+          <TextBlock Grid.Column="1" Text="外观" VerticalAlignment="Center" />
         </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavBrowse" Classes="settings-nav-item" Variant="Text"
+                   Tag="browse" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="浏览" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavStartup" Classes="settings-nav-item" Variant="Text"
+                   Tag="startup" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Settings}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="启动与最近" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavMedia" Classes="settings-nav-item" Variant="Text"
+                   Tag="media" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="媒体" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavAiSearch" Classes="settings-nav-item" Variant="Text"
+                   Tag="ai-search" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="AI 与搜索" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavStorage" Classes="settings-nav-item" Variant="Text"
+                   Tag="storage" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="存储与权限" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavNotifications" Classes="settings-nav-item" Variant="Text"
+                   Tag="notifications" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.NotificationsActive}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="通知" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+      <md:MdButton x:Name="WideNavAbout" Classes="settings-nav-item" Variant="Text"
+                   Tag="about" Click="OnSettingsNavigationClick" HorizontalAlignment="Stretch"
+                   HorizontalContentAlignment="Left">
+        <Grid ColumnDefinitions="40,*" ColumnSpacing="10">
+          <Border Width="34" Height="34" CornerRadius="12" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Info}" Size="19" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          </Border>
+          <TextBlock Grid.Column="1" Text="关于" VerticalAlignment="Center" />
+        </Grid>
+      </md:MdButton>
+          </StackPanel>
+        </ScrollViewer>
       </Border>
 
-      <Grid x:Name="SettingsColumns" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
-            ColumnSpacing="18" RowSpacing="18" SizeChanged="OnSettingsColumnsSizeChanged">
-        <StackPanel x:Name="SettingsPrimaryColumn" Grid.Row="0" Grid.Column="0" Spacing="18">
-          <Border Classes="card settings-card">
+      <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="10">
+        <WrapPanel x:Name="CompactSettingsNavigation" Grid.Row="0" Orientation="Horizontal" IsVisible="True">
+        <md:MdButton x:Name="CompactNavAppearance" Classes="settings-nav-chip" Variant="Text"
+                     Tag="appearance" Click="OnSettingsNavigationClick" Content="外观" />
+        <md:MdButton x:Name="CompactNavBrowse" Classes="settings-nav-chip" Variant="Text"
+                     Tag="browse" Click="OnSettingsNavigationClick" Content="浏览" />
+        <md:MdButton x:Name="CompactNavStartup" Classes="settings-nav-chip" Variant="Text"
+                     Tag="startup" Click="OnSettingsNavigationClick" Content="启动与最近" />
+        <md:MdButton x:Name="CompactNavMedia" Classes="settings-nav-chip" Variant="Text"
+                     Tag="media" Click="OnSettingsNavigationClick" Content="媒体" />
+        <md:MdButton x:Name="CompactNavAiSearch" Classes="settings-nav-chip" Variant="Text"
+                     Tag="ai-search" Click="OnSettingsNavigationClick" Content="AI 与搜索" />
+        <md:MdButton x:Name="CompactNavStorage" Classes="settings-nav-chip" Variant="Text"
+                     Tag="storage" Click="OnSettingsNavigationClick" Content="存储与权限" />
+        <md:MdButton x:Name="CompactNavNotifications" Classes="settings-nav-chip" Variant="Text"
+                     Tag="notifications" Click="OnSettingsNavigationClick" Content="通知" />
+        <md:MdButton x:Name="CompactNavAbout" Classes="settings-nav-chip" Variant="Text"
+                     Tag="about" Click="OnSettingsNavigationClick" Content="关于" />
+        </WrapPanel>
+        <md:MdScrollViewer x:Name="SettingsContentScroll" Grid.Row="1"
+                           HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+          <StackPanel x:Name="SettingsContent" MaxWidth="900" HorizontalAlignment="Left" Spacing="16" Margin="0,0,0,24">
+            <StackPanel Spacing="4" Margin="2,0,0,2">
+              <TextBlock x:Name="SettingsSectionTitle" Classes="h2" Text="外观" />
+              <TextBlock x:Name="SettingsSectionSubtitle" Classes="body" TextWrapping="Wrap"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"
+                         Text="主题、颜色与界面密度" />
+            </StackPanel>
+          <Border Classes="card settings-card" x:Name="SettingsCardAppearance">
             <StackPanel Spacing="10">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -70,8 +196,7 @@
         </Grid>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardBrowse">
             <StackPanel Spacing="14">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -199,8 +324,7 @@
         </StackPanel>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardStartup">
             <StackPanel Spacing="12">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -235,8 +359,7 @@
         </StackPanel>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardAbout">
             <StackPanel Spacing="8">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -256,9 +379,7 @@
         <md:MdButton Variant="Outlined" Content="开源许可证" HorizontalAlignment="Left" Click="OnLicensesClick" />
       </StackPanel>
       </Border>
-        </StackPanel>
-        <StackPanel x:Name="SettingsSecondaryColumn" Grid.Row="0" Grid.Column="1" Spacing="18">
-          <Border Classes="card settings-card" IsVisible="{Binding Capabilities.IsAndroid}">
+          <Border Classes="card settings-card" x:Name="SettingsCardStorage">
             <StackPanel Spacing="12">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
@@ -371,8 +492,7 @@
         </StackPanel>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardMedia">
             <StackPanel Spacing="12">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -408,8 +528,7 @@
         </Grid>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardLocalAi">
             <StackPanel Spacing="12">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -478,8 +597,7 @@
         </Border>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardSearch">
             <StackPanel Spacing="12">
               <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
                 <Border Width="40" Height="40" CornerRadius="20"
@@ -528,8 +646,7 @@
         </WrapPanel>
       </StackPanel>
       </Border>
-
-          <Border Classes="card settings-card">
+          <Border Classes="card settings-card" x:Name="SettingsCardNotifications">
             <StackPanel Spacing="12">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
@@ -562,8 +679,9 @@
         </md:MdButton>
       </StackPanel>
       </Border>
-        </StackPanel>
+          </StackPanel>
+        </md:MdScrollViewer>
       </Grid>
-    </StackPanel>
-  </md:MdScrollViewer>
+    </Grid>
+  </Grid>
 </UserControl>

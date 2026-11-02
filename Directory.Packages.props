@@ -8,6 +8,7 @@
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Android" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Skia" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.2" />
     <PackageVersion Include="Md3.Avalonia" Version="0.5.0-preview.2" />
@@ -27,6 +28,10 @@
     <!-- Office 只读预览控件（MIT；net8.0/net10.0，Avalonia >= 12.0.2，IsTrimmable/IsAotCompatible）。
          仅经 OfficeDocumentViewer 适配层接入，DOCX/PPTX/XLSX 先由宿主做包大小、展开量与结构复杂度预检。 -->
     <PackageVersion Include="OfficeViewer.Avalonia" Version="0.1.6" />
+    <!-- Isolated libmpv spike only; MIT managed Avalonia wrapper, native engine binaries are supplied separately. -->
+    <PackageVersion Include="HanumanInstitute.LibMpv.Avalonia" Version="0.10.1" />
+    <!-- Experimental Lua runtime spike only; MoonSharp is BSD-3-Clause, execution is not wired into the app. -->
+    <PackageVersion Include="MoonSharp" Version="2.0.0" />
     <!-- KDBX 只读解析只用到密码学原语（Argon2 / ChaCha20 / Salsa20 / Twofish）；
          AES 与哈希走 .NET 内置实现。MIT（BouncyCastle 的 C# 移植），纯托管、无反射绑定。
          刻意不用 KeePassLib / ModernKeePassLib（GPL）。 -->
