@@ -269,7 +269,8 @@ jobs:
       - name: Publish trimmed and AOT-compiled Lua Android probe
         run: |
           set -o pipefail
-          dotnet publish spikes/LuaPluginRuntime.Android -c Release \
+          # Match the x86_64 emulator ABI; the default Android APK is arm64-only.
+          dotnet publish spikes/LuaPluginRuntime.Android -c Release -r android-x64 \
             -p:PublishTrimmed=true -p:TrimMode=full -p:RunAOTCompilation=true \
             -o artifacts/lua-android 2>&1 | tee lua-android-output.txt
       - name: Execute Lua Android probe in emulator
@@ -279,11 +280,15 @@ jobs:
           arch: x86_64
           script: |
             set +e
+            report_diagnostics() {
+              python3 -c 'import pathlib,re; lines=pathlib.Path("lua-android-emulator-logcat.txt").read_text(errors="replace").splitlines(); pattern=re.compile(r"LuaRuntimeSpike|FATAL EXCEPTION|AndroidRuntime|INSTALL_FAILED|UnsatisfiedLinkError|dlopen failed|am_crash|Fatal signal|monkey", re.I); selected=[line for line in lines if pattern.search(line)] or lines[-30:]; [print("::error title=Lua Android emulator diagnostic::"+line[-1000:].replace("%","%25").replace(":","%3A").replace(",","%2C")) for line in selected[-30:]]'
+            }
             adb logcat -c
             adb install artifacts/lua-android/*.apk
             install_status=$?
             if [ "$install_status" -ne 0 ]; then
               adb logcat -d -v time > lua-android-emulator-logcat.txt
+              report_diagnostics
               exit "$install_status"
             fi
             adb shell monkey -p dev.mdexplorer.luaspike 1
@@ -297,6 +302,7 @@ jobs:
               sleep 1
             done
             tail -300 lua-android-emulator-logcat.txt
+            report_diagnostics
             if [ "$launch_status" -ne 0 ]; then exit "$launch_status"; fi
             exit 1
       - name: Upload Lua Android probe APK and build log
