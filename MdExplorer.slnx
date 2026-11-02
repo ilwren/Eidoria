@@ -8,7 +8,6 @@
   <Project Path="spikes/LibMpvAvaloniaSpike/LibMpvAvaloniaSpike.csproj" />
   <Project Path="spikes/LuaPluginRuntime/LuaPluginRuntime.csproj" />
   <Project Path="spikes/LuaPluginRuntime.Lab/LuaPluginRuntime.Lab.csproj" />
-  <Project Path="spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj" />
   <Project Path="tests/MdExplorer.LuaRuntime.Tests/MdExplorer.LuaRuntime.Tests.csproj" />
   <Project Path="tests/MdExplorer.Tests/MdExplorer.Tests.csproj" />
   <Project Path="tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj" />

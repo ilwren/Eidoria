@@ -32,26 +32,26 @@ public partial class SettingsView : UserControl
 
         _navigationButtons =
         [
-            ("appearance", FindControl<Button>("WideNavAppearance")!, FindControl<Button>("CompactNavAppearance")!),
-            ("browse", FindControl<Button>("WideNavBrowse")!, FindControl<Button>("CompactNavBrowse")!),
-            ("startup", FindControl<Button>("WideNavStartup")!, FindControl<Button>("CompactNavStartup")!),
-            ("media", FindControl<Button>("WideNavMedia")!, FindControl<Button>("CompactNavMedia")!),
-            ("ai-search", FindControl<Button>("WideNavAiSearch")!, FindControl<Button>("CompactNavAiSearch")!),
-            ("storage", FindControl<Button>("WideNavStorage")!, FindControl<Button>("CompactNavStorage")!),
-            ("notifications", FindControl<Button>("WideNavNotifications")!, FindControl<Button>("CompactNavNotifications")!),
-            ("about", FindControl<Button>("WideNavAbout")!, FindControl<Button>("CompactNavAbout")!),
+            ("appearance", WideNavAppearance, CompactNavAppearance),
+            ("browse", WideNavBrowse, CompactNavBrowse),
+            ("startup", WideNavStartup, CompactNavStartup),
+            ("media", WideNavMedia, CompactNavMedia),
+            ("ai-search", WideNavAiSearch, CompactNavAiSearch),
+            ("storage", WideNavStorage, CompactNavStorage),
+            ("notifications", WideNavNotifications, CompactNavNotifications),
+            ("about", WideNavAbout, CompactNavAbout),
         ];
         _categoryCards =
         [
-            ("appearance", FindControl<Border>("SettingsCardAppearance")!),
-            ("browse", FindControl<Border>("SettingsCardBrowse")!),
-            ("startup", FindControl<Border>("SettingsCardStartup")!),
-            ("media", FindControl<Border>("SettingsCardMedia")!),
-            ("ai-search", FindControl<Border>("SettingsCardLocalAi")!),
-            ("ai-search", FindControl<Border>("SettingsCardSearch")!),
-            ("storage", FindControl<Border>("SettingsCardStorage")!),
-            ("about", FindControl<Border>("SettingsCardAbout")!),
-            ("notifications", FindControl<Border>("SettingsCardNotifications")!),
+            ("appearance", SettingsCardAppearance),
+            ("browse", SettingsCardBrowse),
+            ("startup", SettingsCardStartup),
+            ("media", SettingsCardMedia),
+            ("ai-search", SettingsCardLocalAi),
+            ("ai-search", SettingsCardSearch),
+            ("storage", SettingsCardStorage),
+            ("about", SettingsCardAbout),
+            ("notifications", SettingsCardNotifications),
         ];
 
         DataContextChanged += (_, _) => UpdatePlatformAvailability();

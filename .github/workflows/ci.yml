@@ -274,17 +274,26 @@ jobs:
           api-level: 35
           arch: x86_64
           script: |
+            set +e
             adb logcat -c
             adb install artifacts/lua-android/*.apk
+            install_status=$?
+            if [ "$install_status" -ne 0 ]; then
+              adb logcat -d -v time > lua-android-emulator-logcat.txt
+              exit "$install_status"
+            fi
             adb shell monkey -p dev.mdexplorer.luaspike 1
+            launch_status=$?
             for attempt in $(seq 1 30); do
-              if adb logcat -d -s LuaRuntimeSpike:I | grep -Fq 'PASS:'; then
-                adb logcat -d -s LuaRuntimeSpike:I
+              adb logcat -d -v time > lua-android-emulator-logcat.txt
+              if grep -Eq 'LuaRuntimeSpike.*PASS:' lua-android-emulator-logcat.txt; then
+                grep -F 'LuaRuntimeSpike' lua-android-emulator-logcat.txt | tail -20
                 exit 0
               fi
               sleep 1
             done
-            adb logcat -d -s LuaRuntimeSpike:*
+            tail -300 lua-android-emulator-logcat.txt
+            if [ "$launch_status" -ne 0 ]; then exit "$launch_status"; fi
             exit 1
       - name: Upload Lua Android probe APK and build log
         if: always()
@@ -294,6 +303,7 @@ jobs:
           path: |
             artifacts/lua-android/*.apk
             lua-android-output.txt
+            lua-android-emulator-logcat.txt
       - name: Publish APK
         run: |
           set -o pipefail
@@ -312,7 +322,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/publish-artifacts.sh logs-android android-output.txt
+        run: bash .github/publish-artifacts.sh logs-android android-output.txt lua-android-output.txt lua-android-emulator-logcat.txt
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
