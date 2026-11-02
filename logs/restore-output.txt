@@ -1,7 +1,7 @@
   Determining projects to restore...
-  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 2.43 sec).
-  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Application/MdExplorer.Application.csproj (in 2.43 sec).
-  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 2.43 sec).
-  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 5.59 sec).
-  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.UI/MdExplorer.UI.csproj (in 5.61 sec).
-  Restored /home/runner/work/MdExplorer/MdExplorer/tests/MdExplorer.Tests/MdExplorer.Tests.csproj (in 8.12 sec).
+  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 1.31 sec).
+  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Application/MdExplorer.Application.csproj (in 1.31 sec).
+  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 3 ms).
+  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 4.97 sec).
+  Restored /home/runner/work/MdExplorer/MdExplorer/src/MdExplorer.UI/MdExplorer.UI.csproj (in 3.67 sec).
+  Restored /home/runner/work/MdExplorer/MdExplorer/tests/MdExplorer.Tests/MdExplorer.Tests.csproj (in 5.01 sec).
