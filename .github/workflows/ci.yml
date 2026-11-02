@@ -36,13 +36,17 @@ jobs:
           scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-asr-tiny --dry-run
           scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-classify-yamnet --dry-run
           scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only image-vlm-smol --dry-run
-      - name: Restore
-        run: dotnet restore MdExplorer.slnx
+      - name: Restore unit-test project
+        run: |
+          set -o pipefail
+          # Separate platform-specific apps and experimental spikes have dedicated CI jobs;
+          # restoring the unit-test dependency graph avoids requiring every workload here.
+          dotnet restore tests/MdExplorer.Tests 2>&1 | tee restore-output.txt
       - name: Build
         run: |
           set -o pipefail
-          # 构建失败时 Actions 日志在沙箱里取不到，落盘一份随 ci-artifacts 回传。
-          dotnet build MdExplorer.slnx -c Release --no-restore 2>&1 | tee build-output.txt
+          # Build/test failures are mirrored to ci-artifacts because hosted logs may be unavailable.
+          dotnet build tests/MdExplorer.Tests -c Release --no-restore 2>&1 | tee build-output.txt
       - name: Unit tests
         run: |
           set -o pipefail
@@ -52,7 +56,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/publish-artifacts.sh logs build-output.txt test-output.txt
+        run: bash .github/publish-artifacts.sh logs restore-output.txt build-output.txt test-output.txt
 
   real-model-embedding:
     name: Real model AI search smoke test (cached)
