@@ -274,6 +274,7 @@ jobs:
             -p:PublishTrimmed=true -p:TrimMode=full -p:RunAOTCompilation=true \
             -o artifacts/lua-android 2>&1 | tee lua-android-output.txt
       - name: Execute Lua Android probe in emulator
+        continue-on-error: true # Informational Lua gate must not skip the production APK build.
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
