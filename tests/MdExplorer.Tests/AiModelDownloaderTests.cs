@@ -369,11 +369,12 @@ public sealed class AiModelDownloaderTests : IDisposable
     private static string BuildModelScopeInventoryJson(
         string revision, IEnumerable<string> files, IReadOnlyDictionary<string, byte[]> bodies)
     {
+        // 手拼 JSON：这里是测试替身，用普通字符串最不容易被大括号转义规则绊倒。
         var items = files.Select(path =>
-            $$"""
-              {"Path":"{{path}}","Type":"blob","Revision":"{{revision}}","Size":{{bodies[path].Length}},"Sha256":"{{Sha256Hex(bodies[path])}}"}
-              """);
-        return $$"""{"Code":200,"Data":{"Files":[{{string.Join(",", items)}}]}}""";
+            "{\"Path\":\"" + path + "\",\"Type\":\"blob\",\"Revision\":\"" + revision +
+            "\",\"Size\":" + bodies[path].Length.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+            ",\"Sha256\":\"" + Sha256Hex(bodies[path]) + "\"}");
+        return "{\"Code\":200,\"Data\":{\"Files\":[" + string.Join(",", items) + "]}}";
     }
 
     [Fact]
