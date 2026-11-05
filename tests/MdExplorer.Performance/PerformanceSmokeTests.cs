@@ -43,7 +43,7 @@ public sealed class PerformanceSmokeTests : IClassFixture<TenThousandFileTree>
     public void ShellCompositionStaysWithinBudget()
     {
         var stopwatch = Stopwatch.StartNew();
-        var services = AppHost.Build(_tree.DataDir, _tree.StartDir);
+        var services = AppHost.Build(_tree.DataDirectory, _tree.StartDirectory);
         var shell = AppHost.CreateShell(services);
         stopwatch.Stop();
 
@@ -58,7 +58,7 @@ public sealed class PerformanceSmokeTests : IClassFixture<TenThousandFileTree>
     [Fact]
     public async Task TenThousandEntryDirectoryMaterializesFirstPageWithinBudget()
     {
-        var shell = AppHost.CreateShell(AppHost.Build(_tree.DataDir, _tree.StartDir));
+        var shell = AppHost.CreateShell(AppHost.Build(_tree.DataDirectory, _tree.StartDirectory));
         shell.Browser.SetWatchEnabled(false);
 
         var stopwatch = Stopwatch.StartNew();
@@ -88,7 +88,7 @@ public sealed class PerformanceSmokeTests : IClassFixture<TenThousandFileTree>
     public async Task ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget()
     {
         var ct = TestContext.Current.CancellationToken;
-        var services = AppHost.Build(_tree.DataDir, _tree.StartDir);
+        var services = AppHost.Build(_tree.DataDirectory, _tree.StartDirectory);
 
         var rebuild = Stopwatch.StartNew();
         var stats = await services.ContentIndex.RebuildAsync([_tree.BulkDirectory], null, ct);
