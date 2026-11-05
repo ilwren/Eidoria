@@ -1,7 +1,7 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 995 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 995 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 1.61 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 1.61 sec).
   Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 3 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 4.64 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 3.64 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/MdExplorer.Tests.csproj (in 4.68 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 9.42 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 9.43 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/MdExplorer.Tests.csproj (in 7.78 sec).
