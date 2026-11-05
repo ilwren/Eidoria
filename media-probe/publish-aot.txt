@@ -1,0 +1,43 @@
+  Determining projects to restore...
+  Package 'Splat.Builder 19.3.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'Splat.Builder 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'Splat.Builder 19.3.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'Splat.Builder 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+  Package 'ReactiveUI.Avalonia 12.0.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'ReactiveUI.Avalonia 12.0.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'ReactiveUI.Avalonia 12.0.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'ReactiveUI.Avalonia 12.0.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'Splat.Builder 19.3.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'ReactiveUI.Avalonia 12.0.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+  Package 'Splat.Logging 19.3.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'Splat.Logging 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'Splat.Logging 19.3.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'Splat.Logging 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'Splat.Logging 19.3.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+  Package 'Splat.Core 19.3.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'Splat.Core 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'Splat.Core 19.3.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'Splat.Core 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'Splat.Core 19.3.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+  Package 'Splat 19.3.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'Splat 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'Splat 19.3.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'Splat 19.3.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'Splat 19.3.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+  Package 'ReactiveUI 23.2.1' from source 'https://api.nuget.org/v3/index.json': 
+  Signature type: Author
+  Package 'ReactiveUI 23.2.1' from source 'https://api.nuget.org/v3/index.json':   Subject Name: CN=Glenn Watson, O=Glenn Watson, L=Mooroolbark, S=Victoria, C=AU
+  Package 'ReactiveUI 23.2.1' from source 'https://api.nuget.org/v3/index.json':   SHA256 hash: 09702DACA40821B9E2F12DF12FB32479AD60F6C5C73A69E3EB35E06C9C3F898B
+  Package 'ReactiveUI 23.2.1' from source 'https://api.nuget.org/v3/index.json':   Valid from: 02/21/2026 06:49:49 to 02/20/2027 06:49:49
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj : error NU3012: Package 'ReactiveUI 23.2.1' from source 'https://api.nuget.org/v3/index.json': The author primary signature found a chain building issue: Revoked: certificate revoked
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 3.16 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 3.16 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 3.18 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 6 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 7 ms).
+  Failed to restore /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Desktop/MdExplorer.Desktop.csproj (in 3.19 sec).
