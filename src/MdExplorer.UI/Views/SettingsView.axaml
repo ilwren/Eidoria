@@ -319,6 +319,28 @@
                          Command="{Binding ClearThumbnailCacheCommand}" />
           </Grid>
         </StackPanel>
+        <!-- 全文内容索引：默认关；只在用户显式建立时才落盘。 -->
+        <StackPanel Spacing="6" Margin="0,6,0,0">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="body" Text="全文内容索引" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="在本机建立文件正文索引，搜索中心可跨文件夹找内容；只收白名单文本扩展名、单文件 ≤ 512 KB，索引与查询都不联网。" />
+            </StackPanel>
+            <md:MdSwitch Grid.Column="1" IsChecked="{Binding EnableContentIndex}" VerticalAlignment="Center"
+                         ToolTip.Tip="关闭后全文搜索不可用；已建索引保留在应用数据目录，可手动清除" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding EnableContentIndex}">
+            <StackPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding ContentIndexSummaryText}"
+                         ToolTip.Tip="索引根沿用搜索中心里配置的文件夹；文件改动后重建会自动跳过未变内容" />
+            </StackPanel>
+            <md:MdButton Grid.Column="1" Classes="segmented-choice" Variant="Text" Content="清空"
+                         VerticalAlignment="Center" IsEnabled="{Binding HasContentIndex}"
+                         ToolTip.Tip="删除 content-index.db；不会删除任何用户文件"
+                         Command="{Binding ClearContentIndexCommand}" />
+          </Grid>
+        </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
             <TextBlock Classes="body" Text="移入回收站前确认" />

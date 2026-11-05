@@ -35,6 +35,7 @@ public static class AppHost
         IMediaPlaybackService MediaPlayback,
         MediaBackendSelector? MediaBackends,
         IThumbnailCache Thumbnails,
+        IContentIndexService ContentIndex,
         AiModelCatalog AiModels,
         PluginPackageCatalog Plugins);
 
@@ -79,7 +80,10 @@ public static class AppHost
                 quotaBytes: store.Settings.AppTrashQuotaBytes,
                 retentionDays: store.Settings.AppTrashRetentionDays)
             : new TrashService();
+        var textFiles = new DelegatingTextFileService(new LocalTextFileService(), new StorageTextFileService(fileSystem));
         var searchIndex = new FileNameIndexService(dataDir, store);
+        // 全文内容索引：默认关闭；建库时才会在应用数据目录里出现 content-index.db。
+        var contentIndex = new SqliteContentIndex(Path.Combine(dataDir, "content-index.db"), textFiles);
         var search = new IndexedSearchService(searchIndex, new SearchService(), store);
         var aiModels = new AiModelCatalog(AiModelCatalog.ResolveDirectory(dataDir));
         var embeddings = new OnnxTextEmbeddingService(aiModels);
@@ -136,7 +140,7 @@ public static class AppHost
             searchIndex,
             semanticSearch,
             new StorageInsightsService(),
-            new DelegatingTextFileService(new LocalTextFileService(), new StorageTextFileService(fileSystem)),
+            textFiles,
             systemNotifications ?? new MdSystemNotificationServiceAdapter(),
             // 两条后端都注册了才值得裁决；否则维持原来的“无后端就自述”行为，不让 UI 多一层空壳。
             mediaPlayback,
@@ -144,6 +148,7 @@ public static class AppHost
             // 缩略图磁盘缓存：容量自我限额（默认 192 MB），坏图/无权限走负缓存，
             // 目录放在应用数据目录下，与设置/授权根同一处，方便用户整体清理。
             new FileThumbnailCache(Path.Combine(dataDir, "thumbnails")),
+            contentIndex,
             // 端侧 AI 的模型目录：只扫描文件；ONNX Session 在用户调用本地语义搜索时才延迟建立。
             aiModels,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。

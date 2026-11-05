@@ -31,6 +31,8 @@
     <!-- Isolated libmpv spike only; MIT managed Avalonia wrapper, native engine binaries are supplied separately. -->
     <!-- libmpv 托管核心（无 UI 依赖）。应用只用它；下面的 Avalonia 包装仅 spikes/ 里参考，
          因为它依赖 ReactiveUI.Avalonia（禁用清单）且在 Linux 上触发 NU3012。 -->
+    <!-- 本地数据库（内容索引 FTS5）。自带 e_sqlite3 原生库；禁止 EF Core / 反射式 ORM。 -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageVersion Include="HanumanInstitute.LibMpv" Version="0.10.1" />
     <PackageVersion Include="HanumanInstitute.LibMpv.Avalonia" Version="0.10.1" />
     <!-- Experimental Lua runtime spike only; MoonSharp is BSD-3-Clause, execution is not wired into the app. -->

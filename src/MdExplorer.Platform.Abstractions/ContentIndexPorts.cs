@@ -1,0 +1,49 @@
+namespace MdExplorer.Platform.Abstractions;
+
+/// <summary>
+/// 内容索引（全文）的状态。它只报事实：建没建、多少篇、占多大、什么时候更新的。
+/// 「是否覆盖当前根」由调用方拿 <see cref="Roots"/> 与设置比对，不在这里猜。
+/// </summary>
+public sealed record ContentIndexStats(
+    int DocumentCount,
+    long IndexBytes,
+    DateTimeOffset? UpdatedAt,
+    IReadOnlyList<string> Roots)
+{
+    public bool IsBuilt => DocumentCount > 0;
+}
+
+/// <summary>
+/// 一条全文命中。<see cref="Snippet"/> 是从原文里截出来的上下文窗口，
+/// 带省略号，不含索引内部的分词形态（那东西人看不懂，也不该出现在界面上）。
+/// </summary>
+public sealed record ContentSearchHit(
+    string Path,
+    string Name,
+    string Snippet,
+    DateTimeOffset LastWriteTime,
+    long Length);
+
+/// <summary>
+/// 内容（全文）索引端口。默认关闭的增强能力：只索引用户显式加入的本地根，
+/// 只收白名单扩展名、单文件 ≤ 512 KB 的文本，索引数据只存本机应用数据目录。
+/// <para>
+/// 契约：<see cref="RebuildAsync"/> 是可取消的全量校准（未变的文件跳过、消失的文件删除），
+/// 取消或失败时不得破坏已有索引；<see cref="SearchAsync"/> 只读，允许与重建并发。
+/// </para>
+/// </summary>
+public interface IContentIndexService
+{
+    Task<ContentIndexStats> GetStatsAsync(CancellationToken cancellationToken);
+
+    /// <summary>按给定根做一次全量校准（增量跳过未变文件）。</summary>
+    Task<ContentIndexStats> RebuildAsync(
+        IReadOnlyList<string> roots, IProgress<OperationProgress>? progress, CancellationToken cancellationToken);
+
+    /// <summary>按全文匹配查询；查询为空或索引未建时返回空列表。</summary>
+    Task<IReadOnlyList<ContentSearchHit>> SearchAsync(
+        string query, int maxResults, CancellationToken cancellationToken);
+
+    /// <summary>删除全部索引数据（不动用户文件，不动文件名索引）。</summary>
+    Task ClearAsync(CancellationToken cancellationToken);
+}

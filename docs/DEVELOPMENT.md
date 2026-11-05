@@ -522,6 +522,8 @@ public interface ISearchService
 }
 
 /// 索引是可选增强：仅索引用户勾选纳入的根（默认无），以 SQLite 表存名字索引、FTS5 存文本内容。
+/// v0.41 的内容索引是独立端口（IContentIndexService）：它与文件名索引共用索引根配置，
+/// 但存储、启停与「清除」各自独立——文件名索引仍走紧凑 JSON 快照，只有正文进 SQLite。
 public interface ISearchIndexService
 {
     ValueTask<IndexStatus> GetStatusAsync(CancellationToken ct);
@@ -602,6 +604,8 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 3. **索引搜索**（MVP 仅文件名索引，内容索引默认关）：用户在设置里显式添加要索引的根（外加「曾经浏览即被动记录名字」的零配置层，P2）；后台增量维护（目录监听 + 周期校准）；文本类内容索引以白名单扩展与单文件 ≤ 512 KB 正文抽取入 FTS5，设置里可一键清空索引数据并显示其体积。
 
 > **v0.13 第一切片（已落地）**：新增独立“搜索中心”页与 `IFileNameIndexService`。用户把当前本地文件夹显式加入索引根后，可跨根按文件名与文件类型查询；浏览器递归搜索在根被一份当前快照覆盖时走 `IndexedSearchService`，否则回落实时扫描。快照先以源生成紧凑 JSON 存入应用数据目录（不为文件名层提前引入 SQLite 原生依赖，SQLite/FTS5 仍留给后续内容索引），单快照硬顶 50 万条、无权限子树标为部分、命中返回前复核真实文件。运行期只做变更失效：索引根内增删/改名会把快照标为需重建并回落扫描；手动重建经任务中心执行。内容索引、被动零配置层、真正增量更新、大小/日期筛选与最近搜索仍未实现，不在 v0.13 冒充完成。
+
+> **v0.41 第二切片（已落地）**：搜索中心多出「全文」模式，由 `IContentIndexService` / `SqliteContentIndex` 提供正文检索，数据落在应用数据目录 `content-index.db`（WAL，`docs` 元数据 + 原文、`docs_fts` 分词正文、`meta` 记索引根）。**默认关闭**（`AppSettings.EnableContentIndex` 默认 false，关闭时连库文件都不会创建），用户显式「建立 / 更新」后才收录：索引根沿用搜索中心的根配置，只收白名单文本扩展名、单文件 ≤ 512 KB，跳过隐藏目录与 `node_modules`/`bin`/`obj`、不穿符号链接；读不了的文件（无权限、超限、编码不认识）从索引里删掉而不是让整次重建失败。中文分词不依赖 `trigram`（它要求 ≥3 字符，而中文最常用的是 2 个字）：索引侧把连续汉字展开成**重叠二元组**，查询侧同样展开后逐词加引号用 `AND` 连接，摘要再从保留的原文里截上下文，所以界面不会出现「文件 件管」这种内部形态。重建是单事务的全量校准（未变文件按「修改时间 + 大小」跳过、消失的文件删除、取消或失败整体回滚），经任务中心执行并可取消；设置页与搜索中心都能看到篇数/体积/更新时间并一键清空（只删 `content-index.db` + `-wal`/`-shm`，不动用户文件、不动文件名索引）。FTS5 是否可用由首次建表决定：SQLite 构建不带 FTS5 时降级为「未建立」并如实报状态，不抛给界面。仍未做：真增量（目录监听只标失效）、PDF/Office 正文抽取、结果内高亮定位与大小/日期筛选联动。
 
 搜索筛选器（类型/大小区间/日期区间/扩展名/是否含隐藏）以 Filter Chip 呈现，结果项显相对路径注脚、支持从结果定位「打开所在文件夹」。最近搜索词本地保存可一条清空。索引维护期间展示状态（进行中/已最新/根不可达），结果若来自过期索引要诚实标注时间。
 
@@ -933,7 +937,7 @@ Md3 尚无或不够用时自写控件的清单（实现收在 `MdExplorer.UI/Con
 - `recents(locator TEXT PK, kind, last_accessed_at, access_count)`（容量 200 滚动）
 - `search_history(term TEXT PK, searched_at)`
 - `index_roots(locator TEXT PK, include_contents INT, last_full_scan)`
-- `index_files(locator TEXT PK, parent, name, name_lower, kind, length, mtime)` + `name_lower` 索引；内容 FTS：`CREATE VIRTUAL TABLE index_content USING fts5(locator UNINDEXED, body)`（中文分词走 `trigram` tokenizer 适配子串检索，体积与命中率的折中实现时实测）
+- `index_files(locator TEXT PK, parent, name, name_lower, kind, length, mtime)` + `name_lower` 索引；内容 FTS：`CREATE VIRTUAL TABLE index_content USING fts5(locator UNINDEXED, body)`（**v0.41 实测改口径**：`trigram` 要求查询 ≥3 字符，中文两字查询永远不命中，故内容索引改用 `unicode61` + 写入前把连续汉字展开成重叠二元组，查询侧同样展开。另：v0.41 的正文索引落在独立文件 `content-index.db`，没有并进规划中的 `state.db`——它与 `state.db` 都属可重建数据，合并留到 `state.db` 真正落地时再谈；trimmed/AOT 发布时 `SQLitePCLRaw` 的 provider 程序集需保持不被裁掉，真机尚未验收）
 - `granted_scopes(scope_id TEXT PK, locator, display_name, persisted_at)`（Android 授权登记；桌面恒空）
 - `folder_view_state(locator TEXT PK, view_mode, sort_field, sort_dir)`（「按文件夹记住」开启时用）
 
@@ -1245,7 +1249,8 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | 2026-10-30 | **v0.37 模型分发可复现性与校验修订**：五个 HF 仓库均固定到 40 位 commit SHA，脚本统一生成 `/resolve/<revision>/` 地址并校验清单 SHA；下载策略明确为默认两种文本模型、Whisper/YAMNet/SmolVLM 按需选择或 `--all`，Whisper 实际分发的 Xenova ONNX 导出许可改为 Apache-2.0（另注明 OpenAI 上游源码 MIT）。新增离线脚本回归：默认仅 12 个文本配置/权重文件，`--all` 覆盖清单全部 40 个文件；模拟下载、校验、损坏文件重新拉取与 `--clean --only` checksum 隔离。该测试同时发现并修复 Bash 下载时 checksum key 未带模型目录、verify 错误拼接 key 的缺陷。未下载真实模型权重。 | 本地通过 `bash -n`、manifest 11 列/SHA 检查、40 URL pinned dry-run、离线下载/校验/修复/清理回归与 `git diff --check`；push run `41064572455` 六 Job 全绿：Ubuntu / Windows 单元测试与 PowerShell `-List/-All/-Only/-DryRun`、80 截图、Linux/Windows self-contained、Linux Native AOT 与 Android APK 均通过；本机未安装 dotnet，因此 .NET 验证由 CI 完成 |
 | 2026-10-29 | **v0.32 Android 内嵌视频画面**：核实 Avalonia Android 已实现 `INativeControlHostImpl` 后，用 `TextureView` 作原生画面宿主接管视频输出（`MediaPlayer.SetSurface`），新增 `IMediaVideoRenderer` 平台无关端口与 UI 侧 `MediaSurfaceBridge`/`MediaSurfaceHost`；视频可播判定改为“能力位 + 画面通道”双条件，Android 探测对含视频轨且解码器齐全的文件改报可播并附分辨率。Windows/Linux 视频仍交系统应用。 | push run `41011884151` / PR run `41011889991`（sha `5ec8c2c`）六 Job 全绿：223 单元测试 Ubuntu/Windows 双跑（新增原生画面、有声无画、探测否决 3 例）、74 截图测试分四进程 19/19/18/18、PNG 64→65（新增 `74-large-media-probe-rejected`）、Windows/Linux 自包含、linux-x64 Native AOT 与 Android APK（含 trimming/AOT） |
 | 2026-11-05 | **v0.39 双内嵌媒体后端（平台栈 + 可选 libmpv）**：维护者实测 Windows 系统栈取帧路线卡顿，故新增可选的 libmpv 后端并与系统栈并存。平台抽象新增 `MediaBackendPreference`（Auto / SystemApi / LibMpv）、`IMediaBackendSelector` 与 `AppSettings.MediaBackendPreference`（手改非法值一律收回 Auto）；`MediaBackendSelector` 按偏好 + 实际能力位裁决，**能力位为假的后端不算可用**，显式点名却用不上时写「已回退 + 原因」，Auto 只报「谁没被用上、为什么」。桌面新增 `MpvMediaPlaybackService`（只引用不含 UI 的 `HanumanInstitute.LibMpv` 核心包，自驱动 `SoftwareRender` 把 BGRA 帧推给 `IMediaFrameSink`；独立渲染线程 + 500 ms 属性轮询 + 5 秒打开看门狗）与 `MpvNativeLibrary`（`NativeLibrary.TryLoad` 先行探测，库缺失时连上下文都不创建，避免布局期 `DllNotFoundException`）；`IMediaBackendSelector.ActiveBackend` 让预览视图拿到真正在跑的后端，否则裁决层会吞掉 `IMediaVideoFrameSource` 导致“能播但不出画面”。设置页新增后端三选一与实时裁决摘要。**依赖边界**：放弃 `LibMpv.Avalonia`（依赖 `ReactiveUI.Avalonia`，违反 §3.2 禁用清单，且该依赖在 Linux 上触发 NU3012 签名校验失败——本轮 CI 就是先在这里红了一次）。**边界**：本仓不携带也不下载 libmpv 二进制；包装层未验证 AOT/Trim，AOT 下创建失败只降级不崩；Android 只有平台栈。真机流畅度对比仍待验收 | CI run `41989811246` 九 Job 全绿：Ubuntu 构建/单测（新增后端裁决与预览状态机用例）、Windows 单测、Linux/Windows 自包含发布、linux-x64 Native AOT（仅剩包侧 IL2104/IL3053 警告）、Android APK、无头截图、缓存模型语义搜索 |
-| 2026-11-05 | **v0.40 缩略图三档 + 磁盘缓存 + 负缓存**：新增 `IThumbnailCache` 端口与 `FileThumbnailCache`（应用数据目录 `thumbnails/`，键 = 路径 + 档位 + 大小 + 修改时间，写临时文件后改名，IO 异常一律降级为未命中）；三档 Small 128 / Medium 192 / Large 288 落进 `AppSettings.ThumbnailTier`（非法值收回 Medium），设置页新增档位选择、缓存占用摘要与「清空」；浏览器缩略图管线改为「查缓存 → 命中即用 / 负缓存跳过 / 未命中解码并回写 PNG」，换档释放旧缩略图并按新档重解。负缓存标记 24 h 过期，文件大小或修改时间一变立即失效。**边界**：仅图片类型有缩略图；内存 LRU、视频海报/PDF 首页、平台原生缩略图、用户自定上限仍未做；截图为无头合成，真机翻页手感仍待人工验收 | push run（本轮 CI） |
+| 2026-11-05 | **v0.40 缩略图三档 + 磁盘缓存 + 负缓存**：新增 `IThumbnailCache` 端口与 `FileThumbnailCache`（应用数据目录 `thumbnails/`，键 = 路径 + 档位 + 大小 + 修改时间，写临时文件后改名，IO 异常一律降级为未命中）；三档 Small 128 / Medium 192 / Large 288 落进 `AppSettings.ThumbnailTier`（非法值收回 Medium），设置页新增档位选择、缓存占用摘要与「清空」；浏览器缩略图管线改为「查缓存 → 命中即用 / 负缓存跳过 / 未命中解码并回写 PNG」，换档释放旧缩略图并按新档重解。负缓存标记 24 h 过期，文件大小或修改时间一变立即失效。**边界**：仅图片类型有缩略图；内存 LRU、视频海报/PDF 首页、平台原生缩略图、用户自定上限仍未做；截图为无头合成，真机翻页手感仍待人工验收 | push run `41993919728` |
+| 2026-11-05 | **v0.41 全文内容索引（FTS5）**：新增 `IContentIndexService` 端口（`ContentIndexStats` / `ContentSearchHit`）与 `SqliteContentIndex`（`Microsoft.Data.Sqlite` 10.0.0，手写 SQL、不引 ORM），库落在应用数据目录 `content-index.db`（WAL；`docs` 存元数据与原文、`docs_fts` 存分词正文、`meta` 记索引根）。`AppSettings.EnableContentIndex` **默认 false**，关闭时 `GetStatsAsync` 不建库；搜索中心新增「全文」模式与内容索引卡片（开关、篇数/体积/更新时间、建立·更新、清除），设置页同步加入开关与清空。重建经任务中心执行：沿用搜索中心的索引根，只收白名单文本扩展名、单文件 ≤ 512 KB，跳过隐藏目录与 `node_modules`/`bin`/`obj`、不穿符号链接；未变文件按「修改时间(ms) + 大小」跳过，消失的文件删除，读不了的文件从索引里剔除，**整次重建一个事务**（取消或失败整体回滚，已有索引不变）。中文检索不用 `trigram`（要求 ≥3 字符），改为写入/查询两侧都把连续汉字展开成重叠二元组、逐词加引号 `AND` 连接，摘要从保留的原文截窗口（不暴露内部二元组形态）。**边界**：FTS5 不可用时降级为「未建立」并如实报状态（CI 已用真实 SQLite 往返验证 FTS5 可用）；真增量（目录监听）、PDF/Office 正文抽取、命中高亮与大小/日期筛选联动仍未做；至少 8k 篇规模下的重建耗时与体积未实测。18 例单测覆盖分词/查询构造/摘要 + 真实 SQLite 往返（跳过未变、删除消失、清空可重建、不建空库、进度上报） | push run（本轮 CI） |
 
 ### F. 文档变更规则
 |

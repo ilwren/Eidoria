@@ -151,6 +151,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             OnPropertyChanged(nameof(SearchIndexRootCountText));
             OnPropertyChanged(nameof(SearchIndexStateText));
             OnPropertyChanged(nameof(CanBuildSemanticSearchIndex));
+            OnPropertyChanged(nameof(CanRebuildContentIndex));
+            OnPropertyChanged(nameof(SearchCenterModeHintText));
         };
         SearchCenterResults.CollectionChanged += (_, _) =>
         {
@@ -192,6 +194,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _mediaBackendMode = MediaBackendPreferenceNames.Parse(s.MediaBackendPreference);
         _enableLocalAi = s.EnableLocalAi;
         _useSearchIndex = s.UseSearchIndex;
+        _enableContentIndex = s.EnableContentIndex;
         _isDualPaneEnabled = s.DualPaneEnabled;
         _itemPageSize = Math.Clamp(s.ItemPageSize, 60, 480);
         _autoLoadMore = s.AutoLoadMore;
@@ -212,6 +215,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         RefreshSearchIndexRoots();
         RefreshLocalAiState();
         _ = RefreshThumbnailCacheStatsAsync();
+        if (_enableContentIndex)
+            _ = RefreshContentIndexAsync();
     }
 
     /// <summary>Android 挂载后将打开方式切换为 Avalonia Launcher 实现。</summary>
@@ -2581,6 +2586,12 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     // ---------- 搜索中心 / 文件名索引 ----------
     [ObservableProperty] private bool _useSearchIndex = true;
     [ObservableProperty] private bool _isSemanticSearchMode;
+    [ObservableProperty] private bool _isContentSearchMode;
+    [ObservableProperty] private bool _enableContentIndex;
+    [ObservableProperty] private string _contentIndexStatusText = "尚未建立内容索引";
+    [ObservableProperty] private int _contentIndexDocumentCount;
+    [ObservableProperty] private long _contentIndexBytes;
+    [ObservableProperty] private string _contentIndexUpdatedText = "尚未建立";
     [ObservableProperty] private string _searchCenterQuery = string.Empty;
     [ObservableProperty] private string _searchCenterKindFilter = "All";
     [ObservableProperty] private string _semanticSearchIndexStatusText = "尚未建立 AI 语义索引";
@@ -2604,11 +2615,24 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public string SemanticSearchIndexSizeText => Formatting.Bytes(SemanticSearchIndexBytes);
     public string SemanticSearchIndexSummaryText =>
         $"{SemanticSearchIndexCountText} 项 · {SemanticSearchIndexSizeText} · {SemanticSearchIndexUpdatedText}";
-    public bool IsKeywordSearchMode => !IsSemanticSearchMode;
-    public string SearchCenterSearchPlaceholderText => IsSemanticSearchMode
-        ? "用自然语言描述要找的文件或笔记"
-        : "搜索已索引文件名";
-    public string SearchCenterModeHintText => !IsSemanticSearchMode
+    public bool IsKeywordSearchMode => !IsSemanticSearchMode && !IsContentSearchMode;
+    public bool HasContentIndex => ContentIndexDocumentCount > 0 || ContentIndexBytes > 0;
+    public string ContentIndexCountText =>
+        ContentIndexDocumentCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+    public string ContentIndexSizeText => Formatting.Bytes(ContentIndexBytes);
+    public string ContentIndexSummaryText =>
+        HasContentIndex
+            ? $"{ContentIndexCountText} 篇 · {ContentIndexSizeText} · {ContentIndexUpdatedText}"
+            : "尚未建立内容索引";
+    public bool CanRebuildContentIndex => EnableContentIndex && HasSearchIndexRoots && !IsSearchCenterBusy;
+    public string SearchCenterSearchPlaceholderText => IsContentSearchMode
+        ? "搜索已建索引的文件正文"
+        : IsSemanticSearchMode
+            ? "用自然语言描述要找的文件或笔记"
+            : "搜索已索引文件名";
+    public string SearchCenterModeHintText => IsContentSearchMode
+        ? ContentSearchHintText()
+        : !IsSemanticSearchMode
         ? "按名称匹配已加入索引的文件与文件夹。"
         : !EnableLocalAi
             ? "请先到设置启用本地 AI；所有嵌入推理均在本机运行，不上传内容。"
@@ -2657,10 +2681,42 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         OnPropertyChanged(nameof(IsKeywordSearchMode));
         OnPropertyChanged(nameof(SearchCenterSearchPlaceholderText));
         OnPropertyChanged(nameof(SearchCenterModeHintText));
-        SearchCenterStatusText = value
+        ApplySearchCenterModeStatus();
+    }
+
+    partial void OnIsContentSearchModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsKeywordSearchMode));
+        OnPropertyChanged(nameof(SearchCenterSearchPlaceholderText));
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
+        ApplySearchCenterModeStatus();
+        if (value)
+            _ = RefreshContentIndexAsync();
+    }
+
+    partial void OnEnableContentIndexChanged(bool value)
+    {
+        _services.SettingsStore.Settings.EnableContentIndex = value;
+        OnPropertyChanged(nameof(CanRebuildContentIndex));
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
+        ContentIndexStatusText = value ? "内容索引已启用；建立后才会占用磁盘" : "内容索引已关闭";
+        _ = SaveAsync();
+        if (value)
+            _ = RefreshContentIndexAsync();
+    }
+
+    private void ApplySearchCenterModeStatus() => SearchCenterStatusText = IsContentSearchMode
+        ? "全文搜索：在已建索引的本地文本里按词查找，不联网。"
+        : IsSemanticSearchMode
             ? "AI 语义搜索：先建立文件名索引与 AI 向量索引，再输入自然语言描述。"
             : "输入文件名关键词开始搜索";
-    }
+
+    /// <summary>内容搜索的引导文案：缺什么就说什么，别让用户对着空列表猜。</summary>
+    private string ContentSearchHintText() =>
+        !EnableContentIndex ? "请先在设置页启用全文内容索引。" :
+        !HasSearchIndexRoots ? "请先在设置页加入索引根。" :
+        !HasContentIndex ? "内容索引尚未建立，建立后可跨文件搜正文。" :
+        ContentIndexStatusText;
 
     partial void OnSearchCenterKindFilterChanged(string value)
     {
@@ -2677,6 +2733,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     {
         OnPropertyChanged(nameof(ShowSearchCenterEmpty));
         OnPropertyChanged(nameof(CanBuildSemanticSearchIndex));
+        OnPropertyChanged(nameof(CanRebuildContentIndex));
     }
 
     public async Task RefreshSearchIndexAsync()
@@ -2767,8 +2824,13 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     private void SetSearchCenterKind(string kind) => SearchCenterKindFilter = kind;
 
     [RelayCommand]
-    private void SetSearchCenterMode(string mode) => IsSemanticSearchMode =
-        string.Equals(mode, "Semantic", StringComparison.OrdinalIgnoreCase);
+    private void SetSearchCenterMode(string mode)
+    {
+        // 三个模式互斥；先落两个布尔再统一刷状态文案，避免回调互相覆盖。
+        IsSemanticSearchMode = string.Equals(mode, "Semantic", StringComparison.OrdinalIgnoreCase);
+        IsContentSearchMode = string.Equals(mode, "Content", StringComparison.OrdinalIgnoreCase);
+        ApplySearchCenterModeStatus();
+    }
 
     [RelayCommand]
     private async Task RunSearchCenterSearchAsync()
@@ -2779,6 +2841,14 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _searchCenterCts = cts;
 
         SearchCenterResults.Clear();
+        var modeQuery = SearchCenterQuery.Trim();
+        var modeKinds = SearchCenterKinds();
+        if (IsContentSearchMode)
+        {
+            await RunContentSearchAsync(modeQuery, modeKinds, cts).ConfigureAwait(true);
+            return;
+        }
+
         await RefreshSearchIndexAsync().ConfigureAwait(true);
         if (!UseSearchIndex)
         {
@@ -3074,6 +3144,158 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         await RefreshSemanticSearchIndexAsync().ConfigureAwait(true);
         SearchCenterStatusText = "本地搜索索引已清除";
         Notify("已清除文件名与 AI 语义索引");
+    }
+
+    // ---------- 全文内容索引（FTS5） ----------
+
+    /// <summary>内容搜索：查询已建索引的正文，命中按 bm25 相关度排序。</summary>
+    private async Task RunContentSearchAsync(
+        string query, IReadOnlySet<FileKind>? kinds, CancellationTokenSource cts)
+    {
+        if (!EnableContentIndex)
+        {
+            SearchCenterStatusText = "内容索引已关闭；请先在设置启用";
+            return;
+        }
+        if (query.Length == 0)
+        {
+            SearchCenterStatusText = "输入要在正文里查找的词";
+            return;
+        }
+
+        await RefreshContentIndexAsync().ConfigureAwait(true);
+        if (!HasContentIndex)
+        {
+            SearchCenterStatusText = "内容索引尚未建立；到设置页点「建立内容索引」";
+            return;
+        }
+
+        IsSearchCenterBusy = true;
+        SearchCenterStatusText = "正在已建索引的正文里查找…";
+        try
+        {
+            var hits = await _services.ContentIndex
+                .SearchAsync(query, SearchResultLimit, cts.Token).ConfigureAwait(true);
+            foreach (var hit in hits)
+            {
+                var extension = Path.GetExtension(hit.Name);
+                var item = new FileItem(
+                    FileLocator.FromPath(hit.Path),
+                    hit.Name,
+                    FileKindClassifier.Classify(hit.Name),
+                    hit.Length,
+                    hit.LastWriteTime,
+                    false,
+                    false,
+                    extension.Length == 0 ? null : extension);
+                if (kinds is not null && !kinds.Contains(item.Kind))
+                    continue;
+                SearchCenterResults.Add(new FileItemViewModel(item)
+                {
+                    IsFavorite = _services.SettingsStore.IsFavorite(hit.Path),
+                    SearchSnippetText = hit.Snippet,
+                });
+            }
+
+            SearchCenterStatusText = SearchCenterResults.Count == 0
+                ? "正文里没有匹配；索引只收白名单扩展名且单文件 ≤ 512 KB"
+                : $"{SearchCenterResults.Count} 项 · 全文命中 · {ContentIndexCountText} 篇已索引";
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            SearchCenterStatusText = "搜索已取消";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            SearchCenterStatusText = "内容索引读取失败";
+        }
+        finally
+        {
+            if (ReferenceEquals(_searchCenterCts, cts))
+                IsSearchCenterBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RefreshContentIndexAsync()
+    {
+        try
+        {
+            var stats = await _services.ContentIndex.GetStatsAsync(CancellationToken.None).ConfigureAwait(true);
+            ContentIndexDocumentCount = stats.DocumentCount;
+            ContentIndexBytes = stats.IndexBytes;
+            ContentIndexUpdatedText = stats.UpdatedAt is { } updatedAt
+                ? Formatting.DateTime(updatedAt, DateTimeOffset.Now)
+                : "尚未建立";
+            ContentIndexStatusText = !EnableContentIndex
+                ? "内容索引已关闭"
+                : stats.IsBuilt
+                    ? $"内容索引已就绪 · {stats.DocumentCount:N0} 篇"
+                    : "尚未建立内容索引";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            ContentIndexStatusText = "无法读取内容索引状态";
+        }
+
+        OnPropertyChanged(nameof(HasContentIndex));
+        OnPropertyChanged(nameof(ContentIndexCountText));
+        OnPropertyChanged(nameof(ContentIndexSizeText));
+        OnPropertyChanged(nameof(ContentIndexSummaryText));
+        OnPropertyChanged(nameof(CanRebuildContentIndex));
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
+    }
+
+    [RelayCommand]
+    private async Task RebuildContentIndexAsync()
+    {
+        if (!EnableContentIndex)
+        {
+            Notify("内容索引已关闭；请先在设置启用");
+            return;
+        }
+        if (!HasSearchIndexRoots)
+        {
+            Notify("先加入一个索引根");
+            return;
+        }
+
+        // 内容索引与文件名索引共用索引根：用户只维护一处“要搜哪些文件夹”。
+        var roots = SearchIndexRoots.Select(root => root.Path).ToArray();
+        var outcome = await RunOperationAsync("正在建立内容索引…", async (progress, ct) =>
+        {
+            var stats = await _services.ContentIndex
+                .RebuildAsync(roots, progress, ct).ConfigureAwait(true);
+            return new OperationOutcome(stats.DocumentCount, [], []);
+        }).ConfigureAwait(true);
+
+        await RefreshContentIndexAsync().ConfigureAwait(true);
+        if (outcome.Cancelled)
+            ContentIndexStatusText = "内容索引建立已取消；已完成的条目保留";
+        else if (outcome.Success)
+            ContentIndexStatusText = $"内容索引已更新 · {ContentIndexCountText} 篇";
+        else
+            ContentIndexStatusText = "内容索引建立失败；原有索引未被清除";
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
+    }
+
+    [RelayCommand]
+    private async Task ClearContentIndexAsync()
+    {
+        if (!await ConfirmAsync(
+                "清除全文内容索引？",
+                "只删除本机应用数据目录中的正文索引（content-index.db），不会删除任何用户文件，也不影响文件名索引与索引根配置。",
+                "清除内容索引",
+                destructive: true).ConfigureAwait(true))
+            return;
+
+        _searchCenterCts?.Cancel();
+        await _services.ContentIndex.ClearAsync(CancellationToken.None).ConfigureAwait(true);
+        SearchCenterResults.Clear();
+        await RefreshContentIndexAsync().ConfigureAwait(true);
+        ContentIndexStatusText = "内容索引已清除";
+        Notify("已清除全文内容索引");
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
     }
 
     private static string? TryNormalizeSearchIndexRoot(string? path)

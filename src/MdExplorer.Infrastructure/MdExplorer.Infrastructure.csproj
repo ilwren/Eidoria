@@ -11,6 +11,8 @@
                       Link="Ai\ai-models.manifest" />
   </ItemGroup>
   <ItemGroup>
+    <!-- 内容索引（FTS5）用；手写 SQL，不引 ORM。原生 e_sqlite3 随包按 RID 提供。 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="Microsoft.ML.Tokenizers" />
     <InternalsVisibleTo Include="MdExplorer.Tests" />
