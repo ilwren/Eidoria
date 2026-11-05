@@ -53,12 +53,15 @@ public sealed class AiModelDownloaderTests : IDisposable
         public string[] Hosts => Requests.Select(request => request.Uri.Host).Distinct().ToArray();
     }
 
+    /// <summary>
+    /// 造一个响应。<paramref name="resumed"/> = false 表示服务端忽略 Range、返回**完整**内容——
+    /// 这时不能切片，否则测的就不是「忽略 Range」而是「服务端只给了后半段」。
+    /// </summary>
     private static AiModelTransportResponse RespondBytes(byte[] content, long rangeFrom = 0, bool resumed = true)
     {
-        var slice = rangeFrom > 0 && rangeFrom <= content.Length
-            ? content[(int)rangeFrom..]
-            : content;
-        return new AiModelTransportResponse(new MemoryStream(slice), slice.Length, rangeFrom == 0 || resumed, null);
+        var slicing = resumed && rangeFrom > 0 && rangeFrom <= content.Length;
+        var slice = slicing ? content[(int)rangeFrom..] : content;
+        return new AiModelTransportResponse(new MemoryStream(slice), slice.Length, rangeFrom == 0 || slicing, null);
     }
 
     /// <summary>从 <c>/&lt;repo&gt;/resolve/&lt;40 位 revision&gt;/&lt;相对路径&gt;</c> 里取出仓库内相对路径。</summary>
