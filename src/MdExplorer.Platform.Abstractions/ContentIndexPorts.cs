@@ -1,3 +1,5 @@
+using MdExplorer.Domain;
+
 namespace MdExplorer.Platform.Abstractions;
 
 /// <summary>

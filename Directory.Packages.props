@@ -33,6 +33,9 @@
          因为它依赖 ReactiveUI.Avalonia（禁用清单）且在 Linux 上触发 NU3012。 -->
     <!-- 本地数据库（内容索引 FTS5）。自带 e_sqlite3 原生库；禁止 EF Core / 反射式 ORM。 -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <!-- Microsoft.Data.Sqlite 10.0.0 传递带入的 e_sqlite3 2.1.11 命中 GHSA-2m69-gcr7-jv3q（<=2.1.11），
+         显式提到 2.1.12；只升原生 SQLite 版本，不改托管 API 面。 -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageVersion Include="HanumanInstitute.LibMpv" Version="0.10.1" />
     <PackageVersion Include="HanumanInstitute.LibMpv.Avalonia" Version="0.10.1" />
     <!-- Experimental Lua runtime spike only; MoonSharp is BSD-3-Clause, execution is not wired into the app. -->

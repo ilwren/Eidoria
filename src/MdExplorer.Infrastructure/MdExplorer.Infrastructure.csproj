@@ -13,6 +13,8 @@
   <ItemGroup>
     <!-- 内容索引（FTS5）用；手写 SQL，不引 ORM。原生 e_sqlite3 随包按 RID 提供。 -->
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 直接引用以覆盖 Microsoft.Data.Sqlite 的传递版本（见 Directory.Packages.props 注释）。 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="Microsoft.ML.Tokenizers" />
     <InternalsVisibleTo Include="MdExplorer.Tests" />
