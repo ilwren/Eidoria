@@ -1,6 +1,6 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj (in 730 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/LuaPluginRuntime.csproj (in 4.54 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj (in 898 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/LuaPluginRuntime.csproj (in 3.68 sec).
   LuaPluginRuntime -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/bin/Release/net10.0/MdExplorer.LuaPluginRuntime.dll
   LuaPluginRuntime.Android -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/bin/Release/net10.0-android/android-x64/MdExplorer.LuaPluginRuntime.AndroidSpike.dll
   LuaPluginRuntime -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/bin/Release/net10.0/MdExplorer.LuaPluginRuntime.dll
@@ -17,6 +17,6 @@
   [9/14] System.Linq.dll -> System.Linq.dll.so
   [10/14] System.Linq.Expressions.dll -> System.Linq.Expressions.dll.so
   [11/14] Mono.Android.Runtime.dll -> Mono.Android.Runtime.dll.so
-  [12/14] Java.Interop.dll -> Java.Interop.dll.so
-  [13/14] Mono.Android.dll -> Mono.Android.dll.so
+  [12/14] Mono.Android.dll -> Mono.Android.dll.so
+  [13/14] Java.Interop.dll -> Java.Interop.dll.so
   [14/14] System.Private.CoreLib.dll -> System.Private.CoreLib.dll.so
