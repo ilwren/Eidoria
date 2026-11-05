@@ -1,13 +1,19 @@
   Determining projects to restore...
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\MdExplorer.Domain.csproj (in 1.52 sec).
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Application\MdExplorer.Application.csproj (in 1.52 sec).
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj (in 3 ms).
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj (in 12.62 sec).
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj (in 17.7 sec).
-  Restored D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj (in 22.97 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\MdExplorer.Domain.csproj (in 1.2 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Application\MdExplorer.Application.csproj (in 1.2 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj (in 1.2 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj (in 13.4 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj (in 23.49 sec).
+  Restored D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj (in 28.83 sec).
   MdExplorer.Domain -> D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\bin\Release\net10.0\MdExplorer.Domain.dll
   MdExplorer.Platform.Abstractions -> D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\bin\Release\net10.0\MdExplorer.Platform.Abstractions.dll
   MdExplorer.Application -> D:\a\Eidoria\Eidoria\src\MdExplorer.Application\bin\Release\net10.0\MdExplorer.Application.dll
-D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\Ai\AiModelDownloader.cs(355,26): error CS4032: The 'await' operator can only be used within an async method. Consider marking this method with the 'async' modifier and changing its return type to 'Task<Task<AiModelDownloadOutcome>>'. [D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj]
-D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\Ai\AiModelDownloader.cs(432,22): error CS0103: The name 'modelScope' does not exist in the current context [D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj]
 D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\TrashService.cs(23,34): warning CA1416: This call site is reachable on all platforms. 'WindowsTrash.MoveToTrash(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj]
+  MdExplorer.Infrastructure -> D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\bin\Release\net10.0\MdExplorer.Infrastructure.dll
+D:\a\Eidoria\Eidoria\src\MdExplorer.UI\ViewModels\BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.UI\Preview\PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.UI\Preview\PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.UI\Preview\PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.UI\Preview\PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj]
+  MdExplorer.UI -> D:\a\Eidoria\Eidoria\src\MdExplorer.UI\bin\Release\net10.0\MdExplorer.UI.dll
+D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\AiModelDownloaderTests.cs(376,78): error CS9007: The interpolated raw string literal does not start with enough '$' characters to allow this many consecutive closing braces as content. [D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj]
