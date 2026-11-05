@@ -5,13 +5,38 @@
   MdExplorer.Infrastructure -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/bin/Release/net10.0/MdExplorer.Infrastructure.dll
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
   MdExplorer.UI -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/bin/Release/net10.0/MdExplorer.UI.dll
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(46,44): error CS1061: 'TenThousandFileTree' does not contain a definition for 'DataDir' and no accessible extension method 'DataDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(46,59): error CS1061: 'TenThousandFileTree' does not contain a definition for 'StartDir' and no accessible extension method 'StartDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(61,61): error CS1061: 'TenThousandFileTree' does not contain a definition for 'DataDir' and no accessible extension method 'DataDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(61,76): error CS1061: 'TenThousandFileTree' does not contain a definition for 'StartDir' and no accessible extension method 'StartDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(91,44): error CS1061: 'TenThousandFileTree' does not contain a definition for 'DataDir' and no accessible extension method 'DataDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/PerformanceSmokeTests.cs(91,59): error CS1061: 'TenThousandFileTree' does not contain a definition for 'StartDir' and no accessible extension method 'StartDir' accepting a first argument of type 'TenThousandFileTree' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/MdExplorer.Performance.csproj]
+  MdExplorer.Performance -> /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
+Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
+[xUnit.net 00:00:00.12]   Discovering: MdExplorer.Performance
+[xUnit.net 00:00:00.26]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.39]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [213 ms]
+  Standard Output Messages:
+ [perf] 1 万条目录首批上屏：132.0 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：30.2 ms
+
+
+[xUnit.net 00:00:01.69]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [925 ms]
+  Standard Output Messages:
+ [perf] 内容索引重建 10000 篇：834 ms，库体积 10.74 MB
+ [perf] 内容索引查询命中 50 条：14.0 ms
+
+
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [1 ms]
+  Standard Output Messages:
+ [perf] 组合根 + Shell 构造：0.8 ms
+
+
+
+Test Run Successful.
+Total tests: 3
+     Passed: 3
+ Total time: 2.0462 Seconds
