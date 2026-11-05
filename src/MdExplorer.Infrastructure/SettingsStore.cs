@@ -85,6 +85,9 @@ public sealed class SettingsStore : ISettingsStore
         // 旧版没有这些字段时源生成反序列化会保留默认值；手改 JSON 显式写 null 时则在此兜底。
         settings.ThemeMode ??= "System";
         settings.SeedColor ??= "#006A6A";
+        settings.MediaBackend = string.Equals(settings.MediaBackend, "LibMpv", StringComparison.OrdinalIgnoreCase)
+            ? "LibMpv"
+            : "System";
         settings.ViewMode ??= "List";
         settings.SortField ??= "Name";
         settings.SortDirection ??= "Ascending";

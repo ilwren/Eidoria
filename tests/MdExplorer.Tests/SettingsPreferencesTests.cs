@@ -55,6 +55,38 @@ public sealed class SettingsPreferencesTests : IDisposable
         Assert.Equal(72d, shell.PullRefreshTriggerDistance);
         Assert.True(shell.IsPullTrigger72);
         Assert.Equal("72 DIP", shell.PullTriggerText);
+        Assert.Equal("System", shell.SettingsStore.Settings.MediaBackend);
+    }
+
+    [Fact]
+    public async Task MediaBackendPreferenceRoundTripsAndUnknownValuesFallBackToSystem()
+    {
+        await File.WriteAllTextAsync(
+            Path.Combine(_dataDir, "settings.json"),
+            """
+            {
+              "MediaBackend": "libmpv"
+            }
+            """,
+            TestContext.Current.CancellationToken);
+
+        var store = await SettingsStore.LoadAsync(_dataDir, TestContext.Current.CancellationToken);
+        Assert.Equal("LibMpv", store.Settings.MediaBackend);
+        await store.SaveSettingsAsync(TestContext.Current.CancellationToken);
+
+        var reloaded = await SettingsStore.LoadAsync(_dataDir, TestContext.Current.CancellationToken);
+        Assert.Equal("LibMpv", reloaded.Settings.MediaBackend);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_dataDir, "settings.json"),
+            """
+            {
+              "MediaBackend": "UnrecognizedDecoder"
+            }
+            """,
+            TestContext.Current.CancellationToken);
+        var normalized = await SettingsStore.LoadAsync(_dataDir, TestContext.Current.CancellationToken);
+        Assert.Equal("System", normalized.Settings.MediaBackend);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 # libmpv Avalonia 桌面 Spike
 
-这是一个隔离验证样例，不替换 Eidoria 当前的媒体后端，也不被正式应用引用或随正式应用发布。样例使用 `HanumanInstitute.LibMpv.Avalonia` 0.10.1（MIT managed wrapper，目标为 .NET 10 / Avalonia 12），直接显示 libmpv 画面并提供打开、播放/暂停、停止和 seek 控件。样例项目列在主 `.slnx` 中，以便 CI 至少编译 managed 集成；它不携带或打包任何 libmpv 原生二进制，编译通过不等于已通过播放验收。
+这是一个独立验证样例，仍可单独检查 `HanumanInstitute.LibMpv.Avalonia` 0.10.1（MIT managed wrapper，目标为 .NET 10 / Avalonia 12）的控件与原生库加载。Eidoria 桌面程序现在也有一个可选择的 libmpv 预览后端；两处都使用单独提供的 libmpv 原生库，仓库不携带或打包任何 mpv 二进制。正式应用的选择、接线与对比步骤见 [`MEDIA-PLAYBACK.md`](MEDIA-PLAYBACK.md)。Spike 继续列在主 `.slnx` 中，以便 CI 至少编译 managed 集成；编译通过不等于已通过原生播放验收。
 
 ## 运行
 

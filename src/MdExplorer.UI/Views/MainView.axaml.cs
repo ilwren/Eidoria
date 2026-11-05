@@ -112,6 +112,24 @@ public partial class MainView : UserControl
 
     private ShellViewModel? Shell => DataContext as ShellViewModel;
 
+    private void UpdateMediaRendererActivation(ShellViewModel? shell = null)
+    {
+        shell ??= Shell;
+        var floatingPreviewActive = shell?.ShowPreviewPageNow == true;
+        var sidebarPreviewActive = shell?.ShowPreviewPaneEffective == true && !floatingPreviewActive;
+
+        // Release the old renderer host before activating the next one. This avoids overlapping
+        // native contexts and lets the shared playback service preserve position/play state.
+        if (!floatingPreviewActive)
+            FloatingPreviewView.IsMediaRendererActive = false;
+        if (!sidebarPreviewActive)
+            SidebarPreviewView.IsMediaRendererActive = false;
+        if (floatingPreviewActive)
+            FloatingPreviewView.IsMediaRendererActive = true;
+        if (sidebarPreviewActive)
+            SidebarPreviewView.IsMediaRendererActive = true;
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
@@ -158,6 +176,7 @@ public partial class MainView : UserControl
             vm.SecondaryBrowser.PropertyChanged += OnSecondaryBrowserPropertyChanged;
             vm.Preview.PropertyChanged += OnPreviewPropertyChanged;
             ApplyWindowChromeLayout();
+            UpdateMediaRendererActivation(vm);
             _ = vm.Browser.RefreshExternalClipboardAsync();
         }
     }
@@ -598,6 +617,8 @@ public partial class MainView : UserControl
     {
         if (Shell is not { } shell)
             return;
+
+        UpdateMediaRendererActivation(shell);
 
         if (e.PropertyName is nameof(ShellViewModel.SizeClass)
             or nameof(ShellViewModel.IsExpandedOrAbove)

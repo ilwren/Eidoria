@@ -28,7 +28,7 @@
     <!-- Office 只读预览控件（MIT；net8.0/net10.0，Avalonia >= 12.0.2，IsTrimmable/IsAotCompatible）。
          仅经 OfficeDocumentViewer 适配层接入，DOCX/PPTX/XLSX 先由宿主做包大小、展开量与结构复杂度预检。 -->
     <PackageVersion Include="OfficeViewer.Avalonia" Version="0.1.6" />
-    <!-- Isolated libmpv spike only; MIT managed Avalonia wrapper, native engine binaries are supplied separately. -->
+    <!-- MIT managed Avalonia wrapper for the selectable desktop backend and isolated spike; native libmpv remains external. -->
     <PackageVersion Include="HanumanInstitute.LibMpv.Avalonia" Version="0.10.1" />
     <!-- Experimental Lua runtime spike only; MoonSharp is BSD-3-Clause, execution is not wired into the app. -->
     <PackageVersion Include="MoonSharp" Version="2.0.0" />

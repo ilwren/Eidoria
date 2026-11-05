@@ -185,6 +185,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _watchFolderChanges = s.WatchFolderChanges;
         _notifyOnTaskCompletion = s.NotifyOnTaskCompletion;
         _playVideoInline = s.PlayVideoInline;
+        _mediaBackend = s.MediaBackend;
         _mediaAutoPlay = s.MediaAutoPlay;
         _showMediaDiagnostics = s.ShowMediaDiagnostics;
         _enableLocalAi = s.EnableLocalAi;
@@ -3113,6 +3114,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     [ObservableProperty] private bool _rememberFolderView;
     [ObservableProperty] private bool _notifyOnTaskCompletion;
     [ObservableProperty] private bool _playVideoInline;
+    [ObservableProperty] private string _mediaBackend = "System";
     [ObservableProperty] private bool _mediaAutoPlay;
     [ObservableProperty] private bool _showMediaDiagnostics = true;
     /// <summary>端侧 AI 总开关（默认关）；关闭后语义索引保留在本机，但不进行推理或检索。</summary>
@@ -3176,6 +3178,22 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         double.IsFinite(AutoLoadMoreDistance) ? AutoLoadMoreDistance : 320, 120, 600);
     public string SystemNotificationPlatformText => _services.SystemNotifications.PlatformName;
     public string SystemNotificationSupportText => _services.SystemNotifications.SupportDescription;
+    /// <summary>目前只向 Windows 桌面暴露对比选择；Android/Linux 继续使用各自已验证的系统路线。</summary>
+    public bool CanSelectMediaBackend => OperatingSystem.IsWindows();
+    public bool IsSystemMediaBackend => string.Equals(MediaBackend, "System", StringComparison.Ordinal);
+    public bool IsLibMpvMediaBackend => string.Equals(MediaBackend, "LibMpv", StringComparison.Ordinal);
+    public string MediaBackendSettingsText => IsLibMpvMediaBackend
+        ? "已选择 libmpv。需另行安装并审核 LGPL-only 原生运行库；重启后尝试加载，不可用时不会静默切回系统后端。"
+        : "已选择 Windows 系统 API（Media Foundation）；重启后生效。切换后可用同一文件对比播放流畅度。";
+    public string PlayVideoInlineDescription => OperatingSystem.IsAndroid()
+        ? "关闭时视频先显示系统播放器与内嵌观看两个入口；Android 由系统 MediaPlayer 输出到原生 Surface，格式与设备能力会影响播放。"
+        : IsLibMpvMediaBackend
+            ? "关闭时视频先显示系统播放器与内嵌观看两个入口；libmpv 路线预期直接渲染画面，不走逐帧截图，仍需在实际设备上比较兼容性。"
+            : OperatingSystem.IsLinux()
+                ? "关闭时视频先显示系统播放器与内嵌观看两个入口；Linux GStreamer 走 appsink 推帧，高分辨率视频可能增加 CPU 与帧拷贝负载。"
+                : OperatingSystem.IsWindows()
+                    ? "关闭时视频先显示系统播放器与内嵌观看两个入口；Windows 系统视频路线依赖 MediaComposition 取帧，负载高时可能卡顿或音画不同步。"
+                    : "关闭时视频先显示系统播放器与内嵌观看两个入口；内嵌播放能力取决于当前平台后端。";
 
     public event EventHandler? ThemeSettingsChanged;
 
@@ -3264,6 +3282,22 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _ = SaveAsync();
         Preview.RefreshSettings();
     }
+
+    partial void OnMediaBackendChanged(string value)
+    {
+        _services.SettingsStore.Settings.MediaBackend = value;
+        OnPropertyChanged(nameof(IsSystemMediaBackend));
+        OnPropertyChanged(nameof(IsLibMpvMediaBackend));
+        OnPropertyChanged(nameof(MediaBackendSettingsText));
+        OnPropertyChanged(nameof(PlayVideoInlineDescription));
+        _ = SaveAsync();
+    }
+
+    [RelayCommand]
+    private void SetMediaBackend(string? backend) =>
+        MediaBackend = string.Equals(backend, "LibMpv", StringComparison.OrdinalIgnoreCase)
+            ? "LibMpv"
+            : "System";
 
     partial void OnMediaAutoPlayChanged(bool value)
     {

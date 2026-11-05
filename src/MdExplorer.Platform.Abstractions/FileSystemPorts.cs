@@ -370,7 +370,8 @@ public sealed class AppSettings
     public long AppTrashQuotaBytes { get; set; } = 1_000_000_000; // Android 应用内回收站配额（200 MB–10 GB）；桌面走系统回收站
     public int AppTrashRetentionDays { get; set; } = 30;    // Android 应用内回收站保留期（1–365 天）
     public bool NotifyOnTaskCompletion { get; set; }       // 长任务完成/失败时发送操作系统通知（默认关，需用户显式开启）
-    public bool PlayVideoInline { get; set; }             // 视频默认在应用内嵌面板出画面（默认关：逐帧抓取可能花屏/不同步）
+    public bool PlayVideoInline { get; set; }             // 视频默认在应用内嵌面板出画面（默认关）
+    public string MediaBackend { get; set; } = "System";  // System | LibMpv；桌面启动时选择后端
     public bool MediaAutoPlay { get; set; }               // 选中媒体文件后自动开始播放（默认关）
     public bool ShowMediaDiagnostics { get; set; } = true; // 预览卡里显示媒体后端名称与诊断文本
     public bool EnableLocalAi { get; set; }              // 端侧 AI 总开关（默认关；模型需用户显式下载，未安装时不假装可用）

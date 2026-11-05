@@ -26,6 +26,7 @@ public partial class App : Avalonia.Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktop.Exit += async (_, _) => await services.MediaPlayback.DisposeAsync();
             desktop.MainWindow = new MainWindow { DataContext = shell };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)

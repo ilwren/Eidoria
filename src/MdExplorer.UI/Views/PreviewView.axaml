@@ -235,22 +235,28 @@
               <!-- 原生画面：画面由平台解码器画在这块窗口里（Android TextureView）。 -->
               <Border IsVisible="{Binding ShowNativeVideoSurface}" Height="280"
                       Background="#000000" CornerRadius="12" ClipToBounds="True">
-                <media:MediaSurfaceHost Renderer="{Binding VideoRenderer}" AutomationProperties.Name="视频画面" />
+                <ContentControl x:Name="NativeVideoHost" AutomationProperties.Name="视频画面（原生 surface）" />
+              </Border>
+              <!-- 直接 renderer：Control 只由当前可见的 PreviewView 创建，避免侧栏与浮窗争用同一个 Visual。音频时保留一个不可见的小宿主，以便 libmpv 获得 renderer 上下文。 -->
+              <Border IsVisible="{Binding ShowAvaloniaMediaRendererHost}"
+                      Height="{Binding MediaRendererHostHeight}" Opacity="{Binding MediaRendererHostOpacity}"
+                      Background="#000000" CornerRadius="12" ClipToBounds="True">
+                <media:MediaControlHost x:Name="MediaRendererHost" Service="{Binding MediaPlaybackService}"
+                                        AutomationProperties.Name="视频画面（直接 renderer）" />
               </Border>
               <!-- 推帧画面：后端（Linux appsink / Windows MediaComposition 取帧）把帧推给宿主，Avalonia 自己画。
                    与原生画面互斥：只有 RendererKind=FramePush 的后端才走这里。 -->
               <Border IsVisible="{Binding ShowFrameVideoSurface}" Height="280"
                       Background="#000000" CornerRadius="12" ClipToBounds="True">
-                <media:MediaFrameSurface Source="{Binding VideoFrameSource}" AutomationProperties.Name="视频画面（推帧）" />
+                <ContentControl x:Name="FrameVideoHost" AutomationProperties.Name="视频画面（推帧）" />
               </Border>
-              <!-- 视频默认不在应用内出画面（花屏/不同步/CPU 都实测过）：这里给两个显式入口，
-                   用户自己决定是外挂播放器还是内嵌面板，风险写在按钮上面。 -->
+              <!-- 视频默认不在应用内出画面：逐帧取帧在高负载时可能花屏、不同步或占用较多 CPU，
+                   这里给两个显式入口，用户自己决定是外挂播放器还是内嵌面板。 -->
               <Border IsVisible="{Binding ShowInlineVideoGate}" CornerRadius="12" Padding="12"
                       Background="{DynamicResource Md.Sys.Color.SurfaceContainerHigh.Brush}">
                 <StackPanel Spacing="8">
                   <TextBlock Classes="body" Text="视频默认不在应用内出画面" TextWrapping="Wrap" />
-                  <TextBlock Classes="caption" TextWrapping="Wrap"
-                             Text="内嵌画面按帧抓取，解码或绘制负载高时可能不够流畅、音画不同步或占用较多 CPU。要稳定播放请用系统播放器。" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding InlineVideoRiskText}" />
                   <WrapPanel Orientation="Horizontal">
                     <md:MdButton Variant="Filled" Height="38" Margin="0,0,8,4" Command="{Binding OpenCommand}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
@@ -327,7 +333,7 @@
                 </StackPanel>
               </Border>
               <TextBlock Classes="caption" Text="{Binding MediaBackendDiagnostic}" TextWrapping="Wrap" Margin="0,0,4,0"
-                         IsVisible="{Binding ShowMediaDiagnostics}"
+                         IsVisible="{Binding ShowMediaBackendDiagnostic}"
                          Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
               <TextBlock Classes="caption" Text="{Binding MediaRendererText}" TextWrapping="Wrap" Margin="0,0,4,0"
                          IsVisible="{Binding ShowMediaDiagnostics}"

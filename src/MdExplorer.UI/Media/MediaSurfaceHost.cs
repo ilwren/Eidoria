@@ -23,7 +23,7 @@ public interface IMediaSurfaceAttachment : IDisposable
 
 /// <summary>
 /// 平台注入点。与 <c>AppHost.MediaPlaybackFactory</c> 同一套模式：
-/// Android 宿主在 Activity 创建时注册，桌面与无头测试不注册——此时视频只剩“系统应用打开”。
+/// Android 宿主在 AppBuilder 定制阶段、创建 AppHost 前注册；桌面与无头测试不注册。
 /// </summary>
 public static class MediaSurfaceBridge
 {

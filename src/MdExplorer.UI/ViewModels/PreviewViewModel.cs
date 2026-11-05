@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MdExplorer.Domain;
 using MdExplorer.Platform.Abstractions;
+using MdExplorer.UI.Media;
 using MdExplorer.UI.Preview;
 
 namespace MdExplorer.UI.ViewModels;
@@ -23,6 +24,7 @@ public sealed partial class PreviewViewModel(
     private readonly Func<AppSettings>? _settings = settings;
     private string _mediaProbeText = string.Empty;
     private string? _mediaProbeReason;
+    private string? _mediaControlInitializationError;
     // 探测说“系统接不了”时，能力位再好看也不能播——否则按钮按下去只会失败。
     private bool _mediaProbeAllowsPlayback = true;
     private Avalonia.Threading.DispatcherTimer? _mediaTimer;
@@ -208,7 +210,7 @@ public sealed partial class PreviewViewModel(
     }
 
     /// <summary>
-    /// 关闭预览时把重量级负载（位图、PDF 字节、第三方直接控件）放掉了，内容需要重载。
+    /// 关闭预览时把位图、PDF 字节与 KeePass 敏感负载放掉了，内容需要重载；专用 renderer 控件由视图宿主生命周期管理。
     /// 文本类内容只占几百 KB，不必跟着一起丢。
     /// </summary>
     public bool IsPayloadReleased { get; private set; }
@@ -237,22 +239,40 @@ public sealed partial class PreviewViewModel(
     public bool IsAudioMedia => CurrentItem is { IsFolder: false, Kind: FileKind.Audio };
     public bool IsVideoMedia => CurrentItem is { IsFolder: false, Kind: FileKind.Video };
     /// <summary>
-    /// 当前后端能否在应用内播放这个媒体。音频只看 CanPlayAudio；
-    /// 视频还要求后端真的能交付画面（<see cref="MediaRendererKind.None"/> 时不能播，
+    /// 当前后端能否在应用内播放这个媒体。音频要求 CanPlayAudio；AvaloniaControl 后端还必须注册可用的宿主控件。
+    /// 视频另要求后端真的能交付画面（<see cref="MediaRendererKind.None"/> 时不能播，
     /// 否则会出现“有声音没画面”的假播放）。
     /// </summary>
     public bool CanPlayMediaInApp =>
         _media is { } media && IsMedia && _mediaProbeAllowsPlayback &&
-        (IsAudioMedia ? media.Capabilities.CanPlayAudio : PlayVideoInline && MediaBackendCanShowVideo);
+        (IsAudioMedia
+            ? media.Capabilities.CanPlayAudio && MediaBackendHasAvaloniaControl
+            : PlayVideoInline && MediaBackendCanShowVideo);
 
     /// <summary>
-    /// 后端是否真能交付画面（不看用户偏好）：推帧后端必须真的实现帧呈现面，
+    /// 后端是否真能交付画面（不看用户偏好）：每种 renderer 都必须有对应宿主，
     /// 否则按下去只有声音没画面。
     /// </summary>
-    private bool MediaBackendCanShowVideo =>
-        _media is { } media && media.Capabilities.CanPlayVideo &&
-        media.RendererKind != MediaRendererKind.None &&
-        (media.RendererKind != MediaRendererKind.FramePush || media is IMediaVideoFrameSource);
+    private bool MediaBackendCanShowVideo
+    {
+        get
+        {
+            if (_media is not { } media || !media.Capabilities.CanPlayVideo)
+                return false;
+
+            return media.RendererKind switch
+            {
+                MediaRendererKind.NativeSurface => media is IMediaVideoRenderer,
+                MediaRendererKind.FramePush => media is IMediaVideoFrameSource,
+                MediaRendererKind.AvaloniaControl => MediaBackendHasAvaloniaControl,
+                _ => false,
+            };
+        }
+    }
+
+    private bool MediaBackendHasAvaloniaControl =>
+        _media?.RendererKind != MediaRendererKind.AvaloniaControl ||
+        (MediaControlBridge.Factory is not null && _mediaControlInitializationError is null);
 
     /// <summary>
     /// 视频是否在应用内嵌面板里出画面。默认关（逐帧抓取可能花屏/音画不同步），
@@ -264,18 +284,32 @@ public sealed partial class PreviewViewModel(
     public bool ShowInlineVideoGate =>
         IsVideoMedia && !PlayVideoInline && _mediaProbeAllowsPlayback && MediaBackendCanShowVideo;
 
-    /// <summary>是否显示媒体后端名称与诊断长文（设置项，默认显示）。</summary>
+    /// <summary>是否显示媒体后端名称与 renderer 说明（设置项，默认显示）。</summary>
     public bool ShowMediaDiagnostics => _settings?.Invoke().ShowMediaDiagnostics ?? true;
+    /// <summary>后端不可用或 renderer 初始化失败时，错误诊断不可被普通诊断开关隐藏。</summary>
+    public bool ShowMediaBackendDiagnostic =>
+        ShowMediaDiagnostics || _media is null || !_media.Capabilities.IsSupported ||
+        !string.IsNullOrWhiteSpace(_mediaControlInitializationError) ||
+        (_media?.RendererKind == MediaRendererKind.AvaloniaControl && MediaControlBridge.Factory is null);
     /// <summary>后端需要宿主的原生画面窗口（Android TextureView / Windows HWND）。</summary>
     public IMediaVideoRenderer? VideoRenderer => _media as IMediaVideoRenderer;
     public bool ShowNativeVideoSurface =>
         IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
         _media?.RendererKind == MediaRendererKind.NativeSurface;
-    /// <summary>后端只推帧（Linux Wayland 的 appsink 路线）；画面由 Avalonia 自己画。</summary>
+    /// <summary>后端只推帧（Linux appsink / Windows MediaComposition）；画面由 Avalonia 自己画。</summary>
     public IMediaVideoFrameSource? VideoFrameSource => _media as IMediaVideoFrameSource;
     public bool ShowFrameVideoSurface =>
         IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
         _media?.RendererKind == MediaRendererKind.FramePush && VideoFrameSource is not null;
+    /// <summary>仅为可视 renderer 后端显示宿主；具体 Control 由当前活动的 PreviewView 实例化。</summary>
+    public IMediaPlaybackService? MediaPlaybackService => _media;
+    public bool ShowAvaloniaMediaRendererHost =>
+        IsMedia && _media?.RendererKind == MediaRendererKind.AvaloniaControl;
+    public double MediaRendererHostHeight => ShowAvaloniaVideoSurface ? 280 : 1;
+    public double MediaRendererHostOpacity => ShowAvaloniaVideoSurface ? 1 : 0;
+    public bool ShowAvaloniaVideoSurface =>
+        IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
+        _media?.RendererKind == MediaRendererKind.AvaloniaControl;
     /// <summary>对当前文件显式改用内嵌画面（风险提示就在卡片上，用户自己选的）。</summary>
     [ObservableProperty] private bool _forceInlineVideo;
 
@@ -283,14 +317,26 @@ public sealed partial class PreviewViewModel(
     [RelayCommand]
     private void EnableInlineVideo() => ForceInlineVideo = true;
 
-    partial void OnForceInlineVideoChanged(bool value) =>
+    partial void OnForceInlineVideoChanged(bool value)
+    {
         OnPropertyChanged(nameof(PlayVideoInline));
+        OnPropertyChanged(nameof(CanPlayMediaInApp));
+        OnPropertyChanged(nameof(ShowInlineVideoGate));
+        OnPropertyChanged(nameof(ShowNativeVideoSurface));
+        OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowAvaloniaVideoSurface));
+        OnPropertyChanged(nameof(MediaRendererHostHeight));
+        OnPropertyChanged(nameof(MediaRendererHostOpacity));
+        OnPropertyChanged(nameof(HasMediaProbe));
+        OnPropertyChanged(nameof(MediaStateText));
+    }
 
     /// <summary>设置变化后刷新依赖偏好的可见性（Shell 在写设置后调用）。</summary>
     public void RefreshSettings()
     {
         OnPropertyChanged(nameof(PlayVideoInline));
         OnPropertyChanged(nameof(ShowMediaDiagnostics));
+        OnPropertyChanged(nameof(ShowMediaBackendDiagnostic));
         RaiseMediaState();
     }
 
@@ -307,9 +353,52 @@ public sealed partial class PreviewViewModel(
     {
         MediaRendererKind.NativeSurface => "画面：平台原生 Surface",
         MediaRendererKind.FramePush => "画面：宿主帧呈现",
+        MediaRendererKind.AvaloniaControl => "画面：Avalonia 原生 renderer",
         _ => "画面：未接入（用系统应用打开）",
     };
-    public string MediaBackendDiagnostic => _media?.Capabilities.Diagnostic ?? "未配置播放后端。";
+    public string MediaBackendDiagnostic
+    {
+        get
+        {
+            var diagnostic = _media?.Capabilities.Diagnostic ?? "未配置播放后端。";
+            if (!string.IsNullOrWhiteSpace(_mediaControlInitializationError))
+                return $"{diagnostic} {_mediaControlInitializationError}";
+            return _media?.RendererKind == MediaRendererKind.AvaloniaControl && MediaControlBridge.Factory is null
+                ? $"{diagnostic} 宿主未注册 Avalonia renderer 画面控件。"
+                : diagnostic;
+        }
+    }
+    /// <summary>活动 renderer 宿主初始化失败时，将实际错误同步到预览状态与诊断。</summary>
+    public void ReportMediaRendererInitializationError(string? error)
+    {
+        error = string.IsNullOrWhiteSpace(error) ? null : error.Trim();
+        if (string.Equals(_mediaControlInitializationError, error, StringComparison.Ordinal))
+            return;
+
+        _mediaControlInitializationError = error;
+        OnPropertyChanged(nameof(MediaBackendDiagnostic));
+        OnPropertyChanged(nameof(ShowMediaBackendDiagnostic));
+        OnPropertyChanged(nameof(CanPlayMediaInApp));
+        OnPropertyChanged(nameof(ShowInlineVideoGate));
+        OnPropertyChanged(nameof(ShowNativeVideoSurface));
+        OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowAvaloniaVideoSurface));
+        OnPropertyChanged(nameof(MediaRendererHostHeight));
+        OnPropertyChanged(nameof(MediaRendererHostOpacity));
+        OnPropertyChanged(nameof(HasMediaProbe));
+        OnPropertyChanged(nameof(MediaStateText));
+    }
+
+    public string InlineVideoRiskText => _media?.RendererKind switch
+    {
+        MediaRendererKind.AvaloniaControl =>
+            "libmpv 直接通过 Avalonia renderer 输出画面，不经过逐帧截图；实际解码器、硬件加速与稳定性取决于外部原生构建。",
+        MediaRendererKind.NativeSurface =>
+            "画面由平台原生解码器输出到 Surface；文件格式和设备能力可能影响播放效果。",
+        MediaRendererKind.FramePush =>
+            "当前后端通过取帧/推帧把画面交给 Avalonia；高分辨率视频可能不够流畅、音画不同步或占用较多 CPU。",
+        _ => "此后端没有可用的内嵌视频画面；请使用系统播放器打开。",
+    };
     public string MediaStateText => _media?.State switch
     {
         MediaPlaybackState.Opening => "正在打开…",
@@ -422,17 +511,20 @@ public sealed partial class PreviewViewModel(
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                 or InvalidOperationException or NotSupportedException or ArgumentException)
             {
-                _mediaProbeText = "系统解码器探测失败";
+                _mediaProbeText = $"{_media.Capabilities.BackendName} 探测失败";
                 _mediaProbeReason = ex.Message;
             }
         }
         else if (_media is not null)
         {
-            _mediaProbeText = "系统解码器能力未知（尝试播放后才知道）";
+            _mediaProbeText = $"{_media.Capabilities.BackendName} 解码能力未知（尝试播放后才知道）";
         }
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowAvaloniaVideoSurface));
+        OnPropertyChanged(nameof(MediaRendererHostHeight));
+        OnPropertyChanged(nameof(MediaRendererHostOpacity));
         OnPropertyChanged(nameof(MediaProbeText));
         OnPropertyChanged(nameof(HasMediaProbe));
         OnPropertyChanged(nameof(MediaProbeReasonText));
@@ -447,6 +539,12 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowAvaloniaVideoSurface));
+        OnPropertyChanged(nameof(ShowAvaloniaMediaRendererHost));
+        OnPropertyChanged(nameof(MediaPlaybackService));
+        OnPropertyChanged(nameof(MediaRendererHostHeight));
+        OnPropertyChanged(nameof(MediaRendererHostOpacity));
+        OnPropertyChanged(nameof(InlineVideoRiskText));
         OnPropertyChanged(nameof(VideoRenderer));
         OnPropertyChanged(nameof(VideoFrameSource));
         OnPropertyChanged(nameof(IsMediaPlaying));
@@ -457,6 +555,7 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(MediaVolumePercent));
         OnPropertyChanged(nameof(MediaBackendName));
         OnPropertyChanged(nameof(MediaBackendDiagnostic));
+        OnPropertyChanged(nameof(ShowMediaBackendDiagnostic));
         OnPropertyChanged(nameof(MediaRendererText));
         OnPropertyChanged(nameof(MediaProbeText));
         OnPropertyChanged(nameof(HasMediaProbe));
@@ -481,10 +580,15 @@ public sealed partial class PreviewViewModel(
         // 后端可能从任意线程回调：有 Avalonia 应用时切回 UI 线程，测试环境直接刷新。
         if (global::Avalonia.Application.Current is not null && !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(RaiseMediaState);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                RaiseMediaState();
+                UpdateMediaTimer();
+            });
             return;
         }
         RaiseMediaState();
+        UpdateMediaTimer();
     }
 
     /// <summary>播放中每 500 ms 刷新一次进度；没有 Avalonia 消息泵（普通单元测试）时不建定时器。</summary>
@@ -760,6 +864,7 @@ public sealed partial class PreviewViewModel(
             Title = string.Empty;
             Subtitle = string.Empty;
             IsLoading = false;
+            RaiseMediaState();
             return;
         }
 

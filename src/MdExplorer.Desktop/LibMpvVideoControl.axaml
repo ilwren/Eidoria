@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:MdExplorer.Desktop"
+             xmlns:mpv="using:HanumanInstitute.LibMpv.Avalonia"
+             x:Class="MdExplorer.Desktop.LibMpvVideoControl"
+             x:DataType="local:LibMpvVideoControl"
+             Background="#000000">
+  <mpv:MpvView x:Name="PlayerView"
+               MpvContext="{Binding Context, Mode=OneWayToSource}"
+               Renderer="Auto" />
+</UserControl>

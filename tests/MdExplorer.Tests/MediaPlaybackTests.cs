@@ -1,6 +1,7 @@
 using MdExplorer.Domain;
 using MdExplorer.Infrastructure;
 using MdExplorer.Platform.Abstractions;
+using MdExplorer.UI.Media;
 using MdExplorer.UI.Preview;
 using MdExplorer.UI.Services;
 using MdExplorer.UI.ViewModels;
@@ -35,7 +36,9 @@ public sealed class MediaPlaybackTests
     [Fact]
     public async Task WithoutBallbackBackendUiSaysSoAndNeverPretendsToPlay()
     {
-        var preview = CreatePreview(new UnsupportedMediaPlaybackService("桌面端暂无内嵌解码后端。"));
+        var preview = CreatePreviewWithSettings(
+            new UnsupportedMediaPlaybackService("桌面端暂无内嵌解码后端。"),
+            new AppSettings { ShowMediaDiagnostics = false });
         await preview.LoadAsync(Item("song.mp3", FileKind.Audio));
 
         Assert.True(preview.IsMedia);
@@ -43,6 +46,7 @@ public sealed class MediaPlaybackTests
         Assert.False(preview.CanPlayMediaInApp);
         Assert.Equal("none", preview.MediaBackendName);
         Assert.Contains("暂无内嵌解码后端", preview.MediaBackendDiagnostic, StringComparison.Ordinal);
+        Assert.True(preview.ShowMediaBackendDiagnostic); // 即使关闭常规诊断也不能隐藏后端缺失原因
         Assert.False(preview.IsMediaPlaying);
         // 兜底文案不再与媒体面板打架
         Assert.Null(preview.FailureText);
@@ -338,6 +342,57 @@ public sealed class MediaPlaybackTests
     }
 
     [Fact]
+    public async Task DedicatedAvaloniaRendererRequiresARegisteredControlHost()
+    {
+        // 即使后端能力位声称可播，缺少真正的 Avalonia renderer 控件时也不能给出假播放按钮。
+        var previousFactory = MediaControlBridge.Factory;
+        MediaControlBridge.Factory = null;
+        try
+        {
+            var preview = CreatePreview(new AvaloniaControlWithoutHostBackend());
+            await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
+
+            Assert.False(preview.CanPlayMediaInApp);
+            Assert.False(preview.ShowAvaloniaVideoSurface);
+            Assert.True(preview.ShowAvaloniaMediaRendererHost);
+            Assert.Contains("未注册", preview.MediaBackendDiagnostic, StringComparison.Ordinal);
+
+            var audioPreview = CreatePreview(new AvaloniaControlWithoutHostBackend());
+            await audioPreview.LoadAsync(Item("song.mp3", FileKind.Audio));
+            Assert.False(audioPreview.CanPlayMediaInApp);
+        }
+        finally
+        {
+            MediaControlBridge.Factory = previousFactory;
+        }
+    }
+
+    [Fact]
+    public async Task RendererInitializationErrorBlocksPlaybackAndAppearsInDiagnostics()
+    {
+        var previousFactory = MediaControlBridge.Factory;
+        MediaControlBridge.Factory = static _ => null;
+        try
+        {
+            var preview = CreatePreviewWithSettings(
+                new AvaloniaControlWithoutHostBackend(), new AppSettings { ShowMediaDiagnostics = false, PlayVideoInline = true });
+            await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
+            Assert.True(preview.CanPlayMediaInApp);
+
+            preview.ReportMediaRendererInitializationError("测试 renderer 初始化失败");
+
+            Assert.False(preview.CanPlayMediaInApp);
+            Assert.False(preview.ShowAvaloniaVideoSurface);
+            Assert.True(preview.ShowMediaBackendDiagnostic);
+            Assert.Contains("测试 renderer 初始化失败", preview.MediaBackendDiagnostic, StringComparison.Ordinal);
+        }
+        finally
+        {
+            MediaControlBridge.Factory = previousFactory;
+        }
+    }
+
+    [Fact]
     public async Task ProbeVetoesPlaybackEvenWhenBackendSaysItCould()
     {
         // 能力位说“能播”，但系统探测这个文件认不出来——按钮就必须消失，而不是点了才失败。
@@ -400,6 +455,26 @@ public sealed class MediaPlaybackTests
         }
 
         public void DetachVideoSurface() => AttachedSurface = null;
+    }
+
+    private sealed class AvaloniaControlWithoutHostBackend : IMediaPlaybackService
+    {
+        public MediaPlaybackCapabilities Capabilities { get; } =
+            new(true, true, "fake.avalonia-control", "测试专用直接 renderer。");
+        public MediaRendererKind RendererKind => MediaRendererKind.AvaloniaControl;
+        public MediaPlaybackState State => MediaPlaybackState.Idle;
+        public TimeSpan Position => TimeSpan.Zero;
+        public TimeSpan Duration => TimeSpan.Zero;
+        public int VolumePercent => 100;
+        public string? LastError => null;
+        public event EventHandler? PlaybackChanged { add { } remove { } }
+        public Task<bool> OpenAsync(string path, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task PlayAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task PauseAsync() => Task.CompletedTask;
+        public Task StopAsync() => Task.CompletedTask;
+        public Task SeekAsync(TimeSpan position) => Task.CompletedTask;
+        public void SetVolume(int percent) { }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class VideoWithoutRendererBackend : IMediaPlaybackService

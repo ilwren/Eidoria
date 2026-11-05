@@ -1437,7 +1437,7 @@
               <md:MdIconButton Grid.Column="1" Icon="{x:Static md:MdSymbols.Close}" Click="OnClosePreviewPane"
                                AutomationProperties.Name="关闭预览" />
             </Grid>
-            <views:PreviewView Grid.Row="1" DataContext="{Binding Preview}" />
+            <views:PreviewView x:Name="SidebarPreviewView" Grid.Row="1" DataContext="{Binding Preview}" />
           </Grid>
         </Border>
       </Grid>
@@ -1483,7 +1483,7 @@
                           X="16" Y="72" Width="340" Height="540" MaxWidth="720"
                           CanDrag="True" CanResize="True" CanMinimize="True" CanClose="True"
                           Closed="OnFloatingPreviewClosed">
-      <views:PreviewView DataContext="{Binding Preview}" />
+      <views:PreviewView x:Name="FloatingPreviewView" DataContext="{Binding Preview}" />
     </eco:MdFloatingWindow>
 
     <!-- 灵动岛式悬浮搜索控制面板：默认只占导航行一个迷你胶囊，点开后悬浮展开。 -->

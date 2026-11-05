@@ -25,6 +25,9 @@ public enum MediaRendererKind
 
     /// <summary>后端把解码后的帧推给宿主，由宿主在 Avalonia 内呈现。</summary>
     FramePush,
+
+    /// <summary>后端通过专用 Avalonia 控件直接呈现画面（例如 libmpv renderer）。</summary>
+    AvaloniaControl,
 }
 
 /// <summary>后端自述能力。UI 只按这里说的显隐控件，不猜平台。</summary>

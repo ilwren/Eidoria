@@ -1555,52 +1555,150 @@ public sealed class ScreenshotTests
 
     // 推帧路线的界面证据：后端把帧推给宿主，画面由 Avalonia 自己画（Linux Wayland 无窗口 id 时只能这样）。
     [AvaloniaFact]
-    public async Task Large_VideoFramePush() => await WithStubMediaAsync(
-        async () => await CaptureAsync("76-large-video-frame-push.png", 1440, 900, async shell =>
-        {
-            // v0.36 起视频默认不在应用内出画面：先看到「两个显式入口」，用户选内嵌后才出画面。
-            await SelectByNameAsync(shell, "演示视频.mp4", () => shell.Preview.IsVideoMedia);
-            Assert.True(shell.Preview.IsVideoMedia);
-            Assert.True(shell.Preview.ShowInlineVideoGate,
-                $"inline={shell.Preview.PlayVideoInline} state={shell.Preview.MediaStateText}");
-            Assert.False(shell.Preview.ShowFrameVideoSurface);
-            shell.Preview.EnableInlineVideoCommand.Execute(null);
-            Assert.False(shell.Preview.ShowInlineVideoGate);
-            Assert.True(shell.Preview.CanPlayMediaInApp);
-            Assert.True(shell.Preview.ShowFrameVideoSurface);
-            Assert.False(shell.Preview.ShowNativeVideoSurface);
-            Assert.Equal("画面：宿主帧呈现", shell.Preview.MediaRendererText);
-        }, afterShow: async window =>
-        {
-            await Task.Delay(120); // 让内嵌画面挂上帧接收器并完成一次呈现
-            var surface = window.GetVisualDescendants().OfType<MediaFrameSurface>().FirstOrDefault();
-            Assert.NotNull(surface);
-            Assert.True(surface!.HasFrame);
-            Assert.Equal(new PixelSize(640, 360), surface.FrameSize);
+    public async Task Large_VideoFramePush()
+    {
+        var backend = new FramePushVideoStub();
+        ShellViewModel? shellForSwitch = null;
+        await WithStubMediaAsync(
+            async () => await CaptureAsync("76-large-video-frame-push.png", 1440, 900, async shell =>
+            {
+                shellForSwitch = shell;
+                // v0.36 起视频默认不在应用内出画面：先看到「两个显式入口」，用户选内嵌后才出画面。
+                await SelectByNameAsync(shell, "演示视频.mp4", () => shell.Preview.IsVideoMedia);
+                Assert.True(shell.Preview.IsVideoMedia);
+                Assert.True(shell.Preview.ShowInlineVideoGate,
+                    $"inline={shell.Preview.PlayVideoInline} state={shell.Preview.MediaStateText}");
+                Assert.False(shell.Preview.ShowFrameVideoSurface);
+                shell.Preview.EnableInlineVideoCommand.Execute(null);
+                Assert.False(shell.Preview.ShowInlineVideoGate);
+                Assert.True(shell.Preview.CanPlayMediaInApp);
+                Assert.True(shell.Preview.ShowFrameVideoSurface);
+                Assert.False(shell.Preview.ShowNativeVideoSurface);
+                Assert.Equal("画面：宿主帧呈现", shell.Preview.MediaRendererText);
+            }, afterShow: async window =>
+            {
+                await Task.Delay(120); // 让内嵌画面挂上帧接收器并完成一次呈现
+                var surfaces = window.GetVisualDescendants().OfType<MediaFrameSurface>().ToArray();
+                var surface = Assert.Single(surfaces);
+                Assert.Equal(1, window.GetVisualDescendants().OfType<PreviewView>()
+                    .Count(view => view.IsMediaRendererActive));
+                Assert.True(surface.HasFrame);
+                Assert.Equal(new PixelSize(640, 360), surface.FrameSize);
+                Assert.Equal(1, backend.AttachCount);
+                Assert.Equal(0, backend.DetachCount);
 
-            // v0.34 反馈：Large 下后端名与“打开”按钮右侧被裁掉。这两条断言直接量右边缘，
-            // 横向 StackPanel 把长文本撑出父级时（无限宽度）会立刻失败。
-            var backend = window.GetVisualDescendants().OfType<TextBlock>()
-                .First(t => t.Text is { } text && text.Contains("FramePushVideoStub", StringComparison.Ordinal));
-            var card = backend.FindAncestorOfType<Border>();
-            Assert.NotNull(card);
-            var backendRight = backend.TranslatePoint(new Point(backend.Bounds.Width, 0), card!);
-            Assert.NotNull(backendRight);
-            Assert.True(backendRight!.Value.X <= card!.Bounds.Width + 0.5,
-                $"后端名右边缘 {backendRight.Value.X:0.#} 超出媒体卡片 {card.Bounds.Width:0.#}");
+                // v0.34 反馈：Large 下后端名与“打开”按钮右侧被裁掉。这两条断言直接量右边缘，
+                // 横向 StackPanel 把长文本撑出父级时（无限宽度）会立刻失败。
+                var backendLabel = window.GetVisualDescendants().OfType<TextBlock>()
+                    .First(t => t.Text is { } text && text.Contains("FramePushVideoStub", StringComparison.Ordinal));
+                var card = backendLabel.FindAncestorOfType<Border>();
+                Assert.NotNull(card);
+                var backendRight = backendLabel.TranslatePoint(new Point(backendLabel.Bounds.Width, 0), card!);
+                Assert.NotNull(backendRight);
+                Assert.True(backendRight!.Value.X <= card!.Bounds.Width + 0.5,
+                    $"后端名右边缘 {backendRight.Value.X:0.#} 超出媒体卡片 {card.Bounds.Width:0.#}");
 
-            var openLabel = window.GetVisualDescendants().OfType<TextBlock>()
-                .First(t => t.Text == "打开" && t.IsEffectivelyVisible);
-            var openButton = openLabel.FindAncestorOfType<Button>();
-            Assert.NotNull(openButton);
-            var previewView = openButton!.FindAncestorOfType<PreviewView>();
-            Assert.NotNull(previewView);
-            var buttonRight = openButton.TranslatePoint(new Point(openButton.Bounds.Width, 0), previewView!);
-            Assert.NotNull(buttonRight);
-            Assert.True(buttonRight!.Value.X <= previewView!.Bounds.Width + 0.5,
-                $"“打开”按钮右边缘 {buttonRight.Value.X:0.#} 超出预览视图 {previewView.Bounds.Width:0.#}");
-        }),
-        static () => new FramePushVideoStub());
+                var openLabel = window.GetVisualDescendants().OfType<TextBlock>()
+                    .First(t => t.Text == "打开" && t.IsEffectivelyVisible);
+                var openButton = openLabel.FindAncestorOfType<Button>();
+                Assert.NotNull(openButton);
+                var previewView = openButton!.FindAncestorOfType<PreviewView>();
+                Assert.NotNull(previewView);
+                var buttonRight = openButton.TranslatePoint(new Point(openButton.Bounds.Width, 0), previewView!);
+                Assert.NotNull(buttonRight);
+                Assert.True(buttonRight!.Value.X <= previewView!.Bounds.Width + 0.5,
+                    $"“打开”按钮右边缘 {buttonRight.Value.X:0.#} 超出预览视图 {previewView.Bounds.Width:0.#}");
+
+                // Switch the same frame source to the floating view, then return to the sidebar.
+                window.Width = 390;
+                window.Height = 844;
+                shellForSwitch!.SetViewportSize(390, 844);
+                shellForSwitch.IsPreviewPageOpen = true;
+                await Task.Delay(120);
+                window.CaptureRenderedFrame();
+                var floatingSurface = Assert.Single(window.GetVisualDescendants().OfType<MediaFrameSurface>());
+                Assert.True(floatingSurface.HasFrame);
+                Assert.Equal(1, window.GetVisualDescendants().OfType<PreviewView>()
+                    .Count(view => view.IsMediaRendererActive));
+                Assert.Equal(2, backend.AttachCount);
+                Assert.Equal(1, backend.DetachCount);
+
+                shellForSwitch.IsPreviewPageOpen = false;
+                window.Width = 1440;
+                window.Height = 900;
+                shellForSwitch.SetViewportSize(1440, 900);
+                await Task.Delay(120);
+                window.CaptureRenderedFrame();
+                var sidebarSurface = Assert.Single(window.GetVisualDescendants().OfType<MediaFrameSurface>());
+                Assert.True(sidebarSurface.HasFrame);
+                Assert.Equal(1, window.GetVisualDescendants().OfType<PreviewView>()
+                    .Count(view => view.IsMediaRendererActive));
+                Assert.Equal(3, backend.AttachCount);
+                Assert.Equal(2, backend.DetachCount);
+            }),
+            () => backend);
+    }
+
+    [AvaloniaFact]
+    public async Task AvaloniaRendererSwitchKeepsOnlyOneActivePreviewHost()
+    {
+        var previousControlFactory = MediaControlBridge.Factory;
+        var createdControls = 0;
+        ShellViewModel? shellForSwitch = null;
+        MediaControlBridge.Factory = _ =>
+        {
+            createdControls++;
+            return new Border { Background = Avalonia.Media.Brushes.Black };
+        };
+        try
+        {
+            await WithStubMediaAsync(
+                async () => await CaptureAsync(
+                    "83-preview-renderer-host-switch.png",
+                    1440,
+                    900,
+                    async shell =>
+                    {
+                        shellForSwitch = shell;
+                        await SelectByNameAsync(
+                            shell, "演示视频.mp4", () => shell.Preview.ShowAvaloniaMediaRendererHost);
+                        shell.Preview.EnableInlineVideoCommand.Execute(null);
+                        Assert.True(shell.Preview.CanPlayMediaInApp);
+                    },
+                    afterShow: async window =>
+                    {
+                        await Task.Delay(80);
+                        Assert.Equal(1, createdControls);
+                        Assert.Equal(1, CountActivePreviewViews(window));
+                        Assert.Equal(1, CountOwnedRendererControls(window));
+
+                        // Move the same PreviewViewModel from the desktop sidebar to the compact floating preview.
+                        window.Width = 390;
+                        window.Height = 844;
+                        shellForSwitch!.SetViewportSize(390, 844);
+                        shellForSwitch.IsPreviewPageOpen = true;
+                        await Task.Delay(120);
+                        window.CaptureRenderedFrame();
+
+                        Assert.Equal(2, createdControls);
+                        Assert.Equal(1, CountActivePreviewViews(window));
+                        Assert.Equal(1, CountOwnedRendererControls(window));
+                    }),
+                static () => new AvaloniaControlVideoStub());
+        }
+        finally
+        {
+            MediaControlBridge.Factory = previousControlFactory;
+        }
+    }
+
+    private static int CountActivePreviewViews(Window window) =>
+        window.GetVisualDescendants().OfType<PreviewView>()
+            .Count(view => view.IsMediaRendererActive);
+
+    private static int CountOwnedRendererControls(Window window) =>
+        window.GetVisualDescendants().OfType<MediaControlHost>()
+            .Count(host => host.Content is not null);
 
     // v0.36：视频默认外挂——卡片上是两个显式入口（系统播放器 / 内嵌面板），不是一个假播放按钮。
     [AvaloniaFact]
@@ -1637,7 +1735,7 @@ public sealed class ScreenshotTests
 
     private static async Task WithStubMediaAsync(Func<Task> body, Func<IMediaPlaybackService> factory)
     {
-        AppHost.MediaPlaybackFactory = factory;
+        AppHost.MediaPlaybackFactory = _ => factory();
         try
         {
             await body();

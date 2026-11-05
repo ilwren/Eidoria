@@ -101,6 +101,9 @@ internal sealed class FramePushVideoStub : IMediaPlaybackService, IMediaProbe, I
 
     private IMediaFrameSink? _sink;
 
+    public int AttachCount { get; private set; }
+    public int DetachCount { get; private set; }
+
     public MediaPlaybackCapabilities Capabilities { get; } = new(
         CanPlayAudio: true,
         CanPlayVideo: true,
@@ -119,12 +122,19 @@ internal sealed class FramePushVideoStub : IMediaPlaybackService, IMediaProbe, I
 
     public bool AttachFrameSink(IMediaFrameSink sink)
     {
+        AttachCount++;
         _sink = sink;
         sink.PresentFrame(Frame, FrameWidth, FrameHeight, FrameWidth * 4);
         return true;
     }
 
-    public void DetachFrameSink() => _sink = null;
+    public void DetachFrameSink()
+    {
+        if (_sink is null)
+            return;
+        DetachCount++;
+        _sink = null;
+    }
 
     public Task<bool> OpenAsync(string path, CancellationToken cancellationToken)
     {
@@ -194,4 +204,68 @@ internal sealed class FramePushVideoStub : IMediaPlaybackService, IMediaProbe, I
         }
         return pixels;
     }
+}
+
+/// <summary>直接 Avalonia renderer 的假服务，用于验证侧栏和浮动预览不会共持有控件。</summary>
+internal sealed class AvaloniaControlVideoStub : IMediaPlaybackService
+{
+    public MediaPlaybackCapabilities Capabilities { get; } = new(
+        CanPlayAudio: true,
+        CanPlayVideo: true,
+        BackendName: "Avalonia renderer 假后端",
+        Diagnostic: "测试只验证活动预览宿主的控件所有权。");
+
+    public MediaRendererKind RendererKind => MediaRendererKind.AvaloniaControl;
+
+    public MediaPlaybackState State { get; private set; } = MediaPlaybackState.Idle;
+    public TimeSpan Position { get; private set; }
+    public TimeSpan Duration { get; private set; } = TimeSpan.FromMinutes(3);
+    public int VolumePercent { get; private set; } = 80;
+    public string? LastError => null;
+
+    public event EventHandler? PlaybackChanged;
+
+    public Task<bool> OpenAsync(string path, CancellationToken cancellationToken)
+    {
+        State = MediaPlaybackState.Paused;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+        return Task.FromResult(true);
+    }
+
+    public Task PlayAsync(CancellationToken cancellationToken)
+    {
+        State = MediaPlaybackState.Playing;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task PauseAsync()
+    {
+        State = MediaPlaybackState.Paused;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync()
+    {
+        State = MediaPlaybackState.Stopped;
+        Position = TimeSpan.Zero;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task SeekAsync(TimeSpan position)
+    {
+        Position = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public void SetVolume(int percent)
+    {
+        VolumePercent = Math.Clamp(percent, 0, 100);
+        PlaybackChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

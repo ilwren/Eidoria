@@ -12,6 +12,8 @@
     <ApplicationIcon>..\MdExplorer.UI\Assets\eidoria.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <IsAotCompatible>false</IsAotCompatible>
+    <!-- The optional libmpv renderer is framework-dependent only until its wrapper has passed AOT/Trim validation. -->
+    <DefineConstants Condition="'$(PublishAot)' != 'true'">$(DefineConstants);MDEXPLORER_LIBMPV</DefineConstants>
     <!-- Native AOT 由 CI 的发布 Job 以 -p:PublishAot=true 驱动（见 .github/workflows/ci.yml） -->
   </PropertyGroup>
   <ItemGroup>
@@ -19,6 +21,13 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <!-- 宿主直接引用，确保 Windows 构建按 windows TFM 选中 WinRT 通知后端。 -->
     <PackageReference Include="Md3.Avalonia.Notifications" />
+    <PackageReference Include="HanumanInstitute.LibMpv.Avalonia" Condition="'$(PublishAot)' != 'true'" />
     <ProjectReference Include="..\MdExplorer.UI\MdExplorer.UI.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublishAot)' == 'true'">
+    <Compile Remove="LibMpvMediaPlaybackService.cs;LibMpvVideoControl.axaml.cs" />
+    <AvaloniaResource Remove="LibMpvVideoControl.axaml" />
+    <AvaloniaXaml Remove="LibMpvVideoControl.axaml" />
+    <EmbeddedResource Remove="LibMpvVideoControl.axaml" />
   </ItemGroup>
 </Project>

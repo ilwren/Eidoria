@@ -37,13 +37,13 @@ public static class AppHost
         PluginPackageCatalog Plugins);
 
     /// <summary>
-    /// 平台内嵌播放后端的注入点。Android 宿主在 Activity 创建时注册 MediaPlayer 实现；
-    /// 未注册时（桌面、测试）退回明确自述“无后端”的实现，UI 据此只给系统打开入口。
+    /// 平台内嵌播放后端的注入点。工厂收到已加载并规范化的设置，桌面可据此选择媒体引擎；
+    /// Android 宿主仍注册 MediaPlayer 实现。未注册时退回明确自述“无后端”的实现。
     /// </summary>
-    public static Func<IMediaPlaybackService>? MediaPlaybackFactory { get; set; }
+    public static Func<AppSettings, IMediaPlaybackService>? MediaPlaybackFactory { get; set; }
 
     private const string DefaultMediaDiagnostic =
-        "桌面端暂无内嵌解码后端：Windows 需 Media Foundation、Linux 需系统 FFmpeg，接入前不做静默降级。可用系统应用打开。";
+        "当前桌面宿主未注册内嵌播放后端。Windows 可选系统 Media Foundation 或已配置的 libmpv；Linux 依赖发行版 GStreamer。可用系统应用打开。";
 
     /// <param name="dataDirectory">设置/收藏落点；为空时按平台默认（LocalApplicationData/MdExplorer）。</param>
     /// <param name="startFolder">初始文件夹；为空时桌面=用户主目录，Android=个人目录。</param>
@@ -113,7 +113,7 @@ public static class AppHost
             new StorageInsightsService(),
             new DelegatingTextFileService(new LocalTextFileService(), new StorageTextFileService(fileSystem)),
             systemNotifications ?? new MdSystemNotificationServiceAdapter(),
-            MediaPlaybackFactory?.Invoke() ?? new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic),
+            MediaPlaybackFactory?.Invoke(store.Settings) ?? new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic),
             // 端侧 AI 的模型目录：只扫描文件；ONNX Session 在用户调用本地语义搜索时才延迟建立。
             aiModels,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。
