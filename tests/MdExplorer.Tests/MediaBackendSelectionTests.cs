@@ -10,7 +10,7 @@ namespace MdExplorer.Tests;
 
 /// <summary>
 /// v0.39：双内嵌媒体后端（平台栈 + 可选 libmpv）。核心只依赖端口，所以
-/// 「偏好 → 裁决 → 回退与如实告知」「控件交付与释放」「非媒体不建解码器」都能在无头环境断言。
+/// 「偏好 → 裁决 → 回退与如实告知」「裁决层不吞掉可选画面端口」都能在无头环境断言。
 /// </summary>
 public sealed class MediaBackendSelectionTests
 {
@@ -33,12 +33,12 @@ public sealed class MediaBackendSelectionTests
     public void AutoPrefersLibMpvWhenItIsAvailable()
     {
         var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
-        var mpv = new HostedFakeBackend("libmpv", video: true);
+        var mpv = new FramePushFakeBackend("libmpv");
 
         var selector = Selector(system, mpv);
 
         Assert.Equal("libmpv", selector.Capabilities.BackendName);
-        Assert.Equal(MediaRendererKind.HostedControl, selector.RendererKind);
+        Assert.Equal(MediaRendererKind.FramePush, selector.RendererKind);
         Assert.Contains("使用：libmpv", selector.SelectionSummary, StringComparison.Ordinal);
         Assert.Contains("自动", selector.SelectionSummary, StringComparison.Ordinal);
     }
@@ -47,7 +47,8 @@ public sealed class MediaBackendSelectionTests
     public void AutoFallsBackToSystemStackAndSaysWhy()
     {
         var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
-        var mpv = new HostedFakeBackend("libmpv", video: false, audio: false);
+        // 「注册了但用不了」：原生库没找到时 libmpv 后端正是这个形状（能力位为假）
+        var mpv = new FakeBackend("libmpv", audio: false, video: false);
 
         var selector = Selector(system, mpv);
 
@@ -65,7 +66,7 @@ public sealed class MediaBackendSelectionTests
     public void SystemPreferenceIgnoresAnAvailableLibMpv()
     {
         var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
-        var mpv = new HostedFakeBackend("libmpv", video: true);
+        var mpv = new FramePushFakeBackend("libmpv");
 
         var selector = Selector(system, mpv, Settings(MediaBackendPreferenceNames.SystemApi));
 
@@ -111,43 +112,11 @@ public sealed class MediaBackendSelectionTests
         Assert.Equal(1, system.ProbeCount);
 
         // 换成不实现 IMediaProbe 的后端：如实说“不预检”，并允许用户尝试
-        var hosted = new HostedFakeBackend("libmpv", video: true);
-        var selector2 = Selector(system: null, libMpv: hosted);
+        var mpv = new FramePushFakeBackend("libmpv");
+        var selector2 = Selector(system: null, libMpv: mpv);
         var unknown = await selector2.ProbeAsync("/media/a.mkv", CancellationToken.None);
         Assert.True(unknown.CanPlay);
         Assert.Contains("不做打开前预检", unknown.Summary, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void HostedControlIsDelegatedAndReleased()
-    {
-        var mpv = new HostedFakeBackend("libmpv", video: true);
-        var selector = Selector(system: null, libMpv: mpv);
-
-        var session = selector.CreateVideoControl(includeVideoSurface: true);
-        Assert.True(session.IsAvailable);
-        Assert.Equal(1, mpv.CreateCount);
-        Assert.True(mpv.LastIncludeVideoSurface ?? false);
-
-        // 音频：仍然要建上下文，但不要 GPU 表面
-        mpv.LastIncludeVideoSurface = null;
-        var audioSession = selector.CreateVideoControl(includeVideoSurface: false);
-        Assert.True(audioSession.IsAvailable);
-        Assert.False(mpv.LastIncludeVideoSurface ?? true);
-
-        selector.ReleaseVideoControl();
-        Assert.Equal(1, mpv.ReleaseCount);
-    }
-
-    [Fact]
-    public void BackendWithoutHostedControlExplainsItselfInsteadOfReturningAControl()
-    {
-        var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
-        var selector = Selector(system, libMpv: null, Settings(MediaBackendPreferenceNames.SystemApi));
-
-        var session = selector.CreateVideoControl(includeVideoSurface: true);
-        Assert.False(session.IsAvailable);
-        Assert.Contains("不使用宿主控件", session.Error!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -155,7 +124,7 @@ public sealed class MediaBackendSelectionTests
     {
         var settings = Settings();
         var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
-        var mpv = new HostedFakeBackend("libmpv", video: true);
+        var mpv = new FramePushFakeBackend("libmpv");
         var selector = Selector(system, mpv, settings);
         Assert.Equal("libmpv", selector.Capabilities.BackendName);
 
@@ -197,6 +166,24 @@ public sealed class MediaBackendSelectionTests
         }
     }
 
+    // ── 裁决层不能吞掉可选的画面端口 ────────────────────────────────────────
+
+    [Fact]
+    public void SelectorExposesTheActiveBackendForOptionalPorts()
+    {
+        var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
+        var mpv = new FramePushFakeBackend("libmpv");
+        var selector = Selector(system, mpv);
+
+        // 裁决层自己装不出 IMediaVideoFrameSource：它必须把“真正在跑的那个”交出来，
+        // 否则预览视图会以为这个后端不出画面。
+        Assert.False(selector is IMediaVideoFrameSource);
+        Assert.Same(mpv, selector.ActiveBackend);
+        Assert.Equal(0, mpv.AttachCount);
+        Assert.True(((IMediaVideoFrameSource)selector.ActiveBackend!).AttachFrameSink(new RecordingFrameSink()));
+        Assert.Equal(1, mpv.AttachCount);
+    }
+
     // ── 预览状态机：谁出画面 ────────────────────────────────────────────────
 
     private static FileItem Item(string name, FileKind kind) => new(
@@ -216,73 +203,86 @@ public sealed class MediaBackendSelectionTests
         () => settings);
 
     [Fact]
-    public async Task HostedControlBackendDrawsVideoInItsOwnControl()
+    public async Task MpvStyleFramePushBackendDrawsVideoInTheHostSurface()
     {
         var settings = new AppSettings { PlayVideoInline = true };
-        var backend = new HostedFakeBackend("libmpv", video: true);
+        var backend = new FramePushFakeBackend("libmpv");
         var preview = Preview(backend, settings);
 
         await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
 
         Assert.True(preview.CanPlayMediaInApp);
-        Assert.True(preview.ShowHostedMediaHost);
-        Assert.True(preview.ShowHostedVideoSurface);
-        Assert.Equal(280d, preview.HostedSurfaceHeight);
-        Assert.False(preview.ShowFrameVideoSurface);
+        Assert.True(preview.ShowFrameVideoSurface);
         Assert.False(preview.ShowNativeVideoSurface);
-        Assert.NotNull(preview.VideoControlSource);
-        Assert.NotNull(preview.MediaControlHostSource);
-        Assert.Contains("libmpv", preview.MediaRendererText, StringComparison.Ordinal);
+        Assert.Same(backend, preview.VideoFrameSource);
+        Assert.Null(preview.VideoRenderer); // 两种交付方式互斥
+        Assert.Contains("宿主帧呈现", preview.MediaRendererText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AudioNeedsTheHostButNotAVideoSurface()
+    public async Task PreviewStateUsesTheActiveBackendNotTheSelector()
     {
         var settings = new AppSettings { PlayVideoInline = true };
-        var backend = new HostedFakeBackend("libmpv", video: true);
+        var system = new FakeBackend("MF", video: true, renderer: MediaRendererKind.FramePush);
+        var mpv = new FramePushFakeBackend("libmpv");
+        var preview = Preview(Selector(system, mpv, settings), settings);
+
+        await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
+
+        // 关键回归：预览拿到的是裁决层，但画面端口必须来自真正在跑的那个后端。
+        Assert.Same(mpv, preview.VideoFrameSource);
+        Assert.True(preview.ShowFrameVideoSurface);
+
+        var sink = new RecordingFrameSink();
+        Assert.True(preview.VideoFrameSource!.AttachFrameSink(sink));
+        Assert.Same(sink, mpv.Sink);
+        mpv.Sink!.PresentFrame(new byte[4 * 2 * 2], 2, 2, 8);
+        Assert.Equal(1, sink.FrameCount);
+    }
+
+    [Fact]
+    public async Task AudioDoesNotAskForAVideoSurface()
+    {
+        var settings = new AppSettings { PlayVideoInline = true };
+        var backend = new FramePushFakeBackend("libmpv");
         var preview = Preview(backend, settings);
 
         await preview.LoadAsync(Item("song.mp3", FileKind.Audio));
 
         Assert.True(preview.CanPlayMediaInApp);
-        Assert.False(preview.ShowHostedVideoSurface);
-        // 控件宿主仍然要交给视图：音频也得先有 libmpv 上下文（没有上下文就没有解码器）
-        Assert.NotNull(preview.MediaControlHostSource);
-        Assert.True(preview.ShowHostedMediaHost);
-        // 不占版面，但**不许**用 IsVisible 收起——那会把它摘出视觉树，声音也就没了
-        Assert.Equal(0d, preview.HostedSurfaceHeight);
-        Assert.False(preview.HostedVideoWantsSurface);
+        Assert.False(preview.ShowFrameVideoSurface);
+        Assert.False(preview.ShowNativeVideoSurface);
     }
 
     [Fact]
     public async Task NonMediaSelectionNeverAsksForADecoder()
     {
         var settings = new AppSettings { PlayVideoInline = true };
-        var backend = new HostedFakeBackend("libmpv", video: true);
+        var backend = new FramePushFakeBackend("libmpv");
         var preview = Preview(backend, settings);
 
         await preview.LoadAsync(Item("photo.png", FileKind.Image));
 
         Assert.False(preview.IsMedia);
-        Assert.Null(preview.MediaControlHostSource);
-        Assert.False(preview.ShowHostedMediaHost);
-        Assert.False(preview.ShowHostedVideoSurface);
+        Assert.Null(preview.VideoFrameSource);
+        Assert.Null(preview.VideoRenderer);
+        Assert.False(preview.ShowFrameVideoSurface);
     }
 
     [Fact]
     public async Task VideoGateStaysClosedUntilTheUserAsksForInlineVideo()
     {
         var settings = new AppSettings { PlayVideoInline = false };
-        var backend = new HostedFakeBackend("libmpv", video: true);
+        var backend = new FramePushFakeBackend("libmpv");
         var preview = Preview(backend, settings);
 
         await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
         Assert.True(preview.ShowInlineVideoGate);
-        Assert.False(preview.ShowHostedVideoSurface);
+        Assert.False(preview.ShowFrameVideoSurface);
         Assert.False(preview.CanPlayMediaInApp);
 
         preview.EnableInlineVideoCommand.Execute(null);
-        Assert.True(preview.ShowHostedVideoSurface);
+        Assert.True(preview.ShowFrameVideoSurface);
         Assert.True(preview.CanPlayMediaInApp);
     }
 
@@ -332,6 +332,39 @@ public sealed class MediaBackendSelectionTests
         }
     }
 
+    /// <summary>libmpv 后端的形状：FramePush + 自己实现帧交付面（无原生控件）。</summary>
+    private sealed class FramePushFakeBackend(string name, bool audio = true, bool video = true)
+        : FakeBackend(name, audio, video, MediaRendererKind.FramePush), IMediaVideoFrameSource
+    {
+        public int AttachCount { get; private set; }
+        public int DetachCount { get; private set; }
+        public IMediaFrameSink? Sink { get; private set; }
+
+        public bool AttachFrameSink(IMediaFrameSink sink)
+        {
+            AttachCount++;
+            Sink = sink;
+            return true;
+        }
+
+        public void DetachFrameSink()
+        {
+            DetachCount++;
+            Sink = null;
+        }
+    }
+
+    private sealed class RecordingFrameSink : IMediaFrameSink
+    {
+        public int FrameCount { get; private set; }
+        public bool Cleared { get; private set; }
+
+        public void PresentFrame(ReadOnlySpan<byte> bgra8888, int width, int height, int strideBytes) =>
+            FrameCount++;
+
+        public void Clear() => Cleared = true;
+    }
+
     private sealed class ProbingFakeBackend(string name, bool canPlay)
         : FakeBackend(name, video: canPlay, renderer: MediaRendererKind.FramePush), IMediaProbe
     {
@@ -344,24 +377,5 @@ public sealed class MediaBackendSelectionTests
                 canPlay, HasVideo: canPlay, HasAudio: true,
                 canPlay ? "系统解码器可以处理该文件。" : "系统解码器不认这个容器。"));
         }
-    }
-
-    private sealed class HostedFakeBackend(string name, bool video, bool audio = true)
-        : FakeBackend(name, audio, video, MediaRendererKind.HostedControl), IMediaVideoControlSource
-    {
-        public int CreateCount { get; private set; }
-        public int ReleaseCount { get; private set; }
-        public bool? LastIncludeVideoSurface { get; set; }
-
-        public MediaVideoControl CreateVideoControl(bool includeVideoSurface)
-        {
-            CreateCount++;
-            LastIncludeVideoSurface = includeVideoSurface;
-            // 单元测试不初始化 Avalonia：这里只要“非 null 控件”这个事实，
-            // 真控件由 MediaVideoControlHost 在视图层承接。
-            return new MediaVideoControl(new object());
-        }
-
-        public void ReleaseVideoControl() => ReleaseCount++;
     }
 }

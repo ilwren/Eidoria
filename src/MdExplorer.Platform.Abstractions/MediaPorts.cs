@@ -12,8 +12,8 @@ public enum MediaPlaybackState
 }
 
 /// <summary>
-/// 视频画面的交付方式。它决定 UI 用哪种宿主：Avalonia 内的帧呈现器、
-/// 平台原生画面（Surface/HWND），还是后端自带的 Avalonia 控件。三者不能互相冒充。
+/// 视频画面的交付方式。它决定 UI 用哪种宿主：Avalonia 内的帧呈现器，
+/// 还是平台原生画面（Surface/HWND）。两者不能互相冒充。
 /// </summary>
 public enum MediaRendererKind
 {
@@ -23,14 +23,11 @@ public enum MediaRendererKind
     /// <summary>后端自己把画面画到平台原生 Surface/HWND，宿主只提供句柄。</summary>
     NativeSurface,
 
-    /// <summary>后端把解码后的帧推给宿主，由宿主在 Avalonia 内呈现。</summary>
-    FramePush,
-
     /// <summary>
-    /// 后端交出一个 Avalonia 控件，由它自己把画面画进 Avalonia 的视觉树（libmpv 的
-    /// OpenGL/软件渲染走这条）。宿主只负责把控件摆到正确的位置并转交挂载/卸载事件。
+    /// 后端把解码后的帧推给宿主，由宿主在 Avalonia 内呈现（Linux GStreamer 的 appsink、
+    /// Windows MediaComposition 取帧、桌面 libmpv 的软件渲染都走这条）。
     /// </summary>
-    HostedControl,
+    FramePush,
 }
 
 /// <summary>
@@ -75,15 +72,6 @@ public static class MediaBackendPreferenceNames
         MediaBackendPreference.LibMpv => LibMpv,
         _ => Auto,
     };
-}
-
-/// <summary>
-/// 后端交出的画面控件。<see cref="Control"/> 是 Avalonia 控件对象（端口层只当 <see cref="object"/>，
-/// 避免抽象层反向依赖 Avalonia）；为 null 时 <see cref="Error"/> 必须是一句人话。
-/// </summary>
-public sealed record MediaVideoControl(object? Control, string? Error = null)
-{
-    public bool IsAvailable => Control is not null;
 }
 
 /// <summary>后端自述能力。UI 只按这里说的显隐控件，不猜平台。</summary>
@@ -190,8 +178,8 @@ public interface IMediaFrameSink
 
 /// <summary>
 /// 组合多个后端的裁决层实现它。宿主据此拿到“真正在跑的那个后端”，
-/// 才能判断它是否实现了 <see cref="IMediaVideoRenderer"/>、<see cref="IMediaVideoFrameSource"/>、
-/// <see cref="IMediaVideoControlSource"/> 这些可选的画面端口——裁决层自己不可能同时装作三种。
+/// 才能判断它是否实现了 <see cref="IMediaVideoRenderer"/>、<see cref="IMediaVideoFrameSource"/>
+/// 这些可选的画面端口——裁决层自己不可能同时装作两种。
 /// </summary>
 public interface IMediaBackendSelector
 {
@@ -199,31 +187,7 @@ public interface IMediaBackendSelector
 }
 
 /// <summary>
-/// 自带 Avalonia 控件的后端实现它（<see cref="MediaRendererKind.HostedControl"/>，libmpv 走这条）。
-/// <para>
-/// 为什么不是 <see cref="IMediaVideoRenderer"/> / <see cref="IMediaVideoFrameSource"/>：
-/// libmpv 的托管包装自己持有渲染上下文与 GL/软件渲染器，只能由它的控件创建和销毁上下文；
-/// 宿主再插一脚只会得到两份解码器。所以这里让后端直接交出一个控件，宿主负责摆位置。
-/// </para>
-/// <para>
-/// 实现契约：只在 UI 线程被调用；<see cref="CreateVideoControl"/> 返回的同一个控件对象只能交给宿主一次，
-/// 宿主卸载时必须调用 <see cref="ReleaseVideoControl"/>；没有原生库时返回 null + 原因，不抛异常。
-/// </para>
-/// </summary>
-public interface IMediaVideoControlSource
-{
-    /// <summary>
-    /// 创建画面控件。<paramref name="includeVideoSurface"/> 为 false 时表示当前只播音频
-    /// （或视频画面没被放行），实现应挑一条不需要 GPU 表面的渲染路线，但仍然要建立播放上下文。
-    /// </summary>
-    MediaVideoControl CreateVideoControl(bool includeVideoSurface);
-
-    /// <summary>宿主卸载画面控件；实现应停止播放并释放上下文。</summary>
-    void ReleaseVideoControl();
-}
-
-/// <summary>
-/// 只能把帧推给宿主的后端实现它（Linux GStreamer appsink、Windows MediaComposition 取帧）。
+/// 只能把帧推给宿主的后端实现它（Linux GStreamer appsink、Windows MediaComposition 取帧、桌面 libmpv 软件渲染）。
 /// 与 <see cref="IMediaVideoRenderer"/> 并列：二者互斥，实现只能选一种，否则“画面在哪”说不清。
 /// </summary>
 public interface IMediaVideoFrameSource

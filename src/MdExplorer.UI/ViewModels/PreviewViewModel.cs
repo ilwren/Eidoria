@@ -252,12 +252,11 @@ public sealed partial class PreviewViewModel(
     private bool MediaBackendCanShowVideo =>
         _media is { } media && media.Capabilities.CanPlayVideo &&
         media.RendererKind != MediaRendererKind.None &&
-        (media.RendererKind != MediaRendererKind.FramePush || ActiveMedia is IMediaVideoFrameSource) &&
-        (media.RendererKind != MediaRendererKind.HostedControl || ActiveMedia is IMediaVideoControlSource);
+        (media.RendererKind != MediaRendererKind.FramePush || ActiveMedia is IMediaVideoFrameSource);
 
     /// <summary>
     /// 真正在跑的后端本身。裁决层（<see cref="IMediaBackendSelector"/>）只能转发能力位与画面
-    /// 交付方式，装不出 FramePush/NativeSurface/HostedControl 三种实现中的任何一种，
+    /// 交付方式，装不出 FramePush / NativeSurface 两种实现中的任何一种，
     /// 所以可选画面端口一律从这里取；非媒体项返回 null，免得为一张图片去实例化解码器。
     /// </summary>
     private IMediaPlaybackService? ActiveMedia =>
@@ -285,37 +284,6 @@ public sealed partial class PreviewViewModel(
     public bool ShowFrameVideoSurface =>
         IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
         _media?.RendererKind == MediaRendererKind.FramePush && VideoFrameSource is not null;
-    /// <summary>后端自带 Avalonia 控件（libmpv）：渲染器在控件里，宿主只负责摆位置与挂载。</summary>
-    public IMediaVideoControlSource? VideoControlSource => ActiveMedia as IMediaVideoControlSource;
-    /// <summary>
-    /// 交给视图去承载的控件来源。非媒体文件一律交 null：否则选中一张图片也会
-    /// 让 libmpv 建一个解码器（控件常驻是为了音频，不是为了给每种文件开一个播放器）。
-    /// </summary>
-    public IMediaVideoControlSource? MediaControlHostSource => IsMedia ? VideoControlSource : null;
-    /// <summary>
-    /// 媒体卡片里要不要有宿主控件这一层。<see cref="MediaRendererKind.HostedControl"/> 后端对**所有**媒体
-    /// 都需要它：控件里才是 mpv 上下文，没有上下文连音频都没有解码器。其余后端一律不需要。
-    /// </summary>
-    public bool ShowHostedMediaHost =>
-        IsMedia && _media?.RendererKind == MediaRendererKind.HostedControl && VideoControlSource is not null;
-    /// <summary>
-    /// 是否看得见内嵌控件画面（音频与未放行的视频为 false）。
-    /// 注意它只决定“占不占版面”：宿主控件本身仍留在树上，由 <see cref="HostedSurfaceHeight"/> 压成 0 高。
-    /// </summary>
-    public bool ShowHostedVideoSurface =>
-        IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
-        _media?.RendererKind == MediaRendererKind.HostedControl && VideoControlSource is not null;
-    /// <summary>
-    /// 控件画面区的高度。0 = 仍在树上但不占版面（纯音频）；非 0 = 真的出画面。
-    /// 不用 IsVisible 收起，是因为那会把它从视觉树摘掉并释放后端上下文。
-    /// </summary>
-    public double HostedSurfaceHeight => ShowHostedVideoSurface ? 280 : 0;
-    /// <summary>
-    /// 宿主画面控件该不该按“要出视频画面”来建：决定后端用 GL 渲染还是软件渲染。
-    /// 与 <see cref="ShowHostedVideoSurface"/> 分开是因为后者还要看探测结果与能力位——
-    /// 能力位为假时控件仍然要存在（音频得有解码器），只是不必开 GPU 表面。
-    /// </summary>
-    public bool HostedVideoWantsSurface => IsVideoMedia && PlayVideoInline;
     /// <summary>对当前文件显式改用内嵌画面（风险提示就在卡片上，用户自己选的）。</summary>
     [ObservableProperty] private bool _forceInlineVideo;
 
@@ -330,7 +298,6 @@ public sealed partial class PreviewViewModel(
     public void RefreshSettings()
     {
         OnPropertyChanged(nameof(PlayVideoInline));
-        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(ShowMediaDiagnostics));
         RaiseMediaState();
     }
@@ -349,7 +316,6 @@ public sealed partial class PreviewViewModel(
     {
         MediaRendererKind.NativeSurface => "画面：平台原生 Surface",
         MediaRendererKind.FramePush => "画面：宿主帧呈现",
-        MediaRendererKind.HostedControl => "画面：后端控件内嵌（libmpv）",
         _ => "画面：未接入（用系统应用打开）",
     };
     public string MediaBackendDiagnostic => IsMedia
@@ -478,10 +444,6 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
-        OnPropertyChanged(nameof(ShowHostedMediaHost));
-        OnPropertyChanged(nameof(ShowHostedVideoSurface));
-        OnPropertyChanged(nameof(HostedSurfaceHeight));
-        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(MediaProbeText));
         OnPropertyChanged(nameof(HasMediaProbe));
         OnPropertyChanged(nameof(MediaProbeReasonText));
@@ -496,14 +458,8 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
-        OnPropertyChanged(nameof(ShowHostedMediaHost));
-        OnPropertyChanged(nameof(ShowHostedVideoSurface));
-        OnPropertyChanged(nameof(HostedSurfaceHeight));
-        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(VideoRenderer));
         OnPropertyChanged(nameof(VideoFrameSource));
-        OnPropertyChanged(nameof(VideoControlSource));
-        OnPropertyChanged(nameof(MediaControlHostSource));
         OnPropertyChanged(nameof(IsMediaPlaying));
         OnPropertyChanged(nameof(MediaStateText));
         OnPropertyChanged(nameof(MediaPositionText));

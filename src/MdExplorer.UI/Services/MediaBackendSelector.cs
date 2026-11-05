@@ -17,7 +17,7 @@ namespace MdExplorer.UI.Services;
 /// </para>
 /// </summary>
 public sealed class MediaBackendSelector
-    : IMediaPlaybackService, IMediaProbe, IMediaPlaybackPoller, IMediaVideoControlSource, IMediaBackendSelector
+    : IMediaPlaybackService, IMediaProbe, IMediaPlaybackPoller, IMediaBackendSelector
 {
     private enum BackendKind
     {
@@ -176,19 +176,6 @@ public sealed class MediaBackendSelector
     // ── IMediaPlaybackPoller ─────────────────────────────────────────────────
 
     public void PollPosition() => (_active as IMediaPlaybackPoller)?.PollPosition();
-
-    // ── IMediaVideoControlSource ─────────────────────────────────────────────
-
-    public MediaVideoControl CreateVideoControl(bool includeVideoSurface)
-    {
-        EnsureResolved();
-        if (_active is IMediaVideoControlSource source)
-            return source.CreateVideoControl(includeVideoSurface);
-        return new MediaVideoControl(null,
-            $"{_active?.Capabilities.BackendName ?? "无后端"} 不使用宿主控件交付画面。");
-    }
-
-    public void ReleaseVideoControl() => (_active as IMediaVideoControlSource)?.ReleaseVideoControl();
 
     // ── 裁决 ─────────────────────────────────────────────────────────────────
 

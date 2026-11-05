@@ -514,7 +514,7 @@
             <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsMediaBackendAuto}" Variant="Text"
                          Content="自动" Margin="0,0,6,0"
                          Command="{Binding SetMediaBackendPreferenceCommand}" CommandParameter="Auto"
-                         ToolTip.Tip="优先 libmpv（连续渲染更流畅），本机没有可加载的 libmpv 时用系统解码栈" />
+                         ToolTip.Tip="优先 libmpv（连续解码 + 音视频同步，更接近系统播放器），本机没有可加载的 libmpv 时用系统解码栈" />
             <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsMediaBackendSystem}" Variant="Text"
                          Content="系统解码栈" Margin="0,0,6,0"
                          Command="{Binding SetMediaBackendPreferenceCommand}" CommandParameter="SystemApi"
@@ -525,13 +525,13 @@
                          ToolTip.Tip="使用你自己放置的 LGPL-only libmpv 原生库；找不到时会如实回退到系统解码栈" />
           </WrapPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"
-                     Text="两条路径都保留：系统栈零安装但受平台限制（Windows 取帧路线帧率低）；libmpv 连续渲染更接近系统播放器，但需要你自行放入经审核的 LGPL-only 原生库（本应用不打包、不联网下载）。切换后端会停止当前播放。" />
+                     Text="两条路径都保留：系统栈零安装但受平台限制（Windows 取帧路线帧率低）；libmpv 是连续解码 + 音视频同步，更接近系统播放器，但需要你自行放入经审核的 LGPL-only 原生库（本应用不打包、不联网下载）。切换后端会停止当前播放。" />
         </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
             <TextBlock Classes="body" Text="视频默认在应用内嵌播放" />
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="关掉时视频只给「用系统播放器打开 / 仍要内嵌观看」两个入口。系统栈的内嵌画面是逐帧抓取（目标最高 60 fps），可能出现花屏、音画不同步与较高 CPU；libmpv 后端是连续渲染，通常更流畅" />
+                       Text="关掉时视频只给「用系统播放器打开 / 仍要内嵌观看」两个入口。系统栈的内嵌画面是逐帧抓取（目标最高 60 fps），可能出现花屏、音画不同步与较高 CPU；libmpv 后端是连续解码推帧，通常更流畅" />
           </StackPanel>
           <md:MdSwitch Grid.Column="1" IsChecked="{Binding PlayVideoInline}" VerticalAlignment="Center" />
         </Grid>

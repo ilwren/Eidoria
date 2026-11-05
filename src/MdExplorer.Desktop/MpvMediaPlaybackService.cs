@@ -1,60 +1,74 @@
-using Avalonia;
+using System.Runtime.InteropServices;
 using HanumanInstitute.LibMpv;
-using HanumanInstitute.LibMpv.Avalonia;
 using MdExplorer.Platform.Abstractions;
 
 namespace MdExplorer.Desktop;
 
 /// <summary>
-/// libmpv 后端（桌面端可选路径）。它把解码、渲染、音频输出全部交给用户自己放的 LGPL-only libmpv，
-/// 宿主只做三件事：提供一个 Avalonia 控件当画面宿主、转发播放命令、按需读属性回报状态。
+/// libmpv 后端（桌面端可选路径）。解码、音视频同步、音频输出全部交给用户自己放的 LGPL-only libmpv，
+/// 画面由它自带的软件渲染器解码成 BGRA，再按帧推给宿主（<see cref="IMediaFrameSink"/>）。
 /// <para>
 /// 为什么再养一条后端：系统栈在 Windows 上没有能直接交给外部窗口的画面 API，
 /// 现有实现只能靠 <c>MediaComposition</c> 反复取缩略帧（约 12 fps，卡顿可见）；
-/// libmpv 的 GL 渲染器是连续呈现，观感与系统播放器接近。两条路径都保留、由用户选择，
-/// 谁更稳就以真机结果决定去留（见 docs/DEVELOPMENT.md D-03）。
+/// libmpv 是真正的连续解码 + 音视频同步，推帧的帧率由播放时钟决定。
+/// 两条路径都保留、由用户选择，谁更稳用真机结果决定去留（见 docs/DEVELOPMENT.md D-03）。
+/// </para>
+/// <para>
+/// 为什么用推帧而不是"交一个控件给宿主"：包装层的 <c>LibMpv.Avalonia</c> 依赖 <c>ReactiveUI.Avalonia</c>，
+/// 与 §3.2 的禁用清单（<c>ReactiveUI.*</c>）直接冲突，而且它的签名在 Linux 上过不了 NuGet 校验（NU3012）。
+/// 只引用不含 UI 的 <c>HanumanInstitute.LibMpv</c> 核心包 + 自己驱动 <c>SoftwareRender</c>，
+/// 既守住了依赖边界，又复用了已经跑通的 <see cref="IMediaFrameSink"/> 通道（Linux GStreamer 同一条路）。
 /// </para>
 /// <para>
 /// 打包边界：本仓**不携带也不下载** libmpv 二进制，程序不联网；用户把审核过的构建放到程序目录
 /// 或用环境变量指路即可（<see cref="MpvNativeLibrary.RootVariable"/>）。许可与构建要求见 docs/LIBMPV-SPIKE.md。
 /// </para>
 /// <para>
-/// 线程约定与端口一致：所有成员只在 UI 线程调用。
+/// 线程约定：端口方法只在 UI 线程调用；<c>mpv_render_context_render</c> 固定在本类自己的渲染线程上调用
+/// （libmpv 要求同一线程、且不要在更新回调里直接渲染），更新回调只负责按一下信号量。
 /// </para>
 /// </summary>
-internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPlaybackPoller, IMediaVideoControlSource
+internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPlaybackPoller, IMediaVideoFrameSource
 {
-    /// <summary>画面渲染路线覆盖：<c>opengl</c>（默认）、<c>software</c>、<c>native</c>（仅 Windows 子窗口）。</summary>
-    private const string RendererVariable = "MDEXPLORER_LIBMPV_RENDERER";
-
-    /// <summary>打开后多久还没拿到时长就算失败——不给用户一个永远“正在打开…”的卡片。</summary>
-    private static readonly TimeSpan OpenWatchdog = TimeSpan.FromSeconds(5);
+    /// <summary>渲染上限：预览卡只有两三百像素高，按 960×540 封顶即可，避免为预览做 1080p 的 CPU 转换。</summary>
+    private const int MaxRenderWidth = 960;
+    private const int MaxRenderHeight = 540;
 
     private readonly MpvNativeLibraryStatus _library = MpvNativeLibrary.Status;
-    private readonly object _gate = new();
+    private readonly AutoResetEvent _frameSignal = new(false);
 
-    private MpvView? _view;
     private MpvContext? _context;
-    private string? _pendingPath;
-    private string? _lastPath;
-    private TimeSpan _resumePosition;
-    private bool _pendingAutoPlay;
-    private DateTime? _pendingOpenSince;
+    private Thread? _renderThread;
+    private volatile bool _renderStop;
+    private IMediaFrameSink? _sink;
+
+    private byte[]? _frameBuffer;
+    private GCHandle _frameHandle;
+    private int _renderWidth = MaxRenderWidth;
+    private int _renderHeight = MaxRenderHeight;
+    private int _desiredWidth = MaxRenderWidth;
+    private int _desiredHeight = MaxRenderHeight;
+    private bool _sizeKnown;
+
     private MediaPlaybackState _state = MediaPlaybackState.Idle;
     private TimeSpan _position;
     private TimeSpan _duration;
     private int _volume = 100;
+    private DateTime? _openSince;
     private bool _disposed;
+
+    /// <summary>打开后多久还没拿到时长就算失败——不给用户一个永远“正在打开…”的卡片。</summary>
+    private static readonly TimeSpan OpenWatchdog = TimeSpan.FromSeconds(5);
 
     public MediaPlaybackCapabilities Capabilities => _library.IsAvailable
         ? new MediaPlaybackCapabilities(true, true, "libmpv",
-            $"libmpv 负责解码与画面输出（{RendererName(PreferredRenderer())}），音频走系统默认输出设备；" +
+            "libmpv 负责解码、音视频同步与音频输出，画面经软件渲染转成 BGRA 推给宿主；" +
             $"原生库来自用户自行放置的 LGPL-only 构建{(_library.LibraryPath is null ? "（系统库路径）" : string.Empty)}。" +
             "目标是连续流畅播放；能否解码某个文件取决于该构建带的 FFmpeg 组件。")
         : new MediaPlaybackCapabilities(false, false, "libmpv", _library.Detail);
 
     public MediaRendererKind RendererKind => _library.IsAvailable
-        ? MediaRendererKind.HostedControl
+        ? MediaRendererKind.FramePush
         : MediaRendererKind.None;
 
     public MediaPlaybackState State => _state;
@@ -65,130 +79,23 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
 
     public event EventHandler? PlaybackChanged;
 
-    // ── 画面控件（后端自带） ────────────────────────────────────────────────
+    // ── 帧交付 ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// 交出 libmpv 的画面控件。包装层的每个渲染视图都在自己的字段里创建 mpv 上下文，
-    /// 所以“控件存在”与“能播放”是同一件事：控件必须先挂进视觉树，我们才拿得到上下文。
-    /// 音频（或未放行视频画面）时用软件渲染器，避免为一个没有画面的文件去开 GL 表面。
-    /// </summary>
-    public MediaVideoControl CreateVideoControl(bool includeVideoSurface)
+    public bool AttachFrameSink(IMediaFrameSink sink)
     {
-        if (!_library.IsAvailable)
-            return new MediaVideoControl(null, _library.Detail);
-        if (_disposed)
-            return new MediaVideoControl(null, "libmpv 后端已释放。");
-
-        // 宿主重建画面时先收旧控件：一个后端同时只有一份上下文，不接受两个控件抢同一个播放器。
-        if (_view is not null)
-            ReleaseVideoControl();
-
-        try
-        {
-            var renderer = includeVideoSurface ? PreferredRenderer() : VideoRenderer.Software;
-            var view = new MpvView { Renderer = renderer };
-            view.PropertyChanged += OnViewPropertyChanged;
-            _view = view;
-            TryBindContext(view);
-            return new MediaVideoControl(view);
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            _view = null;
-            LastError = $"libmpv 画面控件创建失败：{ex.Message}";
-            return new MediaVideoControl(null, LastError);
-        }
+        if (!_library.IsAvailable || _disposed)
+            return false;
+        _sink = sink;
+        EnsureRenderThread();
+        // 让已经开始播的画面立刻出现在新宿主上，而不是等下一次解码更新。
+        _frameSignal.Set();
+        return true;
     }
 
-    public void ReleaseVideoControl()
+    public void DetachFrameSink()
     {
-        var view = _view;
-        _view = null;
-        if (view is not null)
-            view.PropertyChanged -= OnViewPropertyChanged;
-
-        MpvContext? context;
-        lock (_gate)
-        {
-            context = _context;
-            _context = null;
-        }
-
-        // 画面控件被卸载（预览栏收起、切到别的目的地）时不留一个“已停止”的假状态：
-        // 记下正在播的文件，控件重新挂回来时按原样续上（用户只是把预览收起来，不是要停播）。
-        var resumePath = _state is MediaPlaybackState.Playing or MediaPlaybackState.Paused
-            or MediaPlaybackState.Opening ? _lastPath : null;
-        var resumePlaying = _state == MediaPlaybackState.Playing;
-        var resumeAt = _position;
-
-        _resumePosition = resumePath is null ? TimeSpan.Zero : resumeAt;
-        _position = TimeSpan.Zero;
-        _duration = TimeSpan.Zero;
-        _pendingPath = resumePath;
-        _pendingAutoPlay = resumePlaying;
-        _pendingOpenSince = resumePath is null ? null : DateTime.UtcNow;
-
-        if (context is not null)
-        {
-            try
-            {
-                context.Dispose();
-            }
-            catch (Exception)
-            {
-                // 释放失败只能说“尽力了”：不能让关闭预览把外壳拖崩。
-            }
-        }
-
-        _state = resumePath is null ? MediaPlaybackState.Stopped : MediaPlaybackState.Opening;
-        RaiseChanged();
-    }
-
-    private void OnViewPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
-    {
-        if (e.Property != MpvView.MpvContextProperty)
-            return;
-        TryBindContext(sender as MpvView ?? _view);
-    }
-
-    private void TryBindContext(MpvView? view)
-    {
-        var context = view?.MpvContext;
-        if (context is null)
-            return;
-        lock (_gate)
-        {
-            if (ReferenceEquals(_context, context))
-                return;
-            _context = context;
-        }
-
-        try
-        {
-            context.Volume.Set(_volume);
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            // 音量设不上不该阻断打开；诊断里已有后端名，播放本身会继续。
-        }
-
-        TryStartPending();
-    }
-
-    /// <summary>
-    /// 上下文一到位就把“等着播的那个文件”打开。控件刚从属性变更里拿到的上下文与
-    /// 500 ms 轮询里补取到的上下文都走这里，两条路都试，谁先到谁开播——
-    /// 只依赖属性变更事件会漏掉“控件挂上来时上下文还没建好”的那种时序。
-    /// </summary>
-    private void TryStartPending()
-    {
-        if (_pendingPath is not { } path || CurrentContext() is null)
-            return;
-
-        _pendingPath = null;
-        var startAt = _resumePosition;
-        _resumePosition = TimeSpan.Zero;
-        _ = OpenCoreAsync(path, startAt);
+        _sink = null;
+        _sizeKnown = false;
     }
 
     // ── 播放控制 ─────────────────────────────────────────────────────────────
@@ -204,25 +111,7 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
             return false;
         }
 
-        _resumePosition = TimeSpan.Zero;
-        var context = CurrentContext();
-        if (context is null)
-        {
-            // 宿主还没把画面控件挂进视觉树（自动播放、或预览栏刚展开）：记下意图，控件一到位就打开。
-            _pendingPath = path;
-            _pendingOpenSince = DateTime.UtcNow;
-            _state = MediaPlaybackState.Opening;
-            LastError = null;
-            RaiseChanged();
-            return true;
-        }
-
-        return await OpenCoreAsync(path).ConfigureAwait(true);
-    }
-
-    private async Task<bool> OpenCoreAsync(string path, TimeSpan startAt = default)
-    {
-        var context = CurrentContext();
+        var context = EnsureContext();
         if (context is null)
             return false;
 
@@ -232,22 +121,15 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
             LastError = null;
             _position = TimeSpan.Zero;
             _duration = TimeSpan.Zero;
-            _pendingOpenSince = DateTime.UtcNow;
-            _lastPath = path;
+            _openSince = DateTime.UtcNow;
+            _sizeKnown = false;
             RaiseChanged();
 
             await context.LoadFile(path).InvokeAsync().ConfigureAwait(true);
             context.Volume.Set(_volume);
-            if (startAt > TimeSpan.Zero)
-            {
-                // 画面控件被宿主摘掉又挂回来时从原位置续播，而不是把用户丢回片头。
-                await context.Seek(startAt.TotalSeconds, SeekOption.Absolute).InvokeAsync().ConfigureAwait(true);
-                _position = startAt;
-            }
             // 端口语义是“打开但不自动播放”；要不要立刻出声由 PlayAsync 决定。
-            context.Pause.Set(!_pendingAutoPlay);
-            _pendingAutoPlay = false;
-            _state = _state == MediaPlaybackState.Failed ? _state : MediaPlaybackState.Paused;
+            context.Pause.Set(true);
+            _state = MediaPlaybackState.Paused;
             RaiseChanged();
             return true;
         }
@@ -255,7 +137,7 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         {
             LastError = $"libmpv 打不开该文件：{ex.Message}";
             _state = MediaPlaybackState.Failed;
-            _pendingOpenSince = null;
+            _openSince = null;
             RaiseChanged();
             return false;
         }
@@ -264,15 +146,9 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
     public Task PlayAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
-        {
-            _pendingAutoPlay = true;
-            if (_state is MediaPlaybackState.Paused or MediaPlaybackState.Stopped or MediaPlaybackState.Ended)
-                _state = MediaPlaybackState.Opening;
-            RaiseChanged();
             return Task.CompletedTask;
-        }
 
         try
         {
@@ -295,12 +171,9 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
 
     public Task PauseAsync()
     {
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
-        {
-            _pendingAutoPlay = false;
             return Task.CompletedTask;
-        }
 
         try
         {
@@ -318,11 +191,7 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
 
     public async Task StopAsync()
     {
-        _pendingAutoPlay = false;
-        _pendingPath = null;
-        _lastPath = null;
-        _resumePosition = TimeSpan.Zero;
-        var context = CurrentContext();
+        var context = Context();
         if (context is not null)
         {
             try
@@ -336,14 +205,25 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         }
 
         _position = TimeSpan.Zero;
+        _openSince = null;
         _state = MediaPlaybackState.Stopped;
-        _pendingOpenSince = null;
+        if (_sink is { } sink)
+        {
+            try
+            {
+                sink.Clear();
+            }
+            catch (Exception)
+            {
+                // 画面清不掉也只是留了最后一帧，不该影响停止。
+            }
+        }
         RaiseChanged();
     }
 
     public async Task SeekAsync(TimeSpan position)
     {
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
             return;
 
@@ -351,6 +231,7 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         try
         {
             await context.Seek(seconds, SeekOption.Absolute).InvokeAsync().ConfigureAwait(true);
+            _position = position;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -362,7 +243,7 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
     public void SetVolume(int percent)
     {
         _volume = Math.Clamp(percent, 0, 100);
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
             return;
         try
@@ -379,30 +260,13 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
 
     /// <summary>
     /// 把 libmpv 的真实状态拉回来。包装层的事件循环在自己的线程上，宿主这边用 500 ms 的
-    /// 属性轮询更简单也更稳：读四个标量属性，代价可以忽略。
+    /// 属性轮询更简单也更稳：读几个标量属性，代价可以忽略。
     /// </summary>
     public void PollPosition()
     {
-        // 控件可能是在轮询间隔里才把上下文建好的：每次轮询都补一次“该开播了”。
-        TryStartPending();
-
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
-        {
-            if (_pendingPath is not null && _pendingOpenSince is { } since)
-            {
-                if (DateTime.UtcNow - since > OpenWatchdog)
-                {
-                    _pendingPath = null;
-                    _pendingOpenSince = null;
-                    LastError = "libmpv 画面控件尚未就绪，无法开始播放。";
-                    _state = MediaPlaybackState.Failed;
-                    RaiseChanged();
-                }
-                // 还不到看门狗时限：继续等宿主把控件挂上来。
-            }
             return;
-        }
 
         var previousState = _state;
         var previousPosition = _position;
@@ -411,7 +275,9 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         _position = ReadPropertyTime(static c => c.TimePos.Get(), _position);
         _duration = ReadPropertyTime(static c => c.Duration.Get(), _duration);
 
-        bool paused = true, eof = false, idle = true;
+        var paused = true;
+        var eof = false;
+        var idle = true;
         try
         {
             paused = context.Pause.Get() ?? true;
@@ -431,17 +297,17 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         if (eof)
         {
             _state = MediaPlaybackState.Ended;
-            _pendingOpenSince = null;
+            _openSince = null;
         }
         else if (idle && _duration <= TimeSpan.Zero)
         {
-            // 还没真正载入文件。正在打开时保持原状态由看门狗收尾（否则用户在 500 ms 内会看到
+            // 还没真正载入文件。正在打开时交给看门狗收尾（否则用户在 500 ms 内会看到
             // “正在播放 → 已停止 → 正在播放”的跳动）；已经播过又回到空闲，就是真的停了。
-            if (_pendingOpenSince is { } openedAt)
+            if (_openSince is { } openedAt)
             {
                 if (DateTime.UtcNow - openedAt > OpenWatchdog)
                 {
-                    _pendingOpenSince = null;
+                    _openSince = null;
                     LastError = "libmpv 没能打开这个文件（容器或编码可能不被这个原生构建支持）。";
                     _state = MediaPlaybackState.Failed;
                 }
@@ -454,8 +320,11 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         else
         {
             _state = paused ? MediaPlaybackState.Paused : MediaPlaybackState.Playing;
-            _pendingOpenSince = null;
+            _openSince = null;
         }
+
+        if (!_sizeKnown)
+            UpdateRenderSize(context);
 
         if (_state != previousState
             || (_position - previousPosition).Duration() > TimeSpan.FromMilliseconds(250)
@@ -472,37 +341,189 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
         if (_disposed)
             return ValueTask.CompletedTask;
         _disposed = true;
-        ReleaseVideoControl();
+
+        StopRenderThread();
+
+        var context = _context;
+        _context = null;
+        if (context is not null)
+        {
+            try
+            {
+                context.Dispose();
+            }
+            catch (Exception)
+            {
+                // 释放失败只能说“尽力了”：不能让关闭预览把外壳拖崩。
+            }
+        }
+
+        _sink = null;
         return ValueTask.CompletedTask;
+    }
+
+    // ── 上下文与渲染线程 ─────────────────────────────────────────────────────
+
+    /// <summary><c>vo=libmpv</c> 必须写在 initialize 之前，否则渲染上下文建不起来。</summary>
+    private sealed class SoftwareOutputContext : MpvContext
+    {
+        protected override void OnPreInitialize() => SetOptionString("vo", "libmpv");
+    }
+
+    private MpvContext? EnsureContext()
+    {
+        if (_disposed)
+            return null;
+        if (_context is not null)
+            return _context;
+
+        MpvContext? created = null;
+        try
+        {
+            created = new SoftwareOutputContext();
+            created.StartSoftwareRendering(OnFrameRequested);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // 原生库存在但初始化失败（版本不匹配、缺依赖 DLL、AOT 下包装层不可用……）：
+            // 如实记下来并降级，别在预览这条路上把进程带走。
+            LastError = $"libmpv 初始化失败：{ex.Message}";
+            try
+            {
+                created?.Dispose();
+            }
+            catch (Exception)
+            {
+            }
+            return null;
+        }
+
+        _context = created;
+        EnsureRenderThread();
+        return _context;
+    }
+
+    private MpvContext? Context() => _context;
+
+    private void EnsureRenderThread()
+    {
+        if (_renderThread is not null || _disposed)
+            return;
+        _renderStop = false;
+        var thread = new Thread(RenderLoop)
+        {
+            IsBackground = true,
+            Name = "libmpv-render",
+        };
+        _renderThread = thread;
+        thread.Start();
+    }
+
+    private void StopRenderThread()
+    {
+        var thread = _renderThread;
+        _renderThread = null;
+        if (thread is null)
+            return;
+        _renderStop = true;
+        _frameSignal.Set();
+        try
+        {
+            thread.Join(TimeSpan.FromSeconds(1));
+        }
+        catch (Exception)
+        {
+            // 线程已经没了或不允许等待：都只是释放阶段的噪音。
+        }
+        FreeFrameBuffer();
+    }
+
+    /// <summary>mpv 的更新回调（来自 mpv 内部线程）：只按一下信号量，绝不在回调里渲染。</summary>
+    private void OnFrameRequested() => _frameSignal.Set();
+
+    private void RenderLoop()
+    {
+        while (!_renderStop)
+        {
+            _frameSignal.WaitOne(100);
+            if (_renderStop)
+                return;
+            PumpFrame();
+        }
+    }
+
+    private void PumpFrame()
+    {
+        var context = _context;
+        var sink = _sink;
+        if (context is null || sink is null || _disposed)
+            return;
+
+        try
+        {
+            EnsureFrameBuffer(_desiredWidth, _desiredHeight);
+            if (_frameBuffer is null)
+                return;
+            context.SoftwareRender(_renderWidth, _renderHeight, _frameHandle.AddrOfPinnedObject(), "bgra");
+            sink.PresentFrame(_frameBuffer, _renderWidth, _renderHeight, _renderWidth * 4);
+        }
+        catch (Exception)
+        {
+            // 单帧渲染失败不该让整段播放失败：丢掉这一帧，等下一次更新回调。
+        }
+    }
+
+    private void EnsureFrameBuffer(int width, int height)
+    {
+        if (_frameBuffer is not null && _renderWidth == width && _renderHeight == height)
+            return;
+
+        FreeFrameBuffer();
+        _renderWidth = Math.Max(2, width);
+        _renderHeight = Math.Max(2, height);
+        _frameBuffer = new byte[_renderWidth * _renderHeight * 4];
+        _frameHandle = GCHandle.Alloc(_frameBuffer, GCHandleType.Pinned);
+    }
+
+    private void FreeFrameBuffer()
+    {
+        if (_frameHandle.IsAllocated)
+            _frameHandle.Free();
+        _frameBuffer = null;
+    }
+
+    /// <summary>
+    /// 按视频尺寸定渲染缓冲：预览卡只有两三百像素高，按 960×540 封顶即可。
+    /// 尺寸取视频自身的宽高比，避免依赖软件渲染器的缩放策略。
+    /// </summary>
+    private void UpdateRenderSize(MpvContext context)
+    {
+        try
+        {
+            var width = context.Width.Get();
+            var height = context.Height.Get();
+            if (width is not > 0 || height is not > 0)
+                return;
+
+            var scale = Math.Min(1d, Math.Min((double)MaxRenderWidth / width.Value, (double)MaxRenderHeight / height.Value));
+            var targetWidth = Math.Max(2, (int)Math.Round(width.Value * scale / 2) * 2);
+            var targetHeight = Math.Max(2, (int)Math.Round(height.Value * scale / 2) * 2);
+            _desiredWidth = targetWidth;
+            _desiredHeight = targetHeight;
+            _sizeKnown = true;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // 属性暂时读不到（还没起播）：下一轮轮询再试。
+        }
     }
 
     // ── 内部工具 ─────────────────────────────────────────────────────────────
 
-    private MpvContext? CurrentContext()
-    {
-        lock (_gate)
-        {
-            if (_context is not null)
-                return _context;
-        }
-
-        // 控件已创建但还没初始化完：顺手取一次，免得依赖属性变更事件的时序。
-        var view = _view;
-        if (view?.MpvContext is { } context)
-        {
-            lock (_gate)
-            {
-                _context ??= context;
-                return _context;
-            }
-        }
-        return null;
-    }
-
     private TimeSpan ReadPropertyTime(Func<MpvContext, double?> read, TimeSpan fallback)
     {
         // 读一个标量属性是一次同步 FFI 调用，开销可忽略；异常时退回上一次已知值，绝不让 UI 卡住。
-        var context = CurrentContext();
+        var context = Context();
         if (context is null)
             return fallback;
         try
@@ -523,24 +544,4 @@ internal sealed class MpvMediaPlaybackService : IMediaPlaybackService, IMediaPla
     }
 
     private void RaiseChanged() => PlaybackChanged?.Invoke(this, EventArgs.Empty);
-
-    private static VideoRenderer PreferredRenderer()
-    {
-        var raw = Environment.GetEnvironmentVariable(RendererVariable)?.Trim().ToLowerInvariant();
-        return raw switch
-        {
-            "software" or "sw" => VideoRenderer.Software,
-            // 原生子窗口只在 Windows 有意义（D3D 互操作），Linux 上会退化，别当默认。
-            "native" when OperatingSystem.IsWindows() => VideoRenderer.Native,
-            "opengl" or "gl" => VideoRenderer.OpenGl,
-            _ => VideoRenderer.OpenGl,
-        };
-    }
-
-    private static string RendererName(VideoRenderer renderer) => renderer switch
-    {
-        VideoRenderer.Software => "软件渲染",
-        VideoRenderer.Native => "原生子窗口",
-        _ => "OpenGL 渲染",
-    };
 }

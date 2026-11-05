@@ -23,16 +23,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - name: Self-contained publish (captured)
         run: |
-          set -o pipefail
           dotnet publish src/MdExplorer.Desktop -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64 > publish-selfcontained.txt 2>&1 || true
-          echo "=== exit above captured ==="
-          grep -nE "error|Error|NU[0-9]{4}|warning IL" publish-selfcontained.txt | head -60 || true
+          grep -nE "error|NU[0-9]{4}" publish-selfcontained.txt | head -80 || true
       - name: Native AOT publish (captured)
         run: |
-          set -o pipefail
           dotnet publish src/MdExplorer.Desktop -c Release -r linux-x64 -p:PublishAot=true > publish-aot.txt 2>&1 || true
-          echo "=== exit above captured ==="
-          grep -nE "error|Error|NU[0-9]{4}|warning IL" publish-aot.txt | head -60 || true
+          grep -nE "error|NU[0-9]{4}|warning IL" publish-aot.txt | head -80 || true
       - name: Publish captured logs
         if: always()
         continue-on-error: true

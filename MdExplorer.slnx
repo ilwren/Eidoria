@@ -5,7 +5,6 @@
   <Project Path="src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj" />
   <Project Path="src/MdExplorer.UI/MdExplorer.UI.csproj" />
   <Project Path="src/MdExplorer.Desktop/MdExplorer.Desktop.csproj" />
-  <Project Path="spikes/LibMpvAvaloniaSpike/LibMpvAvaloniaSpike.csproj" />
   <Project Path="spikes/LuaPluginRuntime/LuaPluginRuntime.csproj" />
   <Project Path="spikes/LuaPluginRuntime.Lab/LuaPluginRuntime.Lab.csproj" />
   <Project Path="tests/MdExplorer.LuaRuntime.Tests/MdExplorer.LuaRuntime.Tests.csproj" />

@@ -19,10 +19,13 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <!-- 宿主直接引用，确保 Windows 构建按 windows TFM 选中 WinRT 通知后端。 -->
     <PackageReference Include="Md3.Avalonia.Notifications" />
-    <!-- 可选媒体后端：libmpv 的 MIT 托管包装（只含 managed 代码，不含任何原生二进制）。
+    <!-- 可选媒体后端：libmpv 的 MIT 托管核心包（只含 managed 代码，不含任何原生二进制）。
+         故意**不**引用 HanumanInstitute.LibMpv.Avalonia：它依赖 ReactiveUI.Avalonia（§3.2 禁用清单），
+         且该依赖包的签名在 Linux 上过不了 NuGet 校验（NU3012）。画面改由本仓自己驱动
+         SoftwareRender 后推给 IMediaFrameSink（与 Linux GStreamer 同一条通道）。
          原生 libmpv 由用户自行放到程序目录或经 MDEXPLORER_LIBMPV_ROOT 指路；
          未安装时探测失败并如实降级到系统栈，见 docs/LIBMPV-SPIKE.md。 -->
-    <PackageReference Include="HanumanInstitute.LibMpv.Avalonia" />
+    <PackageReference Include="HanumanInstitute.LibMpv" />
     <ProjectReference Include="..\MdExplorer.UI\MdExplorer.UI.csproj" />
   </ItemGroup>
 </Project>
