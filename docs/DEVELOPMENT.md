@@ -428,6 +428,8 @@ public interface IDirectoryWatcher : IAsyncDisposable
 
 ```csharp
 /// 缩略图两级：内存 LRU → 磁盘缓存 → 生成器。生成器可插拔（图片/PDF/视频海报…）。
+/// v0.40 已落地的中间层是 IThumbnailCache（磁盘缓存 + 负缓存标记 + 配额清扫），
+/// 生成器仍是 BrowserViewModel 里的图片解码；内存 LRU 与多类型生成器尚未实现。
 public interface IThumbnailService
 {
     // 返回 null 表示无缩略图（UI 回落类型图标）；请求侧传目标像素尺寸，禁止解码原图直绑 UI。
@@ -626,11 +628,11 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 
 ### 6.6 缩略图与元数据
 
-列表/网格缩略图来源优先级：平台原生（若 Spike 证明快且许可面净，如 Windows Shell `IShellItemImageFactory`、Android `loadThumbnail`/`MediaStore`、`ContentResolver.loadThumbnail`)→ 自生成（Skia/PDF 首页）。缓存键 = 定位符哈希 + 修改时间 + 尺寸档（96/192/384 三档）；内存 LRU ≤ 设备分档（桌面 128 MB、Android 48 MB），磁盘 LRU 默认 256 MB 可在设置清理与改上限。视频海报、PDF 首页生成较重，只在网格/预览需要时生成，列表小档图标优先。生成失败负缓存 24 h 防反复重试烧电。元数据抽取（图片 EXIF 尺寸/方向、音视频时长）异步补显不阻塞名称上屏。
+列表/网格缩略图来源优先级：平台原生（若 Spike 证明快且许可面净，如 Windows Shell `IShellItemImageFactory`、Android `loadThumbnail`/`MediaStore`、`ContentResolver.loadThumbnail`)→ 自生成（Skia/PDF 首页）。**v0.40 已落地图片这一档**：缓存键 = 定位符哈希 + 尺寸档 + **文件大小 + 修改时间**（128/192/288 三档，默认 192——沿用 v0.30 之前的解码宽度，升级后观感不变），磁盘缓存放在应用数据目录 `thumbnails/` 下，上限 192 MB（按最后写入时间清扫到 75%），设置页可一键清空并显示当前占用；解码失败写 `.fail` 负缓存标记，**24 h** 后自动失效（文件被占用、网络盘没挂上这类失败是暂时的），文件大小或修改时间一变也立即失效。尚未做：内存 LRU（当前缩略图随行 VM 存活，翻页即回收）、视频海报与 PDF 首页、平台原生缩略图、用户自定上限。元数据抽取（图片 EXIF 尺寸/方向、音视频时长）异步补显不阻塞名称上屏。
 
 ### 6.7 设置与个性化
 
-分节：外观（浅/深/跟随系统、主题色种子与 MD3 方案/对比度、是否用系统动态色——Android 12+ 壁纸取色为 P2 经平台层取种子）、默认视图与排序、搜索（索引根管理、内容索引开关、索引维护)、缩略图（开关/仅 Wi-Fi 无关项不出现/缓存清理与上限）、行为（删除确认强度、粘贴冲突默认策略、双击/单击打开（桌面）、显示隐藏默认)、存储授权管理（Android 已授权目录列表与撤销）、关于（版本、开源许可、日志导出）。设置即时生效持久化（JSON 源生成串行化，§10）；预留「导出/重置设置」。
+分节：外观（浅/深/跟随系统、主题色种子与 MD3 方案/对比度、是否用系统动态色——Android 12+ 壁纸取色为 P2 经平台层取种子）、默认视图与排序、搜索（索引根管理、内容索引开关、索引维护)、缩略图（开关/三档像素宽/缓存占用与一键清空；上限固定 192 MB）、行为（删除确认强度、粘贴冲突默认策略、双击/单击打开（桌面）、显示隐藏默认)、存储授权管理（Android 已授权目录列表与撤销）、关于（版本、开源许可、日志导出）。设置即时生效持久化（JSON 源生成串行化，§10）；预留「导出/重置设置」。
 
 ### 6.8 其他 MVP 能力
 
@@ -1243,6 +1245,7 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | 2026-10-30 | **v0.37 模型分发可复现性与校验修订**：五个 HF 仓库均固定到 40 位 commit SHA，脚本统一生成 `/resolve/<revision>/` 地址并校验清单 SHA；下载策略明确为默认两种文本模型、Whisper/YAMNet/SmolVLM 按需选择或 `--all`，Whisper 实际分发的 Xenova ONNX 导出许可改为 Apache-2.0（另注明 OpenAI 上游源码 MIT）。新增离线脚本回归：默认仅 12 个文本配置/权重文件，`--all` 覆盖清单全部 40 个文件；模拟下载、校验、损坏文件重新拉取与 `--clean --only` checksum 隔离。该测试同时发现并修复 Bash 下载时 checksum key 未带模型目录、verify 错误拼接 key 的缺陷。未下载真实模型权重。 | 本地通过 `bash -n`、manifest 11 列/SHA 检查、40 URL pinned dry-run、离线下载/校验/修复/清理回归与 `git diff --check`；push run `41064572455` 六 Job 全绿：Ubuntu / Windows 单元测试与 PowerShell `-List/-All/-Only/-DryRun`、80 截图、Linux/Windows self-contained、Linux Native AOT 与 Android APK 均通过；本机未安装 dotnet，因此 .NET 验证由 CI 完成 |
 | 2026-10-29 | **v0.32 Android 内嵌视频画面**：核实 Avalonia Android 已实现 `INativeControlHostImpl` 后，用 `TextureView` 作原生画面宿主接管视频输出（`MediaPlayer.SetSurface`），新增 `IMediaVideoRenderer` 平台无关端口与 UI 侧 `MediaSurfaceBridge`/`MediaSurfaceHost`；视频可播判定改为“能力位 + 画面通道”双条件，Android 探测对含视频轨且解码器齐全的文件改报可播并附分辨率。Windows/Linux 视频仍交系统应用。 | push run `41011884151` / PR run `41011889991`（sha `5ec8c2c`）六 Job 全绿：223 单元测试 Ubuntu/Windows 双跑（新增原生画面、有声无画、探测否决 3 例）、74 截图测试分四进程 19/19/18/18、PNG 64→65（新增 `74-large-media-probe-rejected`）、Windows/Linux 自包含、linux-x64 Native AOT 与 Android APK（含 trimming/AOT） |
 | 2026-11-05 | **v0.39 双内嵌媒体后端（平台栈 + 可选 libmpv）**：维护者实测 Windows 系统栈取帧路线卡顿，故新增可选的 libmpv 后端并与系统栈并存。平台抽象新增 `MediaBackendPreference`（Auto / SystemApi / LibMpv）、`IMediaBackendSelector` 与 `AppSettings.MediaBackendPreference`（手改非法值一律收回 Auto）；`MediaBackendSelector` 按偏好 + 实际能力位裁决，**能力位为假的后端不算可用**，显式点名却用不上时写「已回退 + 原因」，Auto 只报「谁没被用上、为什么」。桌面新增 `MpvMediaPlaybackService`（只引用不含 UI 的 `HanumanInstitute.LibMpv` 核心包，自驱动 `SoftwareRender` 把 BGRA 帧推给 `IMediaFrameSink`；独立渲染线程 + 500 ms 属性轮询 + 5 秒打开看门狗）与 `MpvNativeLibrary`（`NativeLibrary.TryLoad` 先行探测，库缺失时连上下文都不创建，避免布局期 `DllNotFoundException`）；`IMediaBackendSelector.ActiveBackend` 让预览视图拿到真正在跑的后端，否则裁决层会吞掉 `IMediaVideoFrameSource` 导致“能播但不出画面”。设置页新增后端三选一与实时裁决摘要。**依赖边界**：放弃 `LibMpv.Avalonia`（依赖 `ReactiveUI.Avalonia`，违反 §3.2 禁用清单，且该依赖在 Linux 上触发 NU3012 签名校验失败——本轮 CI 就是先在这里红了一次）。**边界**：本仓不携带也不下载 libmpv 二进制；包装层未验证 AOT/Trim，AOT 下创建失败只降级不崩；Android 只有平台栈。真机流畅度对比仍待验收 | CI run `41989811246` 九 Job 全绿：Ubuntu 构建/单测（新增后端裁决与预览状态机用例）、Windows 单测、Linux/Windows 自包含发布、linux-x64 Native AOT（仅剩包侧 IL2104/IL3053 警告）、Android APK、无头截图、缓存模型语义搜索 |
+| 2026-11-05 | **v0.40 缩略图三档 + 磁盘缓存 + 负缓存**：新增 `IThumbnailCache` 端口与 `FileThumbnailCache`（应用数据目录 `thumbnails/`，键 = 路径 + 档位 + 大小 + 修改时间，写临时文件后改名，IO 异常一律降级为未命中）；三档 Small 128 / Medium 192 / Large 288 落进 `AppSettings.ThumbnailTier`（非法值收回 Medium），设置页新增档位选择、缓存占用摘要与「清空」；浏览器缩略图管线改为「查缓存 → 命中即用 / 负缓存跳过 / 未命中解码并回写 PNG」，换档释放旧缩略图并按新档重解。负缓存标记 24 h 过期，文件大小或修改时间一变立即失效。**边界**：仅图片类型有缩略图；内存 LRU、视频海报/PDF 首页、平台原生缩略图、用户自定上限仍未做；截图为无头合成，真机翻页手感仍待人工验收 | push run（本轮 CI） |
 
 ### F. 文档变更规则
 |

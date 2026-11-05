@@ -196,6 +196,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _itemPageSize = Math.Clamp(s.ItemPageSize, 60, 480);
         _autoLoadMore = s.AutoLoadMore;
         _enableThumbnails = s.EnableThumbnails;
+        _thumbnailSize = ThumbnailTierNames.Parse(s.ThumbnailTier);
         _density = string.Equals(s.Density, "Compact", StringComparison.OrdinalIgnoreCase) ? "Compact" : "Comfortable";
         _confirmBeforeTrash = s.ConfirmBeforeTrash;
         _restoreTabsOnLaunch = s.RestoreTabsOnLaunch;
@@ -210,6 +211,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _appTrashRetentionDays = Math.Clamp(s.AppTrashRetentionDays, 1, 365);
         RefreshSearchIndexRoots();
         RefreshLocalAiState();
+        _ = RefreshThumbnailCacheStatsAsync();
     }
 
     /// <summary>Android 挂载后将打开方式切换为 Avalonia Launcher 实现。</summary>
@@ -227,7 +229,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         var browser = new BrowserViewModel(
             services.FileSystem, services.Operations, services.Trash,
             services.Archive, services.Search, services.SettingsStore,
-            services.Inspector, services.FolderWatch, services.SystemClipboard,
+            services.Inspector, services.FolderWatch, services.SystemClipboard, services.Thumbnails,
             this, Preview, () => Launcher);
         browser.ClipboardState = _browserClipboard;
         return browser;
@@ -3149,6 +3151,74 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     [RelayCommand]
     private void SetMediaBackendPreference(string? value) =>
         MediaBackendMode = MediaBackendPreferenceNames.Parse(value);
+
+    // ---------- 缩略图档位与磁盘缓存 ----------
+
+    /// <summary>
+    /// 三档只影响解码目标宽度；换档即换缓存键，旧档缩略图会被清掉重解。
+    /// 属性名刻意叫 Size 而不是 ThumbnailTier：避免与枚举类型同名带来的解析歧义（Color Color 规则）。
+    /// </summary>
+    [ObservableProperty] private ThumbnailTier _thumbnailSize;
+
+    public bool IsThumbnailSizeSmall => ThumbnailSize == ThumbnailTier.Small;
+    public bool IsThumbnailSizeMedium => ThumbnailSize == ThumbnailTier.Medium;
+    public bool IsThumbnailSizeLarge => ThumbnailSize == ThumbnailTier.Large;
+
+    /// <summary>缓存占用的一句话摘要（条目数 + 体积）；统计失败时如实说不知道。</summary>
+    public string ThumbnailCacheSummary => _thumbnailCacheSummary;
+    private string _thumbnailCacheSummary = "正在统计缩略图缓存…";
+
+    [RelayCommand]
+    private void SetThumbnailTier(string? value) => ThumbnailSize = ThumbnailTierNames.Parse(value);
+
+    [RelayCommand]
+    private async Task ClearThumbnailCacheAsync()
+    {
+        try
+        {
+            var freed = await _services.Thumbnails.ClearAsync(CancellationToken.None).ConfigureAwait(true);
+            _thumbnailCacheSummary = $"已清空（释放 {Formatting.Bytes(freed)}）；缩略图会按需重新生成。";
+            // 缓存没了但界面里还挂着旧位图：清掉让它们按当前档位重新走一遍。
+            Browser.ApplyThumbnailTierPreference();
+            SecondaryBrowser.ApplyThumbnailTierPreference();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _thumbnailCacheSummary = $"清空失败：{ex.Message}";
+        }
+        OnPropertyChanged(nameof(ThumbnailCacheSummary));
+    }
+
+    private async Task RefreshThumbnailCacheStatsAsync()
+    {
+        try
+        {
+            var stats = await _services.Thumbnails.GetStatsAsync(CancellationToken.None).ConfigureAwait(true);
+            _thumbnailCacheSummary = stats.Entries == 0 && stats.Failures == 0
+                ? "缓存为空；打开含图片的文件夹后会在这里累积。"
+                : $"{stats.Entries} 张 · {Formatting.Bytes(stats.Bytes)}"
+                  + (stats.Failures > 0 ? $" · {stats.Failures} 个失败标记" : string.Empty);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _thumbnailCacheSummary = $"统计失败：{ex.Message}";
+        }
+        OnPropertyChanged(nameof(ThumbnailCacheSummary));
+    }
+
+    partial void OnThumbnailSizeChanged(ThumbnailTier value)
+    {
+        _services.SettingsStore.Settings.ThumbnailTier = ThumbnailTierNames.ToSettingValue(value);
+        _ = SaveAsync();
+        OnPropertyChanged(nameof(IsThumbnailSizeSmall));
+        OnPropertyChanged(nameof(IsThumbnailSizeMedium));
+        OnPropertyChanged(nameof(IsThumbnailSizeLarge));
+        if (!_enableThumbnails)
+            return; // 缩略图关着就别为档位变化做解码了
+        Browser.ApplyThumbnailTierPreference();
+        SecondaryBrowser.ApplyThumbnailTierPreference();
+        _ = RefreshThumbnailCacheStatsAsync();
+    }
     /// <summary>端侧 AI 总开关（默认关）；关闭后语义索引保留在本机，但不进行推理或检索。</summary>
     [ObservableProperty] private bool _enableLocalAi;
     [ObservableProperty] private bool _isSendingTestSystemNotification;

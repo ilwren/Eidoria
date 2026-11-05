@@ -68,6 +68,9 @@ public sealed partial class BrowserViewModel : ObservableObject
     /// <summary>图片缩略图是否仍参与解码；关闭时列表只保留类型图标。</summary>
     public bool ThumbnailDecodingEnabled => _settingsStore.Settings.EnableThumbnails;
 
+    /// <summary>当前缩略图档位（像素宽由档位决定，也是缓存键的一部分）。</summary>
+    public ThumbnailTier CurrentThumbnailTier => ThumbnailTierNames.Parse(_settingsStore.Settings.ThumbnailTier);
+
     /// <summary>移入回收站前是否需要确认；永久删除不受此开关影响，始终确认。</summary>
     public bool RequiresTrashConfirmation =>
         _trash.CanMoveToTrash && _settingsStore.Settings.ConfirmBeforeTrash;
@@ -81,6 +84,7 @@ public sealed partial class BrowserViewModel : ObservableObject
     private readonly IFolderWatchService _folderWatch;
     private readonly ISystemClipboardService _systemClipboard;
     private readonly ISettingsStore _settingsStore;
+    private readonly IThumbnailCache _thumbnailCache;
     private readonly IDialogs _dialogs;
     private readonly PreviewViewModel _preview;
     private readonly Func<IFileLauncherService> _launcher;
@@ -153,7 +157,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         IFileSystemService fileSystem, IFileOperationService operations, ITrashService trash,
         IArchiveService archive, ISearchService search, ISettingsStore settingsStore,
         IFileInspectorService inspector, IFolderWatchService folderWatch,
-        ISystemClipboardService systemClipboard,
+        ISystemClipboardService systemClipboard, IThumbnailCache thumbnailCache,
         IDialogs dialogs, PreviewViewModel preview, Func<IFileLauncherService> launcher)
     {
         _fileSystem = fileSystem;
@@ -165,6 +169,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         _folderWatch = folderWatch;
         _systemClipboard = systemClipboard;
         _settingsStore = settingsStore;
+        _thumbnailCache = thumbnailCache;
         _dialogs = dialogs;
         _preview = preview;
         _launcher = launcher;
@@ -2616,6 +2621,22 @@ public sealed partial class BrowserViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 缩略图档位变化：旧的缩略图是按旧尺寸解出来的，留着只会显示错误档位。
+    /// 全部释放后按新档位重新解码（缓存里有这一档就直接命中）。
+    /// </summary>
+    public void ApplyThumbnailTierPreference()
+    {
+        foreach (var item in Items)
+        {
+            if (item.Thumbnail is null)
+                continue;
+            item.Thumbnail.Dispose();
+            item.Thumbnail = null;
+        }
+        StartThumbnails();
+    }
+
     /// <summary>每页行数改大后补足当前页；改小时不移除已呈现行，避免用户眼前的条目突然消失。</summary>
     public void ApplyPageSizePreference()
     {
@@ -2640,6 +2661,7 @@ public sealed partial class BrowserViewModel : ObservableObject
         if (_thumbCts is null || _thumbCts.IsCancellationRequested)
             _thumbCts = new CancellationTokenSource();
         var ct = _thumbCts.Token;
+        var tier = CurrentThumbnailTier;
         var targets = candidates
             .Where(i => i.Kind == FileKind.Image && i.Thumbnail is null)
             .Take(300)
@@ -2652,14 +2674,52 @@ public sealed partial class BrowserViewModel : ObservableObject
                 await _thumbnailGate.WaitAsync(ct).ConfigureAwait(false);
                 try
                 {
-                    await using var stream = await _fileSystem.OpenReadAsync(item.FullPath, ct).ConfigureAwait(false);
-                    var bitmap = await Task.Run(() => Bitmap.DecodeToWidth(stream, 192), ct).ConfigureAwait(false);
+                    var request = new ThumbnailRequest(
+                        item.FullPath, item.Model.Length ?? 0, item.Model.LastWriteTime, tier);
+
+                    // ① 先看磁盘缓存：命中就直接用，不再解码（翻回旧目录时这才是爽的地方）。
+                    var cached = await _thumbnailCache.LookupAsync(request, ct).ConfigureAwait(false);
+                    if (cached.Status == ThumbnailCacheStatus.KnownFailure)
+                        return; // ② 负缓存：这张图在这台机器上解不出来，别再占用并发额度
+                    if (cached is { Status: ThumbnailCacheStatus.Hit, Payload: { Length: > 0 } payload })
+                    {
+                        var cachedBitmap = await Task.Run(
+                            () => new Bitmap(new MemoryStream(payload, writable: false)), ct).ConfigureAwait(false);
+                        await Dispatcher.UIThread.InvokeAsync(() => item.Thumbnail = cachedBitmap);
+                        return;
+                    }
+
+                    // ③ 未命中：解码 → 编码成 PNG 入缓存 → 显示
+                    byte[] encoded;
+                    Bitmap bitmap;
+                    await using (var stream = await _fileSystem.OpenReadAsync(item.FullPath, ct).ConfigureAwait(false))
+                    {
+                        (bitmap, encoded) = await Task.Run(() =>
+                        {
+                            var decoded = Bitmap.DecodeToWidth(stream, ThumbnailTierNames.Pixels(tier));
+                            using var buffer = new MemoryStream();
+                            decoded.Save(buffer);
+                            return (decoded, buffer.ToArray());
+                        }, ct).ConfigureAwait(false);
+                    }
+
+                    await _thumbnailCache.StoreAsync(request, encoded, ct).ConfigureAwait(false);
                     await Dispatcher.UIThread.InvokeAsync(() => item.Thumbnail = bitmap);
                 }
                 finally { _thumbnailGate.Release(); }
             }
             catch (OperationCanceledException) { }
-            catch (Exception) { /* 坏图回落图标 */ }
+            catch (Exception)
+            {
+                // 坏图/无权限：记一笔负缓存（文件没变就不再重试），列表回落类型图标。
+                try
+                {
+                    await _thumbnailCache.StoreFailureAsync(
+                        new ThumbnailRequest(item.FullPath, item.Model.Length ?? 0, item.Model.LastWriteTime, tier),
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception) { }
+            }
         });
         var all = Task.WhenAll(tasks);
         var previous = _idleTask;

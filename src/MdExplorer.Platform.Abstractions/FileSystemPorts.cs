@@ -360,6 +360,7 @@ public sealed class AppSettings
     public int ItemPageSize { get; set; } = 120;            // 文件区每页物化的行数（60–480），不改变底层枚举
     public bool AutoLoadMore { get; set; } = true;          // 滚动距底 320 DIP 时自动续页
     public bool EnableThumbnails { get; set; } = true;      // 解码图片缩略图；关闭后列表只留类型图标
+    public string ThumbnailTier { get; set; } = "Medium";   // Small 128px | Medium 192px | Large 288px；换档即换缓存键
     public string Density { get; set; } = "Comfortable";    // Comfortable | Compact（列表/网格行密度）
     public bool RestoreTabsOnLaunch { get; set; } = true;   // 启动恢复上次会话标签页
     public int RecentItemLimit { get; set; } = 12;          // 最近访问保留条数（6–60）

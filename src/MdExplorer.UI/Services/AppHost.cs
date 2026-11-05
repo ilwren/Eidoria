@@ -34,6 +34,7 @@ public static class AppHost
         ISystemNotificationService SystemNotifications,
         IMediaPlaybackService MediaPlayback,
         MediaBackendSelector? MediaBackends,
+        IThumbnailCache Thumbnails,
         AiModelCatalog AiModels,
         PluginPackageCatalog Plugins);
 
@@ -140,6 +141,9 @@ public static class AppHost
             // 两条后端都注册了才值得裁决；否则维持原来的“无后端就自述”行为，不让 UI 多一层空壳。
             mediaPlayback,
             mediaBackends,
+            // 缩略图磁盘缓存：容量自我限额（默认 192 MB），坏图/无权限走负缓存，
+            // 目录放在应用数据目录下，与设置/授权根同一处，方便用户整体清理。
+            new FileThumbnailCache(Path.Combine(dataDir, "thumbnails")),
             // 端侧 AI 的模型目录：只扫描文件；ONNX Session 在用户调用本地语义搜索时才延迟建立。
             aiModels,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。

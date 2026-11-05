@@ -292,6 +292,33 @@
           </StackPanel>
           <md:MdSwitch Grid.Column="1" IsChecked="{Binding EnableThumbnails}" VerticalAlignment="Center" />
         </Grid>
+        <!-- 缩略图档位与磁盘缓存：档位是缓存键的一部分，所以换档等于换一份缓存。 -->
+        <StackPanel Spacing="6" IsVisible="{Binding EnableThumbnails}">
+          <TextBlock Classes="body" Text="缩略图档位" />
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     Text="档位只决定解码目标宽度：小档省内存与磁盘，大档在高分屏和网格视图里更清楚。换档会清掉已呈现的缩略图并按新档重新解码。" />
+          <WrapPanel Orientation="Horizontal">
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeSmall}" Variant="Text"
+                         Content="小 128" Margin="0,0,6,0"
+                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Small" />
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeMedium}" Variant="Text"
+                         Content="中 192" Margin="0,0,6,0"
+                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Medium" />
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeLarge}" Variant="Text"
+                         Content="大 288"
+                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Large" />
+          </WrapPanel>
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Classes="body" Text="缩略图磁盘缓存" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding ThumbnailCacheSummary}"
+                         ToolTip.Tip="缓存按「路径 + 档位 + 大小 + 修改时间」记账，文件一改就自动重新生成；坏图记负缓存不再重试。上限 192 MB，超出后按最后使用时间自动清理。" />
+            </StackPanel>
+            <md:MdButton Grid.Column="1" Classes="segmented-choice" Variant="Text" Content="清空"
+                         VerticalAlignment="Center" ToolTip.Tip="删除所有缓存文件；缩略图会在下次浏览时重新生成"
+                         Command="{Binding ClearThumbnailCacheCommand}" />
+          </Grid>
+        </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
             <TextBlock Classes="body" Text="移入回收站前确认" />
