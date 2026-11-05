@@ -188,7 +188,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/publish-artifacts.sh logs-win test-output-win.txt
       - name: Publish self-contained
-        run: dotnet publish src/MdExplorer.Desktop -c Release -r ${{ matrix.rid }} --self-contained true -o artifacts/${{ matrix.rid }}
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet publish src/MdExplorer.Desktop -c Release -r "${{ matrix.rid }}" \
+            --self-contained true -o "artifacts/${{ matrix.rid }}" 2>&1 | tee "publish-${{ matrix.rid }}.txt"
+      - name: Publish desktop log (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh "desktop-publish-${{ matrix.rid }}" "publish-${{ matrix.rid }}.txt"
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:
