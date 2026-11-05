@@ -1,10 +1,10 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 970 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 970 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 1.01 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 5.53 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 7.1 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 7.22 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 909 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 909 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 3 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 5.8 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 5.84 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 5.35 sec).
   MdExplorer.Domain -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/bin/Release/net10.0/MdExplorer.Domain.dll
   MdExplorer.Platform.Abstractions -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/bin/Release/net10.0/MdExplorer.Platform.Abstractions.dll
   MdExplorer.Application -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/bin/Release/net10.0/MdExplorer.Application.dll
@@ -45,29 +45,29 @@ Build succeeded.
     14 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:38.23
+Time Elapsed 00:00:36.15
 Discovered 83 screenshot tests; running in 4 isolated processes.
 === Screenshot partition 1/4: 21 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3042).
+Blame: Attaching crash dump utility to process dotnet (3159).
 
-Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 18 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 22 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 2/4: 21 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3240).
+Blame: Attaching crash dump utility to process dotnet (3363).
 
-Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 23 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 26 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 3/4: 21 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3444).
+Blame: Attaching crash dump utility to process dotnet (3568).
 
-Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 24 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 27 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 4/4: 20 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3644).
+Blame: Attaching crash dump utility to process dotnet (3773).
 
-Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 34 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 38 s - MdExplorer.Screenshots.dll (net10.0)
