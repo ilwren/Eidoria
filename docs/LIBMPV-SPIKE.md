@@ -78,7 +78,10 @@ mpv 默认可构建为 GPL；也支持 `-Dgpl=false` 的 LGPL 构建。libmpv �
 2. **软件渲染的 CPU 成本**：默认按 960×540 封顶 + 视频宽高比，仍未做实测；若明显吃 CPU，
    下一步是接 `StartOpenGlRendering`（Avalonia 的 `OpenGlControlBase` 已有可用的 GL 上下文接口）。
 3. **Native AOT / Trim**：核心包未声明 `IsAotCompatible`，通过函数指针调用原生接口。
-   AOT 下若不可用，探测通过但上下文创建失败会**如实降级**（catch → 诊断文案），不会把进程带走。
+   v0.39 实测 linux-x64 Native AOT 发布**能过**，只留下 `IL2104`（`HanumanInstitute.LibMpv`、
+   `HanumanInstitute.Validators` 产生 trim 警告）与 `IL3053`（Validators 的 AOT 分析警告）——
+   都是包侧警告，本仓 `TreatWarningsAsErrors=false`，AOT 门转正时需要连同这两条一起评估。
+   AOT 下若运行期不可用，探测通过但上下文创建失败会**如实降级**（catch → 诊断文案），不会把进程带走。
 4. **Android**：不提供 libmpv（另需可追溯的 LGPL-only Android 预编译库、ABI 覆盖、Surface 生命周期与 AOT 验证），
    继续用系统 `MediaPlayer` + `TextureView`。
 5. **音频设备切换、字幕与音轨选择**：包装层能力够，但 UI 未开放；不做成「有按钮没效果」。
