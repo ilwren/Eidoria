@@ -1,15 +1,12 @@
   Determining projects to restore...
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\MdExplorer.Domain.csproj (in 6.18 sec).
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj (in 6.18 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\MdExplorer.Domain.csproj (in 1.82 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj (in 1.82 sec).
   Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Application\MdExplorer.Application.csproj (in 5 ms).
-D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q [D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj]
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj (in 29.26 sec).
-D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q [D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj]
-  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj (in 29.63 sec).
-D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-  Restored D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj (in 41.45 sec).
-D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj (in 9.78 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj (in 18.35 sec).
+  Restored D:\a\Eidoria\Eidoria\tests\MdExplorer.Tests\MdExplorer.Tests.csproj (in 25.69 sec).
   MdExplorer.Domain -> D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\bin\Release\net10.0\MdExplorer.Domain.dll
-D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\ContentIndexPorts.cs(41,48): error CS0246: The type or namespace name 'OperationProgress' could not be found (are you missing a using directive or an assembly reference?) [D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj]
+  MdExplorer.Platform.Abstractions -> D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\bin\Release\net10.0\MdExplorer.Platform.Abstractions.dll
+  MdExplorer.Application -> D:\a\Eidoria\Eidoria\src\MdExplorer.Application\bin\Release\net10.0\MdExplorer.Application.dll
+D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\SqliteContentIndex.cs(94,48): error CS0246: The type or namespace name 'OperationProgress' could not be found (are you missing a using directive or an assembly reference?) [D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\SqliteContentIndex.cs(25,42): error CS0535: 'SqliteContentIndex' does not implement interface member 'IContentIndexService.RebuildAsync(IReadOnlyList<string>, IProgress<OperationProgress>?, CancellationToken)' [D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj]
