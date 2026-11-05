@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using MdExplorer.Domain;
 using MdExplorer.Platform.Abstractions;
 using Microsoft.Data.Sqlite;
 
