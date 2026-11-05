@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <IsAotCompatible>false</IsAotCompatible>
+    <RootNamespace>MdExplorer.Performance</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MdExplorer.Domain\MdExplorer.Domain.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.Application\MdExplorer.Application.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.UI\MdExplorer.UI.csproj" />
+  </ItemGroup>
+</Project>

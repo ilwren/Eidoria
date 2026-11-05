@@ -58,6 +58,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/publish-artifacts.sh logs restore-output.txt build-output.txt test-output.txt
 
+  performance-smoke:
+    # §12.2 的结构性冒烟：只拦「管线退化成平方级/整盘重扫」，
+    # 真机冷缓存门槛（1 万条首批 ≤ 500 ms、桌面冷启 ≤ 800 ms）仍在发布前人工实测。
+    name: Performance smoke (§12.2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore
+        run: dotnet restore tests/MdExplorer.Performance
+      - name: Run performance smoke
+        run: |
+          set -o pipefail
+          dotnet test tests/MdExplorer.Performance -c Release --no-restore --logger "console;verbosity=detailed" 2>&1 | tee perf-output.txt
+      - name: Publish perf log (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh logs-perf perf-output.txt
+
   real-model-embedding:
     name: Real model AI search smoke test (cached)
     runs-on: ubuntu-latest

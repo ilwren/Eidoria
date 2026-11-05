@@ -9,5 +9,6 @@
   <Project Path="spikes/LuaPluginRuntime.Lab/LuaPluginRuntime.Lab.csproj" />
   <Project Path="tests/MdExplorer.LuaRuntime.Tests/MdExplorer.LuaRuntime.Tests.csproj" />
   <Project Path="tests/MdExplorer.Tests/MdExplorer.Tests.csproj" />
+  <Project Path="tests/MdExplorer.Performance/MdExplorer.Performance.csproj" />
   <Project Path="tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj" />
 </Solution>
