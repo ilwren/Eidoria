@@ -22,7 +22,11 @@ public sealed class ContentIndexTests : IDisposable
 
     private string Write(string relativeName, string content)
     {
-        var path = Path.Combine(_root, relativeName);
+        // 逐段 Path.Combine：Windows 上直接拼 "notes/x.md" 会保留正斜杠，
+        // 而索引里存的是枚举出来的带反斜杠全路径，断言就会假红。
+        var parts = new List<string> { _root };
+        parts.AddRange(relativeName.Split('/'));
+        var path = Path.Combine(parts.ToArray());
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
