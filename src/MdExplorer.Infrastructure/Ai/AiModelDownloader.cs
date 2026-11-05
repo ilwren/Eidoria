@@ -304,7 +304,7 @@ public sealed class AiModelDownloader : IAiModelDownloader
 
     // ── 对外：校验 ───────────────────────────────────────────────────────────
 
-    public Task<AiModelDownloadOutcome> VerifyAsync(
+    public async Task<AiModelDownloadOutcome> VerifyAsync(
         IReadOnlyList<string> modelIds,
         IProgress<OperationProgress>? progress,
         CancellationToken cancellationToken)
@@ -373,13 +373,13 @@ public sealed class AiModelDownloader : IAiModelDownloader
 
         notes.Insert(0,
             $"校验完成：一致 {ok}、无记录 {unrecorded}、缺失 {missing}、不一致 {mismatched}");
-        return Task.FromResult(new AiModelDownloadOutcome(
+        return new AiModelDownloadOutcome(
             Cancelled: false,
             FilesDownloaded: 0,
             FilesSkipped: ok,
             FilesFailed: missing + mismatched,
             Errors: errors,
-            Notes: notes));
+            Notes: notes);
     }
 
     // ── 单文件：换源 + 续传 + 哈希 ───────────────────────────────────────────
@@ -414,14 +414,16 @@ public sealed class AiModelDownloader : IAiModelDownloader
                     continue;
                 }
 
+                ModelScopeInventory modelScope;
                 try
                 {
-                    if (!modelScopeCache.TryGetValue(model.Id, out var modelScope))
+                    if (!modelScopeCache.TryGetValue(model.Id, out var cached))
                     {
-                        modelScope = await LoadModelScopeInventoryAsync(model, revision, cancellationToken)
+                        cached = await LoadModelScopeInventoryAsync(model, revision, cancellationToken)
                             .ConfigureAwait(false);
-                        modelScopeCache[model.Id] = modelScope;
+                        modelScopeCache[model.Id] = cached;
                     }
+                    modelScope = cached;
                 }
                 catch (Exception ex) when (IsRecoverable(ex))
                 {
