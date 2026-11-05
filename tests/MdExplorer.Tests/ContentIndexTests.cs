@@ -1,3 +1,4 @@
+using MdExplorer.Domain;
 using MdExplorer.Infrastructure;
 using MdExplorer.Platform.Abstractions;
 using Xunit;
