@@ -1,0 +1,18 @@
+  Determining projects to restore...
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Application\MdExplorer.Application.csproj (in 11.83 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj (in 11.83 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj (in 11.83 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.UI\MdExplorer.UI.csproj (in 11.84 sec).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\MdExplorer.Domain.csproj (in 5 ms).
+  Restored D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\MdExplorer.Desktop.csproj (in 19.99 sec).
+  MdExplorer.Domain -> D:\a\Eidoria\Eidoria\src\MdExplorer.Domain\bin\Release\net10.0\MdExplorer.Domain.dll
+  MdExplorer.Platform.Abstractions -> D:\a\Eidoria\Eidoria\src\MdExplorer.Platform.Abstractions\bin\Release\net10.0\MdExplorer.Platform.Abstractions.dll
+  MdExplorer.Application -> D:\a\Eidoria\Eidoria\src\MdExplorer.Application\bin\Release\net10.0\MdExplorer.Application.dll
+  MdExplorer.Infrastructure -> D:\a\Eidoria\Eidoria\src\MdExplorer.Infrastructure\bin\Release\net10.0\MdExplorer.Infrastructure.dll
+  MdExplorer.UI -> D:\a\Eidoria\Eidoria\src\MdExplorer.UI\bin\Release\net10.0\MdExplorer.UI.dll
+D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\LibMpvMediaPlaybackService.cs(491,28): warning IL2075: 'this' argument does not satisfy 'DynamicallyAccessedMemberTypes.PublicProperties', 'DynamicallyAccessedMemberTypes.NonPublicProperties' in call to 'System.Type.GetProperty(String, BindingFlags)'. The return value of method 'System.Object.GetType()' does not have matching annotations. The source value must declare at least the same requirements as those declared on the target location it is assigned to. [D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\MdExplorer.Desktop.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\LibMpvMediaPlaybackService.cs(496,26): warning IL2075: 'this' argument does not satisfy 'DynamicallyAccessedMemberTypes.PublicMethods', 'DynamicallyAccessedMemberTypes.NonPublicMethods' in call to 'System.Type.GetMethods(BindingFlags)'. The return value of method 'System.Object.GetType()' does not have matching annotations. The source value must declare at least the same requirements as those declared on the target location it is assigned to. [D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\MdExplorer.Desktop.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\LibMpvMediaPlaybackService.cs(520,28): warning IL2075: 'this' argument does not satisfy 'DynamicallyAccessedMemberTypes.PublicProperties', 'DynamicallyAccessedMemberTypes.NonPublicProperties' in call to 'System.Type.GetProperty(String, BindingFlags)'. The return value of method 'System.Object.GetType()' does not have matching annotations. The source value must declare at least the same requirements as those declared on the target location it is assigned to. [D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\MdExplorer.Desktop.csproj]
+D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\LibMpvMediaPlaybackService.cs(525,36): warning IL2075: 'this' argument does not satisfy 'DynamicallyAccessedMemberTypes.PublicMethods', 'DynamicallyAccessedMemberTypes.NonPublicMethods' in call to 'System.Type.GetMethods(BindingFlags)'. The return value of method 'System.Object.GetType()' does not have matching annotations. The source value must declare at least the same requirements as those declared on the target location it is assigned to. [D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\MdExplorer.Desktop.csproj]
+  MdExplorer.Desktop -> D:\a\Eidoria\Eidoria\src\MdExplorer.Desktop\bin\Release\net10.0-windows10.0.19041.0\win-x64\MdExplorer.dll
+  MdExplorer.Desktop -> D:\a\Eidoria\Eidoria\artifacts\win-x64\
