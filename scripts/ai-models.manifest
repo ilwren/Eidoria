@@ -1,0 +1,78 @@
+# Eidoria（万象屿）端侧 AI 模型清单 —— 下载脚本与应用共用的唯一真源。
+#
+# 行格式：
+#   以 # 开头          -> 注释，忽略
+#   model|<字段...>    -> 模型元数据（11 列）
+#     1 id            唯一标识（脚本 --only 用，应用按它落设置）
+#     2 显示名
+#     3 用途（一句话，进设置页）
+#     4 许可           SPDX 标识
+#     5 许可链接
+#     6 模型仓库       Hugging Face 仓库名（脚本按 <镜像>/<仓库>/resolve/<revision>/<路径> 下载）
+#     7 固定 revision   HF 不可变 commit SHA，禁止从浮动 main 下载
+#     8 运行时         目前只规划 onnx（ONNX Runtime）
+#     9 约体积 MB     粗略值，仅用于下载前提示
+#    10 默认下载       true=无参数时属于轻量默认包；false=显式 --only / --all 才取
+#   file|<id>|<仓库内路径>
+#
+# 只放权重与推理所需配置；不放示例、不做量化转换。模型文件不进 git。
+
+# ── 默认轻量包：中文/英文文本语义检索（约 49 MB） ─────────────────────────
+model|text-embed-zh|BGE small 中文嵌入|文件名与文本内容的语义检索（中文优先）|MIT|https://huggingface.co/BAAI/bge-small-zh-v1.5|Xenova/bge-small-zh-v1.5|75c43b069aac4d136ba6bc1122f995fedcfd2781|onnx|26|true
+file|text-embed-zh|config.json
+file|text-embed-zh|tokenizer.json
+file|text-embed-zh|tokenizer_config.json
+file|text-embed-zh|special_tokens_map.json
+file|text-embed-zh|vocab.txt
+file|text-embed-zh|onnx/model_quantized.onnx
+
+model|text-embed-en|MiniLM L6 v2 英文嵌入|英文与代码文件的轻量语义检索|Apache-2.0|https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2|Xenova/all-MiniLM-L6-v2|751bff37182d3f1213fa05d7196b954e230abad9|onnx|23|true
+file|text-embed-en|config.json
+file|text-embed-en|tokenizer.json
+file|text-embed-en|tokenizer_config.json
+file|text-embed-en|special_tokens_map.json
+file|text-embed-en|vocab.txt
+file|text-embed-en|onnx/model_quantized.onnx
+
+# ── 可选：音频语音识别（Whisper tiny，约 57 MB） ──────────────────────────
+# multilingual 39M；ONNX q4f16 encoder + merged decoder。文件名/大小核对 HF tree API：2026-10-30。
+# ONNX 导出仓库模型卡声明 Apache-2.0（按实际分发仓库声明）；上游 OpenAI whisper 源代码另为 MIT。
+model|audio-asr-tiny|Whisper tiny 多语音频识别|本地音频转写（多语种含中文；39M 参数；量化 ONNX）|Apache-2.0|https://huggingface.co/Xenova/whisper-tiny|Xenova/whisper-tiny|5332fcc35e32a33b86612b9a57a89be7906102b1|onnx|57|false
+file|audio-asr-tiny|added_tokens.json
+file|audio-asr-tiny|config.json
+file|audio-asr-tiny|generation_config.json
+file|audio-asr-tiny|merges.txt
+file|audio-asr-tiny|normalizer.json
+file|audio-asr-tiny|preprocessor_config.json
+file|audio-asr-tiny|quantize_config.json
+file|audio-asr-tiny|special_tokens_map.json
+file|audio-asr-tiny|tokenizer.json
+file|audio-asr-tiny|tokenizer_config.json
+file|audio-asr-tiny|vocab.json
+file|audio-asr-tiny|onnx/encoder_model_q4f16.onnx
+file|audio-asr-tiny|onnx/decoder_model_merged_q4f16.onnx
+
+# ── 可选：通用声音事件分类（YAMNet ONNX，约 16 MB） ───────────────────────
+# 3.7M 参数、AudioSet 521 类（说话/音乐/犬吠/警笛等），单模型 ONNX，输入 16 kHz 单声道波形。
+# 这是音频标签分类，不是语音转写；Apache-2.0。
+model|audio-classify-yamnet|YAMNet 声音事件分类|识别音乐、说话、犬吠、警笛等声音类别（非转写）|Apache-2.0|https://huggingface.co/andrelgomes/yamnet-onnx|andrelgomes/yamnet-onnx|8a03a1572569685c42fdbef54ff36435dbaaf689|onnx|16|false
+file|audio-classify-yamnet|yamnet.onnx
+
+# ── 可选：小型图文问答/描述 VLM（SmolVLM 256M，约 194 MB） ─────────────────
+# Apache-2.0 官方检查点；q4f16 三段 ONNX（视觉编码器/词嵌入/文本解码器）。英文优先，中文效果需实测。
+# upstream API tree 精确大小合计约 193.7 MB；未走下载验证，首跑须 --verify。
+model|image-vlm-smol|SmolVLM 256M 图像问答|图片描述、图像问答、文档/OCR线索（英文优先）|Apache-2.0|https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct|HuggingFaceTB/SmolVLM-256M-Instruct|7e3e67edbbed1bf9888184d9df282b700a323964|onnx|194|false
+file|image-vlm-smol|added_tokens.json
+file|image-vlm-smol|chat_template.json
+file|image-vlm-smol|config.json
+file|image-vlm-smol|generation_config.json
+file|image-vlm-smol|merges.txt
+file|image-vlm-smol|preprocessor_config.json
+file|image-vlm-smol|processor_config.json
+file|image-vlm-smol|special_tokens_map.json
+file|image-vlm-smol|tokenizer.json
+file|image-vlm-smol|tokenizer_config.json
+file|image-vlm-smol|vocab.json
+file|image-vlm-smol|onnx/embed_tokens_q4f16.onnx
+file|image-vlm-smol|onnx/vision_encoder_q4f16.onnx
+file|image-vlm-smol|onnx/decoder_model_merged_q4f16.onnx

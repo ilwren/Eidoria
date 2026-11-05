@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="'Noto Sans SC','Noto Sans','Microsoft YaHei','PingFang SC',sans-serif">
+<title>MdExplorer ExtraLarge 1600dp+ 大屏/超宽屏（可选双窗格）</title>
+<rect x="0" y="0" width="1920" height="1080" fill="#F4FBFA"/>
+<rect x="0" y="0" width="300" height="1080" rx="0" fill="#E9EFEE"/>
+<text x="20" y="38" font-size="17" fill="#161D1D" text-anchor="start" font-weight="bold">MdExplorer</text>
+<rect x="24" y="62" width="104" height="52" rx="16" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.6"/>
+<text x="76" y="93" font-size="14" fill="#161D1D" text-anchor="middle" font-weight="bold">+ 新建</text>
+<rect x="12" y="124" width="276" height="40" rx="20" fill="#CCE8E7"/>
+<text x="28" y="152" font-size="13" fill="#161D1D" text-anchor="start" font-weight="bold">⌂  主页</text>
+<text x="28" y="200" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">★  收藏</text>
+<text x="28" y="248" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">↺  最近使用</text>
+<text x="28" y="296" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">▣  图片</text>
+<text x="28" y="344" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">🎬  视频</text>
+<text x="28" y="392" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">🎵  音频</text>
+<text x="28" y="440" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">📄  文档</text>
+<rect x="16" y="484" width="268" height="1" rx="0" fill="#6F7A79"/>
+<text x="28" y="514" font-size="12" fill="#3F4948" text-anchor="start" font-weight="bold">存储设备</text>
+<text x="28" y="544" font-size="12" fill="#161D1D" text-anchor="start" font-weight="normal">💽  本地磁盘 (C:)  68%</text>
+<text x="28" y="582" font-size="12" fill="#161D1D" text-anchor="start" font-weight="normal">💽  数据盘 (D:)  31%</text>
+<text x="28" y="620" font-size="12" fill="#161D1D" text-anchor="start" font-weight="normal">▤  SD 卡  12%</text>
+<rect x="16" y="658" width="268" height="1" rx="0" fill="#6F7A79"/>
+<text x="28" y="692" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">🗑  回收站</text>
+<text x="28" y="732" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">⚙  设置</text>
+<rect x="300" y="0" width="1620" height="48" rx="0" fill="#DEE7E6"/>
+<text x="316" y="30" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">Pictures  ✕      Documents  ✕      ＋ 新标签</text>
+<text x="1850" y="30" font-size="12" fill="#3F4948" text-anchor="middle" font-weight="normal">—  ▢  ✕</text>
+<rect x="300" y="48" width="1620" height="56" rx="0" fill="#F4FBFA"/>
+<text x="320" y="84" font-size="15" fill="#3F4948" text-anchor="start" font-weight="normal">‹ › ↑ ⟳</text>
+<rect x="410" y="58" width="680" height="38" rx="19" fill="#F4FBFA" stroke="#6F7A79" stroke-width="1"/>
+<text x="426" y="83" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">此电脑 › 数据盘 (D:) › Pictures</text>
+<rect x="1490" y="52" width="406" height="52" rx="26" fill="#DEE7E6"/>
+<text x="1508" y="85" font-size="18" fill="#3F4948" text-anchor="start" font-weight="normal">⌕</text>
+<text x="1538" y="84" font-size="14" fill="#3F4948" text-anchor="start" font-weight="normal">搜索  (Ctrl+K)</text>
+<circle cx="1868" cy="78" r="15" fill="#006A6A"/>
+<text x="1868" y="83" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">M</text>
+<rect x="300" y="104" width="1620" height="48" rx="0" fill="#F4FBFA"/>
+<text x="316" y="134" font-size="13" fill="#161D1D" text-anchor="start" font-weight="normal">＋ 新建    ✂ 剪切    ⧉ 复制    📋 粘贴    ✎ 重命名    🗑 删除      ⫴ 双窗格：开</text>
+<text x="1904" y="134" font-size="12" fill="#3F4948" text-anchor="end" font-weight="normal">⇅ 排序  ·  ☰ 详细信息  ·  ⚙ 列设置</text>
+<rect x="308" y="162" width="626" height="36" rx="8" fill="#E9EFEE"/>
+<text x="324" y="185" font-size="12" fill="#161D1D" text-anchor="start" font-weight="bold">名称 ↑</text>
+<text x="722" y="185" font-size="12" fill="#3F4948" text-anchor="start" font-weight="normal">修改日期</text>
+<text x="832" y="185" font-size="12" fill="#3F4948" text-anchor="start" font-weight="normal">类型</text>
+<text x="918" y="185" font-size="12" fill="#3F4948" text-anchor="end" font-weight="normal">大小</text>
+<rect x="322" y="217" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="322" y="212" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="226" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Documents</text>
+<text x="364" y="243" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">12 个项目 · 10月20日</text>
+<text x="918" y="232" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="322" y="263" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="322" y="258" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="272" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Pictures</text>
+<text x="364" y="289" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">248 个项目 · 10月18日</text>
+<text x="918" y="278" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="322" y="304" width="26" height="26" rx="4" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.7"/>
+<circle cx="329" cy="312" r="3" fill="#006A6A"/>
+<text x="364" y="318" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">IMG_20261001.jpg</text>
+<text x="364" y="335" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">3.2 MB · 10月1日</text>
+<text x="918" y="324" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="350" width="20" height="24" rx="2" fill="#FDEDEC" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="336" y="367" font-size="7" fill="#B3261E" text-anchor="middle" font-weight="bold">PDF</text>
+<text x="364" y="364" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">设计规范 v3.pdf</text>
+<text x="364" y="381" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">8.7 MB · 9月28日</text>
+<text x="918" y="370" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="396" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="410" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Program.cs</text>
+<text x="364" y="427" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">12 KB · 9月27日</text>
+<text x="918" y="416" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="442" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="456" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">README.md</text>
+<text x="364" y="473" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">4 KB · 9月26日</text>
+<text x="918" y="462" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="488" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="502" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">backup-2026.zip</text>
+<text x="364" y="519" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">1.4 GB · 9月20日</text>
+<text x="918" y="508" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="534" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="548" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">录音 001.m4a</text>
+<text x="364" y="565" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">22 MB · 9月19日</text>
+<text x="918" y="554" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="580" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="594" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">演示视频.mp4</text>
+<text x="364" y="611" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">380 MB · 9月15日</text>
+<text x="918" y="600" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="626" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="640" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">会议纪要.txt</text>
+<text x="364" y="657" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">18 KB · 9月12日</text>
+<text x="918" y="646" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="322" y="677" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="322" y="672" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="364" y="686" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Downloads</text>
+<text x="364" y="703" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">36 个项目 · 9月10日</text>
+<text x="918" y="692" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="322" y="718" width="26" height="26" rx="4" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.7"/>
+<circle cx="329" cy="726" r="3" fill="#006A6A"/>
+<text x="364" y="732" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">screenshot.png</text>
+<text x="364" y="749" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">1.1 MB · 9月8日</text>
+<text x="918" y="738" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="326" y="764" width="20" height="24" rx="2" fill="#FDEDEC" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="336" y="781" font-size="7" fill="#B3261E" text-anchor="middle" font-weight="bold">PDF</text>
+<text x="364" y="778" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">发票.pdf</text>
+<text x="364" y="795" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">240 KB · 9月5日</text>
+<text x="918" y="784" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<text x="324" y="155" font-size="12" fill="#006A6A" text-anchor="start" font-weight="bold">窗格 A · Pictures</text>
+<rect x="950" y="162" width="626" height="36" rx="8" fill="#E9EFEE"/>
+<text x="966" y="185" font-size="12" fill="#161D1D" text-anchor="start" font-weight="bold">名称 ↑</text>
+<text x="1364" y="185" font-size="12" fill="#3F4948" text-anchor="start" font-weight="normal">修改日期</text>
+<text x="1474" y="185" font-size="12" fill="#3F4948" text-anchor="start" font-weight="normal">类型</text>
+<text x="1560" y="185" font-size="12" fill="#3F4948" text-anchor="end" font-weight="normal">大小</text>
+<rect x="964" y="217" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="964" y="212" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="226" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Documents</text>
+<text x="1006" y="243" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">12 个项目 · 10月20日</text>
+<text x="1560" y="232" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="964" y="263" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="964" y="258" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="272" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Pictures</text>
+<text x="1006" y="289" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">248 个项目 · 10月18日</text>
+<text x="1560" y="278" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="964" y="304" width="26" height="26" rx="4" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.7"/>
+<circle cx="971" cy="312" r="3" fill="#006A6A"/>
+<text x="1006" y="318" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">IMG_20261001.jpg</text>
+<text x="1006" y="335" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">3.2 MB · 10月1日</text>
+<text x="1560" y="324" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="350" width="20" height="24" rx="2" fill="#FDEDEC" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="978" y="367" font-size="7" fill="#B3261E" text-anchor="middle" font-weight="bold">PDF</text>
+<text x="1006" y="364" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">设计规范 v3.pdf</text>
+<text x="1006" y="381" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">8.7 MB · 9月28日</text>
+<text x="1560" y="370" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="396" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="410" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Program.cs</text>
+<text x="1006" y="427" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">12 KB · 9月27日</text>
+<text x="1560" y="416" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="442" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="456" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">README.md</text>
+<text x="1006" y="473" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">4 KB · 9月26日</text>
+<text x="1560" y="462" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="488" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="502" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">backup-2026.zip</text>
+<text x="1006" y="519" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">1.4 GB · 9月20日</text>
+<text x="1560" y="508" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="534" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="548" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">录音 001.m4a</text>
+<text x="1006" y="565" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">22 MB · 9月19日</text>
+<text x="1560" y="554" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="580" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="594" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">演示视频.mp4</text>
+<text x="1006" y="611" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">380 MB · 9月15日</text>
+<text x="1560" y="600" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="626" width="20" height="24" rx="2" fill="#FFFFFF" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="640" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">会议纪要.txt</text>
+<text x="1006" y="657" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">18 KB · 9月12日</text>
+<text x="1560" y="646" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="964" y="677" width="26" height="19" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<rect x="964" y="672" width="12" height="7" rx="3" fill="#FFD88A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1006" y="686" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">Downloads</text>
+<text x="1006" y="703" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">36 个项目 · 9月10日</text>
+<text x="1560" y="692" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="964" y="718" width="26" height="26" rx="4" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.7"/>
+<circle cx="971" cy="726" r="3" fill="#006A6A"/>
+<text x="1006" y="732" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">screenshot.png</text>
+<text x="1006" y="749" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">1.1 MB · 9月8日</text>
+<text x="1560" y="738" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<rect x="968" y="764" width="20" height="24" rx="2" fill="#FDEDEC" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="978" y="781" font-size="7" fill="#B3261E" text-anchor="middle" font-weight="bold">PDF</text>
+<text x="1006" y="778" font-size="14" fill="#161D1D" text-anchor="start" font-weight="normal">发票.pdf</text>
+<text x="1006" y="795" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">240 KB · 9月5日</text>
+<text x="1560" y="784" font-size="16" fill="#3F4948" text-anchor="middle" font-weight="normal">⋮</text>
+<text x="966" y="155" font-size="12" fill="#006A6A" text-anchor="start" font-weight="bold">窗格 B · Documents</text>
+<rect x="950" y="162" width="626" height="870" rx="8" fill="none" stroke="#6F7A79" stroke-width="1" stroke-dasharray="6 4"/>
+<rect x="1596" y="160" width="300" height="884" rx="0" fill="#E9EFEE" stroke="#6F7A79" stroke-width="0.8"/>
+<text x="1612" y="190" font-size="14" fill="#161D1D" text-anchor="start" font-weight="bold">预览</text>
+<text x="1880" y="190" font-size="13" fill="#3F4948" text-anchor="middle" font-weight="normal">✕</text>
+<rect x="1612" y="208" width="268" height="150" rx="12" fill="#9EF1F0" stroke="#6F7A79" stroke-width="0.7"/>
+<circle cx="1716" cy="260" r="10" fill="#006A6A"/>
+<rect x="1636" y="310" width="220" height="10" rx="5" fill="#006A6A"/>
+<text x="1746" y="345" font-size="10" fill="#3F4948" text-anchor="middle" font-weight="normal">图片缩略图 / PDF 首页 / 文本片段</text>
+<text x="1612" y="392" font-size="15" fill="#161D1D" text-anchor="start" font-weight="bold">IMG_20261001.jpg</text>
+<text x="1612" y="424" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">类型</text>
+<text x="1880" y="424" font-size="11" fill="#161D1D" text-anchor="end" font-weight="normal">JPEG 图像</text>
+<text x="1612" y="450" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">大小</text>
+<text x="1880" y="450" font-size="11" fill="#161D1D" text-anchor="end" font-weight="normal">3.2 MB</text>
+<text x="1612" y="476" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">尺寸</text>
+<text x="1880" y="476" font-size="11" fill="#161D1D" text-anchor="end" font-weight="normal">4032 × 3024</text>
+<text x="1612" y="502" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">修改时间</text>
+<text x="1880" y="502" font-size="11" fill="#161D1D" text-anchor="end" font-weight="normal">2026-10-01 14:22</text>
+<text x="1612" y="528" font-size="11" fill="#3F4948" text-anchor="start" font-weight="normal">位置</text>
+<text x="1880" y="528" font-size="11" fill="#161D1D" text-anchor="end" font-weight="normal">Pictures/Camera</text>
+<rect x="1612" y="560" width="84" height="38" rx="19" fill="#006A6A" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1654" y="584" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">打开</text>
+<rect x="1704" y="560" width="84" height="38" rx="19" fill="#F4FBFA" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1746" y="584" font-size="12" fill="#161D1D" text-anchor="middle" font-weight="bold">共享</text>
+<rect x="1796" y="560" width="84" height="38" rx="19" fill="#F4FBFA" stroke="#6F7A79" stroke-width="0.7"/>
+<text x="1838" y="584" font-size="12" fill="#161D1D" text-anchor="middle" font-weight="bold">更多</text>
+<rect x="300" y="1044" width="1620" height="36" rx="0" fill="#E9EFEE"/>
+<text x="316" y="1067" font-size="12" fill="#3F4948" text-anchor="start" font-weight="normal">窗格 A 248 项 · 窗格 B 96 项 · F6 切换活动窗格 · 拖拽跨窗格移动</text>
+<circle cx="20" cy="30" r="11" fill="#B3261E"/>
+<text x="20" y="34" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="324" cy="170" r="11" fill="#B3261E"/>
+<text x="324" y="174" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<circle cx="966" cy="170" r="11" fill="#B3261E"/>
+<text x="966" y="174" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<circle cx="1608" cy="172" r="11" fill="#B3261E"/>
+<text x="1608" y="176" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+</svg>

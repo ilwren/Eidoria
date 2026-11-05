@@ -1,0 +1,428 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:themes="using:Md3.Avalonia.Themes"
+             xmlns:mdm="using:Markdown.Avalonia"
+             xmlns:ae="using:AvaloniaEdit"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             xmlns:views="using:MdExplorer.UI.Views"
+             xmlns:media="using:MdExplorer.UI.Media"
+             x:Class="MdExplorer.UI.Views.PreviewView"
+             x:DataType="vm:PreviewViewModel"
+             Background="Transparent">
+  <!-- 编辑器主题作用域限定在本视图内（同 Md3 Gallery 做法），不污染全局 -->
+  <UserControl.Styles>
+    <themes:MaterialAvaloniaEditTheme />
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="17,14,17,17">
+    <TextBlock Classes="h2" Text="{Binding Title}" TextWrapping="Wrap" />
+
+    <md:MdTabs x:Name="PreviewTabs" Grid.Row="1" Margin="0,10,0,0"
+               Variant="Secondary" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+      <md:MdTabItem Content="预览" />
+      <md:MdTabItem Content="属性" />
+    </md:MdTabs>
+
+    <md:MdTabsView Grid.Row="2" Tabs="{Binding #PreviewTabs}" Margin="0,8,0,0">
+      <!-- 页 1：内容预览。外层 MdScrollViewer 保证窄高窗格里也能拖到全部内容。 -->
+      <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                         AllowMouseDrag="True">
+        <StackPanel Margin="0,4,2,10" Spacing="10">
+        <Grid MinHeight="112">
+          <md:MdCircularProgressIndicator IsVisible="{Binding IsLoading}" IsIndeterminate="True"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <Border CornerRadius="16" ClipToBounds="True" IsVisible="{Binding HasImage}" MaxHeight="300"
+                  VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+            <Image Source="{Binding Image}" Stretch="Uniform" MaxHeight="300" VerticalAlignment="Top" />
+          </Border>
+          <Border IsVisible="{Binding HasPdf}" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerHigh.Brush}" CornerRadius="18"
+                  Padding="4,2" Margin="0,0,0,6">
+            <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+              <md:MdIconButton Icon="{x:Static md:MdSymbols.FirstPage}" Command="{Binding FirstPdfPageCommand}"
+                               IsEnabled="{Binding CanPreviousPdfPage}" AutomationProperties.Name="第一页" />
+              <md:MdIconButton Icon="{x:Static md:MdSymbols.ChevronLeft}" Command="{Binding PreviousPdfPageCommand}"
+                               IsEnabled="{Binding CanPreviousPdfPage}" AutomationProperties.Name="上一页" />
+              <TextBlock Classes="caption" Text="{Binding PdfPageText}" VerticalAlignment="Center" Margin="4,0" MinWidth="72"
+                         TextAlignment="Center" />
+              <md:MdIconButton Icon="{x:Static md:MdSymbols.ChevronRight}" Command="{Binding NextPdfPageCommand}"
+                               IsEnabled="{Binding CanNextPdfPage}" AutomationProperties.Name="下一页" />
+              <md:MdIconButton Icon="{x:Static md:MdSymbols.LastPage}" Command="{Binding LastPdfPageCommand}"
+                               IsEnabled="{Binding CanNextPdfPage}" AutomationProperties.Name="最后一页" />
+            </StackPanel>
+          </Border>
+          <Border IsVisible="{Binding HasOfficeDocument}" VerticalAlignment="Top" Height="456"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                  CornerRadius="16" ClipToBounds="True">
+            <Grid RowDefinitions="*,Auto">
+              <views:OfficeDocumentViewer Document="{Binding OfficeDocument}"
+                                          SelectedSheetIndex="{Binding OfficeSheetIndex, Mode=TwoWay}"
+                                          PageCount="{Binding OfficePageCount, Mode=TwoWay}"
+                                          SheetCount="{Binding OfficeSheetCount, Mode=TwoWay}"
+                                          HasLoadError="{Binding OfficeViewerLoadFailed, Mode=TwoWay}"
+                                          AutomationProperties.Name="Office 文档预览" />
+              <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" MinHeight="44"
+                    Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.ChevronLeft}" Command="{Binding PreviousOfficeSheetCommand}"
+                                 IsVisible="{Binding IsOfficeExcel}" IsEnabled="{Binding CanPreviousOfficeSheet}"
+                                 AutomationProperties.Name="上一张工作表" />
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.Image}" Command="{Binding UseRasterPdfCommand}"
+                                 IsVisible="{Binding CanSwitchToRasterPdf}"
+                                 ToolTip.Tip="直接控件呈现不完整时，改用 PDFium 光栅兼容视图"
+                                 AutomationProperties.Name="切换到 PDF 兼容视图" />
+                <TextBlock Grid.Column="1" Classes="caption" Text="{Binding OfficeStatusText}" TextWrapping="Wrap"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="4,5" />
+                <md:MdIconButton Grid.Column="2" Icon="{x:Static md:MdSymbols.ChevronRight}" Command="{Binding NextOfficeSheetCommand}"
+                                 IsVisible="{Binding IsOfficeExcel}" IsEnabled="{Binding CanNextOfficeSheet}"
+                                 AutomationProperties.Name="下一张工作表" />
+              </Grid>
+            </Grid>
+          </Border>
+          <Border IsVisible="{Binding ShowPlainText}" VerticalAlignment="Top" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}"
+                  CornerRadius="16" Padding="12" ClipToBounds="True" MaxHeight="480">
+            <md:MdScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+              <SelectableTextBlock Classes="mono" Text="{Binding TextContent}" />
+            </md:MdScrollViewer>
+          </Border>
+          <Border IsVisible="{Binding ShowSource}" VerticalAlignment="Top" Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}"
+                  CornerRadius="16" ClipToBounds="True" Height="440">
+            <ae:TextEditor x:Name="CodeEditor" IsReadOnly="True" ShowLineNumbers="True"
+                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+          </Border>
+          <mdm:MarkdownScrollViewer Markdown="{Binding MarkdownText}" IsVisible="{Binding HasMarkdown}" MaxHeight="500" VerticalAlignment="Top">
+            <mdm:MarkdownScrollViewer.MarkdownStyle>
+              <themes:MaterialMarkdownTheme />
+            </mdm:MarkdownScrollViewer.MarkdownStyle>
+          </mdm:MarkdownScrollViewer>
+          <md:MdScrollViewer IsVisible="{Binding HasArchive}" MaxHeight="440" VerticalAlignment="Top"
+                             HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                             AllowMouseDrag="True">
+            <ItemsControl ItemsSource="{Binding ArchiveEntries}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArchiveEntryRowModel">
+                  <Grid ColumnDefinitions="*,Auto" Margin="2,3">
+                    <TextBlock Classes="body" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Classes="caption" Text="{Binding SizeText}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </md:MdScrollViewer>
+          <!-- KeePass 只读预览：未解锁时只要主密码；解锁后是「分组 → 条目 → 字段」三段。
+               主密码只在内存里用一次，不写盘、不进日志；受保护字段默认遮罩。 -->
+          <Border IsVisible="{Binding IsKeePassLocked}" VerticalAlignment="Top"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                  CornerRadius="16" Padding="14">
+            <StackPanel Spacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Lock}" Size="20" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                <TextBlock Classes="body" Text="这个 KeePass 密码库已加密" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="主密码只在本机内存里用一次，不写盘、不进日志。内置只读预览不支持密钥文件、硬件密钥与写回；需要这些请用 KeePass 客户端打开。" />
+              <md:MdTextBox Text="{Binding KeePassPassword, Mode=TwoWay}" Variant="Outlined"
+                            Label="主密码" IsPassword="True" AutomationProperties.Name="KeePass 主密码" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <md:MdButton Variant="Filled" Height="40" MinWidth="96"
+                             Command="{Binding UnlockKeePassCommand}">
+                  <TextBlock Text="解锁" VerticalAlignment="Center" />
+                </md:MdButton>
+                <TextBlock Classes="caption" Text="{Binding KeePassErrorText}" TextWrapping="Wrap"
+                           IsVisible="{Binding HasKeePassError}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border IsVisible="{Binding HasKeePass}" VerticalAlignment="Top"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                  CornerRadius="16" Padding="14">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Classes="caption" Text="{Binding KeePassSummaryText}" TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+                <md:MdButton Grid.Column="1" Variant="Text" Height="34" Padding="8,0"
+                             Command="{Binding LockKeePassCommand}" AutomationProperties.Name="锁定密码库">
+                  <TextBlock Text="锁定" VerticalAlignment="Center" />
+                </md:MdButton>
+              </Grid>
+              <CheckBox Content="显示受保护字段" IsChecked="{Binding ShowKeePassSecrets, Mode=TwoWay}"
+                        AutomationProperties.Name="显示受保护字段" />
+
+              <TextBlock Classes="caption" Text="分组" />
+              <Border Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}" CornerRadius="12"
+                      Padding="4" MaxHeight="168">
+                <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                   AllowMouseDrag="True">
+                  <ItemsControl ItemsSource="{Binding KeePassGroups}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:KeePassGroupRowModel">
+                        <md:MdButton Variant="Text" Height="34" Padding="8,0" Click="OnKeePassGroupClick"
+                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                     Margin="{Binding IndentMargin}" AutomationProperties.Name="{Binding Name}">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Classes="body" FontSize="12.5" Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CountText}"
+                                       VerticalAlignment="Center" />
+                          </Grid>
+                        </md:MdButton>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </md:MdScrollViewer>
+              </Border>
+
+              <TextBlock Classes="caption" Text="{Binding SelectedKeePassGroupName, StringFormat='条目 · {0}'}" />
+              <Border Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}" CornerRadius="12"
+                      Padding="4" MaxHeight="200">
+                <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                   AllowMouseDrag="True">
+                  <ItemsControl ItemsSource="{Binding KeePassEntries}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:KeePassEntryRowModel">
+                        <md:MdButton Variant="Text" Height="46" Padding="8,2" Click="OnKeePassEntryClick"
+                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                     AutomationProperties.Name="{Binding Title}">
+                          <StackPanel Spacing="1">
+                            <TextBlock Classes="body" FontSize="12.5" Text="{Binding Title}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="caption" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding HasSubtitle}" />
+                          </StackPanel>
+                        </md:MdButton>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </md:MdScrollViewer>
+              </Border>
+
+              <TextBlock Classes="caption" Text="字段" />
+              <ItemsControl ItemsSource="{Binding KeePassFields}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:KeePassFieldRowModel">
+                    <Border BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}"
+                            BorderThickness="0,0,0,1" Padding="0,6">
+                      <Grid ColumnDefinitions="88,*" ColumnSpacing="8">
+                        <TextBlock Classes="caption" Text="{Binding Key}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <SelectableTextBlock Grid.Column="1" Classes="body" FontSize="12.5"
+                                             Text="{Binding Value}" TextWrapping="Wrap" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <!-- 内嵌音视频：能力位为真才出现播放控件，否则只留后端诊断与“系统应用打开”。
+               画面放在这张卡片里面而不是平级叠放——平放时会和下面的控制面板互相盖住
+               （v0.32 只有 Android 用到画面，问题被遮挡掩盖了）。 -->
+          <Border IsVisible="{Binding IsMedia}" VerticalAlignment="Top"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                  CornerRadius="16" Padding="14">
+            <StackPanel Spacing="10">
+              <!-- 原生画面：画面由平台解码器画在这块窗口里（Android TextureView）。 -->
+              <Border IsVisible="{Binding ShowNativeVideoSurface}" Height="280"
+                      Background="#000000" CornerRadius="12" ClipToBounds="True">
+                <media:MediaSurfaceHost Renderer="{Binding VideoRenderer}" AutomationProperties.Name="视频画面" />
+              </Border>
+              <!-- 推帧画面：后端（Linux appsink / Windows MediaComposition 取帧）把帧推给宿主，Avalonia 自己画。
+                   与原生画面互斥：只有 RendererKind=FramePush 的后端才走这里。 -->
+              <Border IsVisible="{Binding ShowFrameVideoSurface}" Height="280"
+                      Background="#000000" CornerRadius="12" ClipToBounds="True">
+                <media:MediaFrameSurface Source="{Binding VideoFrameSource}" AutomationProperties.Name="视频画面（推帧）" />
+              </Border>
+              <!-- 视频默认不在应用内出画面（花屏/不同步/CPU 都实测过）：这里给两个显式入口，
+                   用户自己决定是外挂播放器还是内嵌面板，风险写在按钮上面。 -->
+              <Border IsVisible="{Binding ShowInlineVideoGate}" CornerRadius="12" Padding="12"
+                      Background="{DynamicResource Md.Sys.Color.SurfaceContainerHigh.Brush}">
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="body" Text="视频默认不在应用内出画面" TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap"
+                             Text="内嵌画面按帧抓取，解码或绘制负载高时可能不够流畅、音画不同步或占用较多 CPU。要稳定播放请用系统播放器。" />
+                  <WrapPanel Orientation="Horizontal">
+                    <md:MdButton Variant="Filled" Height="38" Margin="0,0,8,4" Command="{Binding OpenCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="16" />
+                        <TextBlock Text="用系统播放器打开" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </md:MdButton>
+                    <md:MdButton Variant="Outlined" Height="38" Margin="0,0,0,4"
+                                 Command="{Binding EnableInlineVideoCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="16" />
+                        <TextBlock Text="仍要内嵌观看" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </md:MdButton>
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+              <!-- 后端名可能很长（例如“推帧假后端（FramePushVideoStub）”）。横向 StackPanel 会给子元素
+                   无限宽度，长文本只能被父级裁掉；改用 Grid 的 * 列把它约束住，再显式换行/省略。 -->
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <Border Width="44" Height="44" CornerRadius="12"
+                        Background="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}">
+                  <Panel>
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.MusicNote}" Size="22" IsVisible="{Binding IsAudioMedia}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="22" IsVisible="{Binding IsVideoMedia}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+                  </Panel>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Classes="body" Text="{Binding MediaStateText}" TextWrapping="Wrap" />
+                  <TextBlock Classes="caption" Text="{Binding MediaBackendName}" TextWrapping="Wrap"
+                             MaxLines="2" TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding MediaBackendName}" />
+                </StackPanel>
+              </Grid>
+
+              <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding CanPlayMediaInApp}">
+                <TextBlock Classes="caption" Text="{Binding MediaPositionText}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Classes="caption" Text="{Binding MediaDurationText}" VerticalAlignment="Center" />
+              </Grid>
+              <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding MediaProgressPercent}" Height="4"
+                                            Margin="0,-6,0,0" IsVisible="{Binding CanPlayMediaInApp}" />
+
+              <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding CanPlayMediaInApp}" HorizontalAlignment="Center">
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.Replay10}" Command="{Binding SeekMediaBackwardCommand}"
+                                 Variant="Outlined" AutomationProperties.Name="后退 10 秒" />
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.PlayArrow}" Command="{Binding ToggleMediaPlaybackCommand}"
+                                 Variant="Filled" IsVisible="{Binding !IsMediaPlaying}" AutomationProperties.Name="播放" />
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.Pause}" Command="{Binding ToggleMediaPlaybackCommand}"
+                                 Variant="Filled" IsVisible="{Binding IsMediaPlaying}" AutomationProperties.Name="暂停" />
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.Forward10}" Command="{Binding SeekMediaForwardCommand}"
+                                 Variant="Outlined" AutomationProperties.Name="前进 10 秒" />
+                <md:MdIconButton Icon="{x:Static md:MdSymbols.Stop}" Command="{Binding StopMediaPlaybackCommand}"
+                                 Variant="Outlined" AutomationProperties.Name="停止" />
+              </StackPanel>
+
+              <md:MdLinearProgressIndicator IsIndeterminate="True" Height="2" Margin="0,2,0,0"
+                                            IsVisible="{Binding IsLoading}" />
+              <Border CornerRadius="10" Padding="9,6" Background="{DynamicResource Md.Sys.Color.SurfaceContainerHigh.Brush}"
+                      IsVisible="{Binding HasMediaProbe}">
+                <StackPanel Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.Info}" Size="15" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                    <TextBlock Classes="caption" Text="{Binding MediaProbeText}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <!-- 拒绝原因是要被读的文字，用 OnSurface 而不是 OnSurfaceVariant（后者在 tonal 底上对比不足）。 -->
+                  <TextBlock Classes="caption" Text="{Binding MediaProbeReasonText}" TextWrapping="Wrap" Margin="21,0,0,0"
+                             IsVisible="{Binding HasMediaProbeReason}"
+                             Foreground="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+                </StackPanel>
+              </Border>
+              <TextBlock Classes="caption" Text="{Binding MediaBackendDiagnostic}" TextWrapping="Wrap" Margin="0,0,4,0"
+                         IsVisible="{Binding ShowMediaDiagnostics}"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Classes="caption" Text="{Binding MediaRendererText}" TextWrapping="Wrap" Margin="0,0,4,0"
+                         IsVisible="{Binding ShowMediaDiagnostics}"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+            </StackPanel>
+          </Border>
+          <TextBlock Classes="caption" Text="{Binding FailureText}" IsVisible="{Binding HasFailure}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+        </Grid>
+
+        <TextBlock Classes="caption" Text="{Binding PreviewEncodingText}" IsVisible="{Binding HasPreviewEncoding}"
+                   Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding HasQuickFacts}">
+          <Border Classes="fact-chip" Margin="0,0,6,6" IsVisible="{Binding HasImageDimensions}"
+                  ToolTip.Tip="图像尺寸">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Image}" Size="15" VerticalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Text="{Binding ImageDimensionsText}" FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="文件大小">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="15" VerticalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Text="{Binding QuickSizeText}" FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="修改时间">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.PendingActions}" Size="15" VerticalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Text="{Binding QuickModifiedText}" FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding CanOpen}">
+          <md:MdButton Variant="Filled" Height="42" MinWidth="116" Margin="0,0,8,6" Command="{Binding OpenCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="18" />
+              <TextBlock Text="打开" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </md:MdButton>
+          <md:MdButton Variant="Tonal" Height="42" Margin="0,0,8,6"
+                       Command="{Binding OpenDocumentWorkbenchCommand}"
+                       IsVisible="{Binding CanOpenDocumentWorkbench}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Description}" Size="18" />
+              <TextBlock Text="文档工作台" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </md:MdButton>
+          <md:MdButton Variant="Tonal" Height="42" Margin="0,0,0,6"
+                       Command="{Binding OpenArchiveWorkbenchCommand}"
+                       IsVisible="{Binding CanOpenArchiveWorkbench}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="18" />
+              <TextBlock Text="压缩包工作台" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </md:MdButton>
+        </WrapPanel>
+        </StackPanel>
+      </md:MdScrollViewer>
+
+      <!-- 页 2：文件属性。 -->
+      <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                         AllowMouseDrag="True">
+        <StackPanel Margin="0,4,2,10" Spacing="14">
+          <Border Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" CornerRadius="12" Padding="12,9">
+            <TextBlock Classes="body" FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+          </Border>
+          <ItemsControl ItemsSource="{Binding MetadataRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MetadataRowModel">
+                <Border BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="0,0,0,1"
+                        Padding="0,7">
+                  <Grid ColumnDefinitions="72,*">
+                    <TextBlock Classes="caption" Text="{Binding Key}" VerticalAlignment="Center" />
+                    <SelectableTextBlock Grid.Column="1" Classes="body" FontSize="12.5" Text="{Binding Value}"
+                                         TextWrapping="Wrap" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding CanOpen}">
+            <md:MdButton Variant="Filled" Height="42" MinWidth="116" Command="{Binding OpenCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="18" />
+                <TextBlock Text="打开" VerticalAlignment="Center" />
+              </StackPanel>
+            </md:MdButton>
+          </StackPanel>
+        </StackPanel>
+      </md:MdScrollViewer>
+    </md:MdTabsView>
+  </Grid>
+</UserControl>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Eidoria — 万象屿</title>
+  <desc id="desc">蓝色竖向页片的左上角翻起，露出绿色背页与橙黄色折面，后方错落一层薄荷色页片，页脚有两道安静的地层曲线。</desc>
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EDFBF4"/>
+      <stop offset="0.55" stop-color="#D8F1EC"/>
+      <stop offset="1" stop-color="#BFE4E9"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#3B97F6"/>
+      <stop offset="0.52" stop-color="#2478DF"/>
+      <stop offset="1" stop-color="#175FC0"/>
+    </linearGradient>
+    <linearGradient id="backPage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#23C48D"/>
+      <stop offset="1" stop-color="#079A72"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD166"/>
+      <stop offset="0.48" stop-color="#FFAB2E"/>
+      <stop offset="1" stop-color="#FF7438"/>
+    </linearGradient>
+    <clipPath id="mainSheetClip">
+      <path d="M286 145 H671 Q759 145 759 229 V731 Q759 815 671 815 H286 Q199 815 199 731 V229 Q199 145 286 145 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" rx="230" fill="url(#field)"/>
+
+  <!-- Rear sheet: one quiet offset layer for the file stack. -->
+  <path d="M344 201 H730 Q817 201 817 286 V787 Q817 871 730 871 H344 Q257 871 257 787 V286 Q257 201 344 201 Z" fill="#84D8BE"/>
+  <path d="M344 201 H730 Q817 201 817 286 V787 Q817 871 730 871 H344 Q257 871 257 787 V286 Q257 201 344 201 Z" fill="#0D9B83" opacity="0.15"/>
+
+  <!-- Main blue sheet. -->
+  <path d="M286 145 H671 Q759 145 759 229 V731 Q759 815 671 815 H286 Q199 815 199 731 V229 Q199 145 286 145 Z" fill="url(#page)"/>
+
+  <g clip-path="url(#mainSheetClip)">
+    <!-- Quiet island strata at the foot of the sheet. -->
+    <path d="M174 666 C309 607 443 705 600 642 C667 615 729 620 783 651 L783 845 L174 845 Z" fill="#FFFFFF" opacity="0.08"/>
+    <path d="M174 733 C320 685 463 769 615 715 C681 693 739 698 783 722 L783 845 L174 845 Z" fill="#7DD3FC" opacity="0.13"/>
+
+    <!-- Green back page exposed by the folded corner. -->
+    <path d="M199 145 H456 C427 257 367 361 199 432 Z" fill="url(#backPage)"/>
+
+    <!-- Soft shadow under the broad folded flap. -->
+    <path d="M470 167 C441 272 384 372 221 445 C297 454 384 443 450 413 C481 333 483 240 470 167 Z" fill="#073B7A" opacity="0.15"/>
+
+    <!-- Broad orange folded flap. -->
+    <path d="M456 145 C427 257 367 361 199 432 C277 441 369 430 439 398 C472 316 473 219 456 145 Z" fill="url(#fold)"/>
+    <path d="M456 145 C442 232 407 322 338 394 C385 326 417 236 421 145 Z" fill="#FFE3A3" opacity="0.34"/>
+    <path d="M456 145 C427 257 367 361 199 432" fill="none" stroke="#E85D26" stroke-width="7" stroke-linecap="round" opacity="0.28"/>
+
+    <!-- Paper edge light, only on the blue top edge. -->
+    <path d="M472 158 H671" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" opacity="0.16"/>
+  </g>
+</svg>

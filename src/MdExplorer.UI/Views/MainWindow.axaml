@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:vm="using:MdExplorer.UI.ViewModels"
+        xmlns:views="using:MdExplorer.UI.Views"
+        x:Class="MdExplorer.UI.Views.MainWindow"
+        x:DataType="vm:ShellViewModel"
+        Width="1280" Height="840"
+        MinWidth="360" MinHeight="520"
+        Title="Eidoria"
+        WindowDecorations="BorderOnly" ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="48"
+        Icon="/Assets/eidoria.ico"
+        Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+  <!-- Windows 运行时由 MainWindow 代码先绑定此空白主题、再切换 Full：
+       Full 原生样式位让 DWM 保留最小化/最大化/还原缩放动画；空白 drawn decorations
+       则确保 Avalonia 不再绘制第二套标题和窗口按钮，继续由 MainView 顶部 Chrome 负责。 -->
+  <Window.Resources>
+    <ControlTheme x:Key="EidoriaWindowDrawnDecorationsTheme" TargetType="chrome:WindowDrawnDecorations">
+      <Setter Property="DefaultTitleBarHeight" Value="0" />
+      <Setter Property="DefaultFrameThickness" Value="0" />
+      <Setter Property="DefaultShadowThickness" Value="0" />
+      <Setter Property="Template">
+        <WindowDrawnDecorationsTemplate>
+          <chrome:WindowDrawnDecorationsContent />
+        </WindowDrawnDecorationsTemplate>
+      </Setter>
+    </ControlTheme>
+  </Window.Resources>
+  <views:MainView />
+</Window>

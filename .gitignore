@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+.idea/
+
+# 发布与签名材料（永不入仓）
+*.nupkg
+*.snupkg
+*.apk
+*.aab
+*.keystore
+*.pfx
+*.p12
+keystore.properties
+
+# CI 下载的截图工件（仓库内基线图除外）
+screenshots-ci/
+
+# 端侧 AI 模型权重（几十 MB，不随仓库分发；用 scripts/fetch-ai-models.* 下载）
+models/
+AI-models/
+
+# 系统
+.DS_Store
+Thumbs.db

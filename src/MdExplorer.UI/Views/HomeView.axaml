@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.HomeView"
+             x:DataType="vm:ShellViewModel">
+  <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+    <StackPanel Margin="22,18,22,30" Spacing="26" MaxWidth="1120" HorizontalAlignment="Stretch">
+      <md:MdSearchBar x:Name="HomeSearch" PlaceholderText="搜索" ShowClearButton="True"
+                      ToolTip.Tip="在主目录中递归搜索" AutomationProperties.Name="在主目录中递归搜索" />
+
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h3" Text="存储" />
+        <ItemsControl ItemsSource="{Binding Volumes}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:VolumeItemModel">
+              <Border Classes="card" Width="292" Margin="0,0,12,12" Tapped="OnVolumeTapped" Cursor="Hand" ToolTip.Tip="{Binding UsageText}">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Border Width="38" Height="38" CornerRadius="12"
+                            Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+                      <md:MdIcon Glyph="{Binding Glyph}" Size="21"
+                                 Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Classes="h3" Text="{Binding Name}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Classes="h3" Text="{Binding UsedPercentText}" VerticalAlignment="Center" />
+                  </Grid>
+                  <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding UsedPercent}" Height="6" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h3" Text="类别" />
+        <WrapPanel Orientation="Horizontal">
+          <Border Classes="category-card" Width="76" Height="60" Margin="0,0,8,8" Tag="Image" Tapped="OnCategoryTapped" Cursor="Hand" ToolTip.Tip="图片" AutomationProperties.Name="图片">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Image}" Size="27" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+          </Border>
+          <Border Classes="category-card" Width="76" Height="60" Margin="0,0,8,8" Tag="Video" Tapped="OnCategoryTapped" Cursor="Hand" ToolTip.Tip="视频" AutomationProperties.Name="视频">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="27" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+          </Border>
+          <Border Classes="category-card" Width="76" Height="60" Margin="0,0,8,8" Tag="Audio" Tapped="OnCategoryTapped" Cursor="Hand" ToolTip.Tip="音频" AutomationProperties.Name="音频">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.MusicNote}" Size="27" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+          </Border>
+          <Border Classes="category-card" Width="76" Height="60" Margin="0,0,8,8" Tag="Document" Tapped="OnCategoryTapped" Cursor="Hand" ToolTip.Tip="文档" AutomationProperties.Name="文档">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Description}" Size="27" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+          </Border>
+          <Border Classes="category-card" Width="76" Height="60" Margin="0,0,8,8" Tag="Archive" Tapped="OnCategoryTapped" Cursor="Hand" ToolTip.Tip="压缩包" AutomationProperties.Name="压缩包">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="27" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+          </Border>
+        </WrapPanel>
+      </StackPanel>
+
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h3" Text="位置" />
+        <ItemsControl ItemsSource="{Binding Places}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavEntry">
+              <Border Classes="tap-chip" Margin="0,0,8,8" Tapped="OnPlaceTapped" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <md:MdIcon Glyph="{Binding Glyph}" Size="20" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="10" IsVisible="{Binding HasRecents}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h3" Text="最近访问" VerticalAlignment="Center" />
+          <md:MdButton Grid.Column="1" Variant="Text" Content="清除" Command="{Binding ClearRecentsCommand}" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding RecentFolders}" IsVisible="{Binding HasRecentFolders}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavEntry">
+              <Border Classes="tap-chip" Margin="0,0,8,8" Tapped="OnPlaceTapped" Cursor="Hand">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="20" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ItemsControl ItemsSource="{Binding RecentFiles}" IsVisible="{Binding HasRecentFiles}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FileItemViewModel">
+              <Border Classes="tap-chip" Margin="0,0,0,8" Tapped="OnRecentFileTapped" Cursor="Hand" ToolTip.Tip="{Binding FullPath}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <md:MdIcon Glyph="{Binding Glyph}" Size="22" Foreground="{Binding GlyphBrush}" />
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" />
+                    <TextBlock Classes="caption" Text="{Binding ParentNameText}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="10" IsVisible="{Binding Capabilities.IsAndroid}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <TextBlock Classes="h3" Text="已授权文件夹" VerticalAlignment="Center" />
+          <md:MdButton Variant="Tonal" Command="{Binding PickAuthorizedFolderCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="18" />
+              <TextBlock Text="授权文件夹…" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+        </StackPanel>
+        <TextBlock Classes="caption" TextWrapping="Wrap"
+                   Text="删除会进入应用内回收站，可从回收站还原" ToolTip.Tip="通过系统选择器授权后可浏览所选文件夹；删除会先复制到应用数据目录，大文件夹较慢。" />
+        <ItemsControl ItemsSource="{Binding AuthorizedRoots}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AuthorizedRootModel">
+              <Border Classes="tap-chip" Margin="0,0,8,8" Tapped="OnAuthorizedRootTapped" Cursor="Hand"
+                      ToolTip.Tip="{Binding PathToolTip}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <md:MdIcon Glyph="{Binding StatusGlyph}" Size="20" VerticalAlignment="Center" />
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" />
+                    <TextBlock Classes="caption" Text="{Binding StateText}" />
+                  </StackPanel>
+                  <md:MdIconButton Icon="{x:Static md:MdSymbols.Close}" Click="OnRemoveAuthorizedRootClick"
+                                   ToolTip.Tip="移除授权入口（不删除文件）" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="10" IsVisible="{Binding HasFavorites}">
+        <TextBlock Classes="h3" Text="收藏" />
+        <ItemsControl ItemsSource="{Binding FavoriteItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FileItemViewModel">
+              <Border Classes="tap-chip" Margin="0,0,0,8" Tapped="OnFavoriteTapped" Cursor="Hand" ToolTip.Tip="{Binding FullPath}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <md:MdIcon Glyph="{Binding Glyph}" Size="22" Foreground="{Binding GlyphBrush}" />
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" />
+                    <TextBlock Classes="caption" Text="{Binding ParentNameText}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </StackPanel>
+  </md:MdScrollViewer>
+</UserControl>

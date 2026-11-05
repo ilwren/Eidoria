@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 与 Md3.Avalonia 0.5.0-preview.2 的兼容基线对齐（其 Directory.Packages.props 钉 12.1.2） -->
+    <PackageVersion Include="Avalonia" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Android" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Skia" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.2" />
+    <PackageVersion Include="Md3.Avalonia" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.Icons" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.AvaloniaEdit" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.Markdown" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.DataGrid" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.Extra" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.NodifyM" Version="0.5.0-preview.2" />
+    <PackageVersion Include="Md3.Avalonia.Notifications" Version="0.5.0-preview.2" />
+    <!-- NodifyM.Avalonia 12.0.0（MIT）显式 IsAotCompatible；Md3 卫星包只提供 MD3 主题。 -->
+    <PackageVersion Include="NodifyM.Avalonia" Version="12.0.0" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- PDF 预览：PDFtoImage（MIT，PDFium 光栅化；net10.0/net10.0-android，IsAotCompatible）；
+         5.2.1 的 SkiaSharp 3.119 线与 Avalonia 12.1.2 对齐，避免 5.3+ 的 SkiaSharp 4.x 程序集冲突 -->
+    <PackageVersion Include="PDFtoImage" Version="5.2.1" />
+    <!-- Office 只读预览控件（MIT；net8.0/net10.0，Avalonia >= 12.0.2，IsTrimmable/IsAotCompatible）。
+         仅经 OfficeDocumentViewer 适配层接入，DOCX/PPTX/XLSX 先由宿主做包大小、展开量与结构复杂度预检。 -->
+    <PackageVersion Include="OfficeViewer.Avalonia" Version="0.1.6" />
+    <!-- Isolated libmpv spike only; MIT managed Avalonia wrapper, native engine binaries are supplied separately. -->
+    <PackageVersion Include="HanumanInstitute.LibMpv.Avalonia" Version="0.10.1" />
+    <!-- Experimental Lua runtime spike only; MoonSharp is BSD-3-Clause, execution is not wired into the app. -->
+    <PackageVersion Include="MoonSharp" Version="2.0.0" />
+    <!-- KDBX 只读解析只用到密码学原语（Argon2 / ChaCha20 / Salsa20 / Twofish）；
+         AES 与哈希走 .NET 内置实现。MIT（BouncyCastle 的 C# 移植），纯托管、无反射绑定。
+         刻意不用 KeePassLib / ModernKeePassLib（GPL）。 -->
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.5.1" />
+    <!-- 端侧语义搜索：ONNX Runtime（MIT；CPU provider，Android/Linux/Windows）+ 纯托管 WordPiece tokenizer（MIT）。 -->
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+</Project>

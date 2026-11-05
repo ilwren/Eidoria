@@ -1,0 +1,360 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:nod="using:NodifyM.Avalonia.Controls"
+             xmlns:nodvm="using:NodifyM.Avalonia.ViewModelBase"
+             xmlns:nodconv="using:NodifyM.Avalonia.Converters"
+             xmlns:themes="using:Md3.Avalonia.Themes"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.AutomationView"
+             x:DataType="vm:ShellViewModel">
+  <!-- Md3.Avalonia.NodifyM 主题按 Gallery 方式只注册在此页面，不污染全局原生控件样式。 -->
+  <UserControl.Styles>
+    <themes:MaterialNodifyMTheme />
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <nodconv:FlowToDirectionConverter x:Key="AutomationFlowToDirection" />
+
+    <DataTemplate x:Key="AutomationConnectionTemplate" x:DataType="nodvm:ConnectionViewModelBase">
+      <!-- 不使用上游连线文本标签：其几何硬编码 Inter，宿主缺字体时可能在渲染期失败。 -->
+      <nod:Connection Source="{Binding Source.Anchor}"
+                      Target="{Binding Target.Anchor}"
+                      Direction="{Binding ., Converter={StaticResource AutomationFlowToDirection}}"
+                      DisconnectCommand="{Binding DisconnectConnectionCommand}" />
+    </DataTemplate>
+
+    <DataTemplate x:Key="AutomationPendingConnectionTemplate" x:DataType="nodvm:PendingConnectionViewModelBase">
+      <nod:PendingConnection StartedCommand="{Binding StartCommand}"
+                             CompletedCommand="{Binding FinishCommand}"
+                             EnablePreview="True"
+                             EnableSnapping="True"
+                             Direction="{Binding Source.Flow, Converter={StaticResource AutomationFlowToDirection}}"
+                             PreviewTarget="{Binding PreviewTarget, Mode=OneWayToSource}">
+        <TextBlock Text="{Binding PreviewText}" />
+      </nod:PendingConnection>
+    </DataTemplate>
+
+    <nod:NodeTemplateSelector x:Key="AutomationNodeTemplates">
+      <DataTemplate DataType="nodvm:NodeViewModelBase" x:DataType="nodvm:NodeViewModelBase">
+        <nod:Node MinWidth="176"
+                  IsResize="False"
+                  VerticalAlignment="Center"
+                  Header="{Binding Title}"
+                  Footer="{Binding Footer}"
+                  Input="{Binding Input}"
+                  Output="{Binding Output}"
+                  Location="{Binding Location, Mode=TwoWay}">
+          <nod:Node.InputConnectorTemplate>
+            <DataTemplate DataType="nodvm:ConnectorViewModelBase" x:DataType="nodvm:ConnectorViewModelBase">
+              <nod:NodeInput Header="{Binding Title}"
+                             VerticalAlignment="Center"
+                             IsConnected="{Binding IsConnected}"
+                             Anchor="{Binding Anchor, Mode=OneWayToSource}" />
+            </DataTemplate>
+          </nod:Node.InputConnectorTemplate>
+          <nod:Node.OutputConnectorTemplate>
+            <DataTemplate DataType="nodvm:ConnectorViewModelBase" x:DataType="nodvm:ConnectorViewModelBase">
+              <nod:NodeOutput Header="{Binding Title}"
+                              VerticalAlignment="Center"
+                              IsConnected="{Binding IsConnected}"
+                              Anchor="{Binding Anchor, Mode=OneWayToSource}" />
+            </DataTemplate>
+          </nod:Node.OutputConnectorTemplate>
+        </nod:Node>
+      </DataTemplate>
+    </nod:NodeTemplateSelector>
+  </UserControl.Resources>
+
+  <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+    <StackPanel Margin="20,12,20,20" Spacing="14">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+        <md:MdTextBox Text="{Binding Automation.WorkflowName}" Variant="Outlined" Label="工作流名称"
+                      AutomationProperties.Name="自动化工作流名称" />
+        <md:MdButton Grid.Column="1" Variant="Outlined" Command="{Binding Automation.ResetWorkflowCommand}"
+                     VerticalAlignment="Center" ToolTip.Tip="恢复图片整理示例">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.RestartAlt}" Size="18" />
+            <TextBlock Text="示例" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Grid.Column="2" Variant="Filled" Command="{Binding Automation.RunCommand}"
+                     IsEnabled="{Binding !Automation.IsRunning}" VerticalAlignment="Center"
+                     ToolTip.Tip="在主浏览器当前文件夹运行">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.PlayArrow}" Size="19" />
+            <TextBlock Text="运行" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+      </Grid>
+
+      <WrapPanel Orientation="Horizontal">
+        <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddKindFilterNodeCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FilterAlt}" Size="18" />
+            <TextBlock Text="类型筛选" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddNameFilterNodeCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.TextFields}" Size="18" />
+            <TextBlock Text="名称筛选" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddMatchCountConditionNodeCommand}"
+                     IsEnabled="{Binding Automation.CanAddMatchCountCondition}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.AccountTree}" Size="18" />
+            <TextBlock Text="匹配数条件" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Variant="Tonal" Margin="0,0,8,8" Command="{Binding Automation.AddNotificationNodeCommand}"
+                     IsEnabled="{Binding Automation.CanAddNotificationNode}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.NotificationsActive}" Size="18" />
+            <TextBlock Text="系统通知" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Variant="Outlined" Margin="0,0,8,8" Command="{Binding Automation.AutoLayoutCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.AccountTree}" Size="18" />
+            <TextBlock Text="整理布局" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+      </WrapPanel>
+
+      <Border Padding="12,10" CornerRadius="14"
+              Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+              BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="caption" Text="载入可编辑示例（会替换当前画布；载入前确认，运行时仍先检查校验结果）" />
+          <WrapPanel Orientation="Horizontal">
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="图片整理"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="images" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="视频归档"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="videos" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="文档收纳"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="documents" />
+            <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="代码说明"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="code" />
+            <md:MdButton Variant="Outlined" Content="匹配数条件"
+                         Command="{Binding Automation.LoadExampleCommand}" CommandParameter="threshold" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <Grid x:Name="AutomationLayoutGrid" ColumnDefinitions="*,16,340">
+        <Border x:Name="AutomationCanvasCard" Classes="card" Padding="12">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
+              <Border Width="36" Height="36" CornerRadius="11" VerticalAlignment="Center"
+                      Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="20"
+                           Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                <TextBlock Classes="caption" Text="来源 · 主浏览器当前文件夹" />
+                <TextBlock Text="{Binding Automation.CurrentFolderText}" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding Automation.CurrentFolderText}" />
+              </StackPanel>
+            </Grid>
+
+            <!-- 与 Md3 Gallery 一致固定画布框高度：NodifyEditor 会按父尺寸回写自身高度，
+                 内容自适应框会形成逐轮变高的布局循环。 -->
+            <Border x:Name="AutomationEditorFrame" Grid.Row="1" Height="520" CornerRadius="14" Padding="4"
+                    ClipToBounds="True"
+                    Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                    BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+              <nod:NodifyEditor x:Name="AutomationEditor"
+                                ConnectionTemplate="{StaticResource AutomationConnectionTemplate}"
+                                PendingConnectionTemplate="{StaticResource AutomationPendingConnectionTemplate}"
+                                ItemTemplate="{StaticResource AutomationNodeTemplates}"
+                                ItemsSource="{Binding Automation.Nodes}"
+                                Connections="{Binding Automation.Connections}"
+                                PendingConnection="{Binding Automation.PendingConnection}"
+                                SelectedItems="{Binding Automation.SelectedNodes}"
+                                DisconnectConnectorCommand="{Binding Automation.DisconnectConnectorCommand}"
+                                Zoom="0.82" />
+            </Border>
+
+            <StackPanel Grid.Row="2" Spacing="4">
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Automation.StatusText}" />
+              <TextBlock Classes="body" TextWrapping="Wrap" Text="{Binding Automation.ValidationText}" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Automation.LastResultText}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border x:Name="AutomationInspectorCard" Grid.Column="2" Classes="card">
+          <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+            <StackPanel Spacing="14">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <Border Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
+                        Background="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}">
+                  <md:MdIcon Glyph="{x:Static md:MdSymbols.Tune}" Size="21"
+                             Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Classes="h3" Text="{Binding Automation.SelectedNodeTitle}" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Automation.SelectedNodeDescription}" />
+                </StackPanel>
+              </Grid>
+
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="点击画布节点后在此编辑参数。修改会自动保存。"
+                         IsVisible="{Binding !Automation.HasSelectedNode}" />
+
+              <StackPanel Spacing="8" IsVisible="{Binding Automation.IsCurrentFolderSelected}">
+                <TextBlock Classes="h3" Text="运行来源" />
+                <TextBlock Classes="body" TextWrapping="Wrap" Text="{Binding Automation.CurrentFolderText}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="仅枚举当前文件夹顶层文件；不递归、不处理文件夹。Android SAF 目录第一版会明确拒绝运行。" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsKindFilterSelected}">
+                <TextBlock Classes="h3" Text="保留类型" />
+                <md:MdScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterAny}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Any"
+                                 ToolTip.Tip="任意文件" AutomationProperties.Name="任意文件">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterImage}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Image"
+                                 ToolTip.Tip="图片" AutomationProperties.Name="图片">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.Image}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterVideo}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Video"
+                                 ToolTip.Tip="视频" AutomationProperties.Name="视频">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterAudio}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Audio"
+                                 ToolTip.Tip="音频" AutomationProperties.Name="音频">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.MusicNote}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterDocument}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Document"
+                                 ToolTip.Tip="文档" AutomationProperties.Name="文档">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.Description}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterArchive}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Archive"
+                                 ToolTip.Tip="压缩包" AutomationProperties.Name="压缩包">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterCode}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Code"
+                                 ToolTip.Tip="代码" AutomationProperties.Name="代码">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.Code}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterText}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Text"
+                                 ToolTip.Tip="文本" AutomationProperties.Name="文本">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.TextSnippet}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterData}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Data"
+                                 ToolTip.Tip="数据" AutomationProperties.Name="数据">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.DataObject}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterFont}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Font"
+                                 ToolTip.Tip="字体" AutomationProperties.Name="字体">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.FontDownload}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterExecutable}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Executable"
+                                 ToolTip.Tip="可执行文件" AutomationProperties.Name="可执行文件">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.Terminal}" Size="20" />
+                    </md:MdButton>
+                    <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsFilterUnknown}" Variant="Outlined"
+                                 Command="{Binding Automation.SetSelectedFilterKindCommand}" CommandParameter="Unknown"
+                                 ToolTip.Tip="其他" AutomationProperties.Name="其他">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.InsertDriveFile}" Size="20" />
+                    </md:MdButton>
+                  </StackPanel>
+                </md:MdScrollViewer>
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="左右拖动查看更多类型。多个筛选节点按连线顺序依次收窄结果。" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsNameFilterSelected}">
+                <TextBlock Classes="h3" Text="文件名包含" />
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.NameQuery}" Variant="Outlined"
+                              Label="包含文本" AutomationProperties.Name="文件名包含文本" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="不区分大小写；留空表示不按名称筛选。" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsMatchCountConditionSelected}">
+                <TextBlock Classes="h3" Text="分支阈值" />
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.MinimumMatchCountText}" Variant="Outlined"
+                              Label="至少匹配数量" AutomationProperties.Name="自动化至少匹配数量" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="按前面筛选后的顶层文件数量判断。达到阈值走“达到阈值”端口；不足走“未达阈值”端口，留空则安全结束。限制 1–100000。" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsTransferSelected}">
+                <TextBlock Classes="h3" Text="传输方式" />
+                <Grid ColumnDefinitions="*,8,*">
+                  <md:MdButton Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsCopyMode}" Variant="Outlined"
+                               Command="{Binding Automation.SetSelectedTransferModeCommand}" CommandParameter="Copy">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.ContentCopy}" Size="18" />
+                      <TextBlock Text="复制" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </md:MdButton>
+                  <md:MdButton Grid.Column="2" Classes="search-kind" Classes.active="{Binding Automation.SelectedNode.IsMoveMode}" Variant="Outlined"
+                               Command="{Binding Automation.SetSelectedTransferModeCommand}" CommandParameter="Move">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.DriveFileMove}" Size="18" />
+                      <TextBlock Text="移动" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </md:MdButton>
+                </Grid>
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.DestinationSubfolder}" Variant="Outlined"
+                              Label="目标子文件夹" AutomationProperties.Name="自动化目标子文件夹" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="只能填写当前文件夹下的一级名称。没有匹配文件时不会创建空文件夹；同名文件始终保留两份。" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding Automation.IsNotificationSelected}">
+                <TextBlock Classes="h3" Text="系统通知" />
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.NotificationTitle}" Variant="Outlined"
+                              Label="通知标题" AutomationProperties.Name="自动化通知标题" />
+                <md:MdTextBox Text="{Binding Automation.SelectedNode.NotificationBody}" Variant="Outlined"
+                              Label="通知正文" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="92"
+                              AutomationProperties.Name="自动化通知正文" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="可用占位符：count、succeeded、failed、destination（写入时用花括号包围）。显式通知不受设置中的任务通知总开关拦截。" />
+              </StackPanel>
+
+              <Border Height="1" Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+              <WrapPanel Orientation="Horizontal">
+                <md:MdButton Variant="Outlined" Margin="0,0,8,8"
+                             Command="{Binding Automation.DisconnectSelectedNodeCommand}"
+                             IsEnabled="{Binding Automation.HasSelectedNode}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.LinkOff}" Size="18" />
+                    <TextBlock Text="断开" VerticalAlignment="Center" />
+                  </StackPanel>
+                </md:MdButton>
+                <md:MdButton Variant="Outlined" Margin="0,0,8,8"
+                             Command="{Binding Automation.DeleteSelectedNodeCommand}"
+                             IsEnabled="{Binding Automation.CanDeleteSelectedNode}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.Delete}" Size="18" />
+                    <TextBlock Text="删除节点" VerticalAlignment="Center" />
+                  </StackPanel>
+                </md:MdButton>
+              </WrapPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="支持有界 DAG：当前文件夹 → 顺序筛选 → 可选“匹配数条件”；达到阈值才传输，未达阈值可安全结束或汇入通知。最多 16 节点、1 个条件与 1 个传输；拒绝循环、嵌套分支和任意目标路径。" />
+            </StackPanel>
+          </md:MdScrollViewer>
+        </Border>
+      </Grid>
+    </StackPanel>
+  </md:MdScrollViewer>
+</UserControl>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MdExplorer.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MdExplorer.Domain\MdExplorer.Domain.csproj" />
+    <ProjectReference Include="..\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

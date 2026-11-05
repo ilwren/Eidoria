@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <application android:allowBackup="true"
+               android:icon="@mipmap/ic_launcher"
+               android:label="Eidoria"
+               android:supportsRtl="true"
+               android:theme="@style/MyTheme.NoActionBar">
+  </application>
+  <!-- v0.1 仅访问应用专属目录与用户经 StorageProvider 显式选择的位置，不申请存储强权限。
+       SAF 持久化授权与 MediaStore 类别聚合为后续版本（开发文档 §9.3）。 -->
+</manifest>

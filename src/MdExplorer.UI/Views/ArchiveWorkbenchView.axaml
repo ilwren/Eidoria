@@ -1,0 +1,287 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.ArchiveWorkbenchView"
+             x:DataType="vm:ShellViewModel">
+  <Grid Margin="20,12,20,20" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+    <Border x:Name="ArchiveHeaderCard" Classes="card">
+      <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+          <md:MdIconButton Width="42" Height="42" MinWidth="42" MinHeight="42"
+                           Icon="{x:Static md:MdSymbols.ArrowBack}"
+                           Command="{Binding CloseArchiveWorkbenchCommand}"
+                           ToolTip.Tip="返回文件列表" AutomationProperties.Name="返回文件列表" />
+          <Border Grid.Column="1" Width="44" Height="44" CornerRadius="14" VerticalAlignment="Center"
+                  Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="24"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+          </Border>
+          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding ArchivePath}">
+            <TextBlock Classes="h3" Text="{Binding ArchiveName}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Classes="caption" Text="{Binding ArchivePath}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <md:MdCircularProgressIndicator Grid.Column="3" IsVisible="{Binding IsArchiveBusy}"
+                                          IsIndeterminate="True" Width="24" Height="24"
+                                          VerticalAlignment="Center" />
+        </Grid>
+
+        <WrapPanel x:Name="ArchiveFactsPanel" Grid.Row="1" Orientation="Horizontal">
+          <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="条目数量">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="17" />
+              <TextBlock Text="{Binding ArchiveCountsText}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="原始大小合计">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="17" />
+              <TextBlock Text="{Binding ArchiveUncompressedSizeText}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="压缩后大小合计">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="17" />
+              <TextBlock Text="{Binding ArchiveCompressedSizeText}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="压缩率">
+            <TextBlock Text="{Binding ArchiveCompressionRatioText}" />
+          </Border>
+        </WrapPanel>
+      </Grid>
+    </Border>
+
+    <Grid x:Name="ArchiveToolbarGrid" Grid.Row="1" ColumnDefinitions="*,12,320" RowDefinitions="Auto">
+      <Border x:Name="ArchiveBreadcrumbBar" Classes="path-pill" MinHeight="48">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="4">
+          <md:MdIconButton x:Name="ArchiveCompactBackButton" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ArrowBack}" IsVisible="False"
+                           Command="{Binding CloseArchiveWorkbenchCommand}"
+                           ToolTip.Tip="返回文件列表" AutomationProperties.Name="返回文件列表" />
+          <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ArrowUpward}"
+                           Command="{Binding ArchiveGoUpCommand}" IsEnabled="{Binding CanArchiveGoUp}"
+                           ToolTip.Tip="上一级" AutomationProperties.Name="返回上一级虚拟文件夹" />
+          <md:MdScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Hidden"
+                             VerticalScrollBarVisibility="Disabled" AllowMouseDrag="True"
+                             VerticalAlignment="Center">
+            <ItemsControl ItemsSource="{Binding ArchiveBreadcrumbs}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArchiveBreadcrumbModel">
+                  <md:MdButton Variant="Text" Height="38" Padding="8,0" Click="OnArchiveBreadcrumbClick"
+                               ToolTip.Tip="{Binding Path}" AutomationProperties.Name="{Binding Name}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <md:MdIcon Glyph="{Binding Glyph}" Size="17" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </md:MdButton>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </md:MdScrollViewer>
+          <md:MdIconButton Grid.Column="3" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.Close}"
+                           Command="{Binding ClearArchiveFilterCommand}" IsVisible="{Binding IsArchiveFiltering}"
+                           ToolTip.Tip="清除筛选" AutomationProperties.Name="清除条目筛选" />
+        </Grid>
+      </Border>
+
+      <md:MdSearchBar x:Name="ArchiveFilterBox" Grid.Column="2" Text="{Binding ArchiveFilterText}"
+                      PlaceholderText="筛选全部条目" ShowClearButton="True"
+                      ToolTip.Tip="按虚拟路径筛选全部文件条目"
+                      AutomationProperties.Name="筛选压缩包条目" />
+    </Grid>
+
+    <Grid x:Name="ArchiveContentGrid" Grid.Row="2" ColumnDefinitions="*,16,360" RowDefinitions="*">
+      <Border x:Name="ArchiveEntriesCard" Classes="card" Padding="10">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Margin="6,2">
+            <StackPanel Spacing="1" VerticalAlignment="Center">
+              <TextBlock Classes="body" Text="{Binding ArchiveStatusText}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="caption" Text="{Binding ArchiveSelectedSummaryText}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                             Icon="{x:Static md:MdSymbols.CheckCircle}"
+                             Command="{Binding SelectVisibleArchiveEntriesCommand}"
+                             ToolTip.Tip="勾选当前可见条目" AutomationProperties.Name="勾选当前可见条目" />
+            <md:MdIconButton Grid.Column="2" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                             Icon="{x:Static md:MdSymbols.Close}"
+                             Command="{Binding ClearArchiveSelectionCommand}" IsEnabled="{Binding HasArchiveSelection}"
+                             ToolTip.Tip="清除勾选" AutomationProperties.Name="清除压缩包条目勾选" />
+          </Grid>
+
+          <Grid Grid.Row="1">
+            <md:MdList ItemsSource="{Binding ArchiveVisibleEntries}" Variant="Segmented" ItemSpacing="2"
+                       Background="Transparent" BorderThickness="0">
+              <md:MdList.ItemTemplate>
+                <DataTemplate x:DataType="vm:ArchiveWorkbenchEntryViewModel">
+                  <Grid ColumnDefinitions="*,Auto" Margin="4,4" ToolTip.Tip="{Binding VirtualPath}">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="9" Background="Transparent"
+                          Tapped="OnArchiveEntryTapped" DoubleTapped="OnArchiveEntryDoubleTapped" Cursor="Hand">
+                      <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" VerticalAlignment="Center"
+                                       Icon="{x:Static md:MdSymbols.CheckCircle}" Opacity="{Binding CheckOpacity}"
+                                       Click="OnArchiveCheckClick"
+                                       ToolTip.Tip="勾选此条目" AutomationProperties.Name="勾选此条目" />
+                      <Border Grid.Column="1" Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
+                              Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+                        <md:MdIcon Glyph="{Binding Glyph}" Size="21"
+                                   Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                      </Border>
+                      <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="{Binding MetaText}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="3" Spacing="1" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="{Binding SizeText}" HorizontalAlignment="Right" />
+                        <TextBlock Classes="caption" Text="{Binding CompressedSizeText}" HorizontalAlignment="Right" />
+                      </StackPanel>
+                    </Grid>
+                    <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                                     VerticalAlignment="Center" IsVisible="{Binding IsFolder}"
+                                     Icon="{x:Static md:MdSymbols.ChevronRight}" Click="OnArchiveEnterFolderClick"
+                                     ToolTip.Tip="进入文件夹" AutomationProperties.Name="进入虚拟文件夹" />
+                  </Grid>
+                </DataTemplate>
+              </md:MdList.ItemTemplate>
+            </md:MdList>
+
+            <StackPanel IsVisible="{Binding ShowArchiveEmpty}" VerticalAlignment="Center"
+                        HorizontalAlignment="Center" Spacing="8" IsHitTestVisible="False">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="44" HorizontalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Classes="body" Text="{Binding ArchiveStatusText}" />
+            </StackPanel>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Border x:Name="ArchiveDetailCard" Grid.Column="2" Classes="card">
+        <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden"
+                           AllowMouseDrag="True">
+          <StackPanel Spacing="14" Margin="0,0,8,2">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+              <Border Width="42" Height="42" CornerRadius="13" VerticalAlignment="Center"
+                      Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+                <md:MdIcon Glyph="{Binding SelectedArchiveGlyph}" Size="22"
+                           Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+              </Border>
+              <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center"
+                          ToolTip.Tip="{Binding SelectedArchivePathText}">
+                <TextBlock Classes="h3" Text="{Binding SelectedArchiveTitle}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="caption" Text="{Binding SelectedArchivePathText}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </Grid>
+
+            <StackPanel Spacing="7">
+              <Grid ColumnDefinitions="72,*" ColumnSpacing="8">
+                <TextBlock Classes="caption" Text="原始" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding SelectedArchiveOriginalSizeText}" HorizontalAlignment="Right" />
+              </Grid>
+              <Grid ColumnDefinitions="72,*" ColumnSpacing="8">
+                <TextBlock Classes="caption" Text="压缩后" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding SelectedArchiveCompressedSizeText}" HorizontalAlignment="Right" />
+              </Grid>
+              <Grid ColumnDefinitions="72,*" ColumnSpacing="8">
+                <TextBlock Classes="caption" Text="比率" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding SelectedArchiveRatioText}" HorizontalAlignment="Right" />
+              </Grid>
+              <Grid ColumnDefinitions="72,*" ColumnSpacing="8">
+                <TextBlock Classes="caption" Text="修改" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding SelectedArchiveModifiedText}" HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="h3" Text="预览" />
+              <TextBlock Classes="caption" Text="{Binding ArchivePreviewMessage}" TextWrapping="Wrap" />
+              <Border IsVisible="{Binding HasArchivePreviewImage}" CornerRadius="12" ClipToBounds="True"
+                      Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+                <Image Source="{Binding ArchivePreviewImage}" Stretch="Uniform" MaxHeight="260" />
+              </Border>
+              <Border IsVisible="{Binding HasArchivePreviewText}" CornerRadius="12" ClipToBounds="True"
+                      Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" Padding="10"
+                      MaxHeight="260">
+                <md:MdScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"
+                                   AllowMouseDrag="True">
+                  <SelectableTextBlock Classes="mono" Text="{Binding ArchivePreviewText}" />
+                </md:MdScrollViewer>
+              </Border>
+            </StackPanel>
+
+            <Border Height="1" Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+
+            <StackPanel Spacing="11">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Download}" Size="20"
+                           Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                <TextBlock Classes="h3" Text="解压" VerticalAlignment="Center" />
+              </StackPanel>
+
+              <md:MdTextBox Text="{Binding ArchiveDestinationPath}" Variant="Outlined" Label="目标文件夹"
+                            ToolTip.Tip="{Binding ArchiveDestinationPath}"
+                            AutomationProperties.Name="解压目标文件夹" />
+              <TextBlock Classes="caption" Text="{Binding ArchiveSelectedSummaryText}" TextWrapping="Wrap" />
+
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Classes="body" Text="保留目录结构" VerticalAlignment="Center" />
+                <md:MdSwitch Grid.Column="1" IsChecked="{Binding ArchivePreserveStructure}" VerticalAlignment="Center"
+                             ToolTip.Tip="关闭后把文件扁平解压到目标文件夹"
+                             AutomationProperties.Name="保留压缩包目录结构" />
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Classes="body" Text="完成后打开" VerticalAlignment="Center" />
+                <md:MdSwitch Grid.Column="1" IsChecked="{Binding ArchiveOpenAfterExtract}" VerticalAlignment="Center"
+                             ToolTip.Tip="解压成功后打开目标文件夹"
+                             AutomationProperties.Name="解压完成后打开目标文件夹" />
+              </Grid>
+
+              <TextBlock Classes="body" Text="同名处理" />
+              <WrapPanel Orientation="Horizontal">
+                <md:MdButton Classes="search-kind" Classes.active="{Binding IsArchiveKeepBoth}" Variant="Outlined"
+                             Height="40" Margin="0,0,8,8" Command="{Binding SetArchiveConflictPolicyCommand}"
+                             CommandParameter="KeepBoth" ToolTip.Tip="保留已有文件，新文件自动改名">
+                  <TextBlock Text="两者保留" />
+                </md:MdButton>
+                <md:MdButton Classes="search-kind" Classes.active="{Binding IsArchiveSkipConflicts}" Variant="Outlined"
+                             Height="40" Margin="0,0,8,8" Command="{Binding SetArchiveConflictPolicyCommand}"
+                             CommandParameter="Skip" ToolTip.Tip="不解压与已有文件同名的条目">
+                  <TextBlock Text="跳过" />
+                </md:MdButton>
+                <md:MdButton Classes="search-kind" Classes.active="{Binding IsArchiveOverwriteConflicts}" Variant="Outlined"
+                             Height="40" Margin="0,0,8,8" Command="{Binding SetArchiveConflictPolicyCommand}"
+                             CommandParameter="Overwrite" ToolTip.Tip="用压缩包中的文件替换同名文件">
+                  <TextBlock Text="覆盖" />
+                </md:MdButton>
+              </WrapPanel>
+              <TextBlock Classes="caption" Text="{Binding ArchiveConflictPolicyText}" TextWrapping="Wrap" />
+
+              <WrapPanel Orientation="Horizontal">
+                <md:MdButton Variant="Tonal" Height="42" MinWidth="128" Margin="0,0,8,8"
+                             Command="{Binding ExtractArchiveSelectedCommand}" IsEnabled="{Binding !IsArchiveBusy}"
+                             ToolTip.Tip="仅解压已勾选的文件" AutomationProperties.Name="解压所选条目">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.CheckCircle}" Size="18" />
+                    <TextBlock Text="解压所选" VerticalAlignment="Center" />
+                  </StackPanel>
+                </md:MdButton>
+                <md:MdButton Classes="primary-action" Variant="Filled" Height="42" MinWidth="128" Margin="0,0,8,8"
+                             Command="{Binding ExtractArchiveAllCommand}" IsEnabled="{Binding !IsArchiveBusy}"
+                             ToolTip.Tip="按当前选项解压全部条目" AutomationProperties.Name="解压全部条目">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.Download}" Size="18" />
+                    <TextBlock Text="解压全部" VerticalAlignment="Center" />
+                  </StackPanel>
+                </md:MdButton>
+              </WrapPanel>
+            </StackPanel>
+          </StackPanel>
+        </md:MdScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

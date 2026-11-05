@@ -1,0 +1,340 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:themes="using:Md3.Avalonia.Themes"
+             xmlns:mdm="using:Markdown.Avalonia"
+             xmlns:ae="using:AvaloniaEdit"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             xmlns:views="using:MdExplorer.UI.Views"
+             x:Class="MdExplorer.UI.Views.DocumentWorkbenchView"
+             x:DataType="vm:DocumentWorkbenchViewModel"
+             Background="Transparent">
+  <UserControl.Styles>
+    <themes:MaterialAvaloniaEditTheme />
+    <!-- 连续阅读的当前页只用纸面左侧主色线标记，不把整行染成选中面。 -->
+    <Style Selector="md|MdList.pdf-continuous ListBoxItem:selected /template/ Border#PART_Container">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="md|MdList.pdf-continuous ListBoxItem:pointerover /template/ Border#PART_Container">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid x:Name="DocumentRoot" Margin="20,12,20,20" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+    <!-- 身份与保存动作 -->
+    <Border Classes="card">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <md:MdIconButton Width="42" Height="42" MinWidth="42" MinHeight="42"
+                         Icon="{x:Static md:MdSymbols.ArrowBack}" Command="{Binding RequestCloseCommand}"
+                         ToolTip.Tip="返回文件列表" AutomationProperties.Name="返回文件列表" />
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding FullPath}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Classes="h3" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+            <Border CornerRadius="8" Padding="7,2" VerticalAlignment="Center" IsVisible="{Binding IsTextDocument}"
+                    Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+              <TextBlock Text="{Binding DirtyText}" FontSize="11"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+            </Border>
+          </StackPanel>
+          <TextBlock Classes="caption" Text="{Binding FullPath}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <md:MdCircularProgressIndicator Grid.Column="2" IsVisible="{Binding IsLoading}" IsIndeterminate="True"
+                                        Width="24" Height="24" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- 工具区：文本编辑动作与 PDF 阅读动作互斥呈现 -->
+    <Border Grid.Row="1" Classes="card" Padding="10,7">
+      <Grid>
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding IsTextDocument}">
+          <md:MdButton Variant="Filled" Height="40" MinWidth="104" Margin="0,0,7,5"
+                       Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}"
+                       IsEnabled="{Binding CanEditDocument}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Edit}" Size="18" />
+              <TextBlock Text="编辑" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+          <md:MdButton Variant="Filled" Height="40" MinWidth="104" Margin="0,0,7,5"
+                       Command="{Binding SaveCommand}" IsVisible="{Binding IsEditing}" IsEnabled="{Binding CanSave}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Save}" Size="18" />
+              <TextBlock Text="保存" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+          <md:MdButton Variant="Tonal" Height="40" Margin="0,0,7,5"
+                       Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}"
+                       Content="退出编辑" />
+          <md:MdIconButton x:Name="DocumentSearchButton" Width="40" Height="40" MinWidth="40" MinHeight="40" Margin="0,0,3,5"
+                           Icon="{x:Static md:MdSymbols.Search}" ToolTip.Tip="查找（Ctrl+F）"
+                           AutomationProperties.Name="在文档中查找" />
+          <md:MdIconButton x:Name="DocumentUndoButton" Width="40" Height="40" MinWidth="40" MinHeight="40" Margin="0,0,3,5"
+                           Icon="{x:Static md:MdSymbols.Undo}" IsEnabled="{Binding IsEditing}" ToolTip.Tip="撤销"
+                           AutomationProperties.Name="撤销编辑" />
+          <md:MdIconButton x:Name="DocumentRedoButton" Width="40" Height="40" MinWidth="40" MinHeight="40" Margin="0,0,7,5"
+                           Icon="{x:Static md:MdSymbols.Redo}" IsEnabled="{Binding IsEditing}" ToolTip.Tip="重做"
+                           AutomationProperties.Name="重做编辑" />
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,7,5" Command="{Binding FormatCommand}"
+                       IsEnabled="{Binding CanFormat}" Content="格式化" />
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,7,5" Command="{Binding ReloadCommand}"
+                       Content="重新加载" />
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,0,5" Command="{Binding OpenExternalCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="17" />
+              <TextBlock Text="系统打开" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+        </WrapPanel>
+
+        <Grid x:Name="PdfToolbarGrid" IsVisible="{Binding ShowPdfWorkbench}" ColumnDefinitions="Auto,Auto,72,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="2" MinHeight="48">
+          <md:MdIconButton x:Name="PdfFirstPageButton" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.FirstPage}" Command="{Binding FirstPdfPageCommand}"
+                           IsEnabled="{Binding CanPreviousPdfPage}" AutomationProperties.Name="PDF 第一页" />
+          <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ChevronLeft}" Command="{Binding PreviousPdfPageCommand}"
+                           IsEnabled="{Binding CanPreviousPdfPage}" AutomationProperties.Name="PDF 上一页" />
+          <md:MdTextBox Grid.Column="2" x:Name="PdfPageInputBox" Text="{Binding PdfPageInput}" Variant="Outlined"
+                        Width="64" MinWidth="0" Height="44" MinHeight="0" Padding="6,0"
+                        TextAlignment="Center" VerticalAlignment="Center"
+                        ToolTip.Tip="输入页码后按 Enter" AutomationProperties.Name="PDF 页码" />
+          <TextBlock Grid.Column="3" Classes="caption" Text="{Binding PdfPageCountText}" VerticalAlignment="Center"
+                     Margin="2,0,4,0" ToolTip.Tip="{Binding PdfPageText}" />
+          <md:MdIconButton Grid.Column="4" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ChevronRight}" Command="{Binding NextPdfPageCommand}"
+                           IsEnabled="{Binding CanNextPdfPage}" AutomationProperties.Name="PDF 下一页" />
+          <md:MdIconButton x:Name="PdfLastPageButton" Grid.Column="5" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.LastPage}" Command="{Binding LastPdfPageCommand}"
+                           IsEnabled="{Binding CanNextPdfPage}" AutomationProperties.Name="PDF 最后一页" />
+          <md:MdIconButton Grid.Column="6" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ZoomOut}" Command="{Binding ZoomOutCommand}"
+                           AutomationProperties.Name="缩小 PDF" />
+          <TextBlock Grid.Column="7" Classes="caption" Text="{Binding ZoomText}" MinWidth="42"
+                     TextAlignment="Center" VerticalAlignment="Center" />
+          <md:MdIconButton Grid.Column="8" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.ZoomIn}" Command="{Binding ZoomInCommand}"
+                           AutomationProperties.Name="放大 PDF" />
+          <md:MdIconButton x:Name="PdfRotateButton" Grid.Column="9" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                           Icon="{x:Static md:MdSymbols.RotateRight}" Command="{Binding RotateRightCommand}"
+                           AutomationProperties.Name="旋转 PDF" />
+          <md:MdButton x:Name="PdfOpenExternalButton" Grid.Column="10" Variant="Text" Height="40" HorizontalAlignment="Right"
+                       Command="{Binding OpenExternalCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="17" />
+              <TextBlock Text="系统打开" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+        </Grid>
+
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding ShowOfficeWorkbench}">
+          <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Margin="0,0,3,5"
+                           Icon="{x:Static md:MdSymbols.ChevronLeft}" Command="{Binding PreviousOfficeSheetCommand}"
+                           IsVisible="{Binding IsOfficeExcel}" IsEnabled="{Binding CanPreviousOfficeSheet}"
+                           AutomationProperties.Name="上一张工作表" />
+          <TextBlock Classes="body" Text="{Binding OfficeCountText}" VerticalAlignment="Center" Margin="2,0,5,5"
+                     IsVisible="{Binding IsOfficeExcel}" TextTrimming="CharacterEllipsis" />
+          <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Margin="0,0,7,5"
+                           Icon="{x:Static md:MdSymbols.ChevronRight}" Command="{Binding NextOfficeSheetCommand}"
+                           IsVisible="{Binding IsOfficeExcel}" IsEnabled="{Binding CanNextOfficeSheet}"
+                           AutomationProperties.Name="下一张工作表" />
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,7,5" Command="{Binding ReloadCommand}"
+                       Content="重新加载" />
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,7,5" Command="{Binding UseRasterPdfCommand}"
+                       IsVisible="{Binding CanSwitchToRasterPdf}"
+                       ToolTip.Tip="直接控件呈现不完整时，改用 PDFium 光栅兼容视图">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Image}" Size="17" />
+              <TextBlock Text="兼容视图" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+          <md:MdButton Variant="Text" Height="40" Margin="0,0,0,5" Command="{Binding OpenExternalCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.OpenInNew}" Size="17" />
+              <TextBlock Text="系统打开" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+        </WrapPanel>
+      </Grid>
+    </Border>
+
+    <!-- 文本工作面 -->
+    <Grid Grid.Row="2" IsVisible="{Binding IsTextDocument}" RowDefinitions="Auto,*,Auto" RowSpacing="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <StackPanel Spacing="2" VerticalAlignment="Center">
+          <TextBlock Classes="body" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="caption" Text="{Binding TextFactsText}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TextFactsText}" />
+        </StackPanel>
+        <md:MdTabs x:Name="DocumentTextTabs" Grid.Column="1" IsVisible="{Binding IsMarkdown}" Variant="Secondary"
+                   SelectedIndex="{Binding TextViewIndex, Mode=TwoWay}">
+          <md:MdTabItem Content="源稿" />
+          <md:MdTabItem Content="渲染" />
+        </md:MdTabs>
+      </Grid>
+
+      <Border Grid.Row="1" Classes="card" Padding="6" ClipToBounds="True">
+        <Grid>
+          <ae:TextEditor x:Name="DocumentEditor" IsVisible="{Binding IsSourceView}" ShowLineNumbers="True"
+                         HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                         AutomationProperties.Name="文档编辑器" />
+          <mdm:MarkdownScrollViewer Markdown="{Binding MarkdownText}" IsVisible="{Binding IsRenderedView}">
+            <mdm:MarkdownScrollViewer.MarkdownStyle>
+              <themes:MaterialMarkdownTheme />
+            </mdm:MarkdownScrollViewer.MarkdownStyle>
+          </mdm:MarkdownScrollViewer>
+          <TextBlock Classes="caption" Text="{Binding FailureText}" IsVisible="{Binding HasFailure}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2" Classes="card" Padding="12" IsVisible="{Binding IsDirty}">
+        <StackPanel Spacing="6">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <TextBlock Classes="body" Text="{Binding ChangeSummaryText}" VerticalAlignment="Center" />
+            <md:MdButton Grid.Column="1" Variant="Tonal" Height="36" Content="重新加载磁盘版本"
+                         Command="{Binding ReloadCommand}" IsVisible="{Binding HasExternalConflict}" />
+            <md:MdButton Grid.Column="2" Variant="Filled" Height="36" Content="以编辑器内容覆盖"
+                         Command="{Binding OverwriteCommand}" IsVisible="{Binding HasExternalConflict}" />
+          </Grid>
+          <SelectableTextBlock Classes="mono" Text="{Binding DiffPreviewText}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- PDF 工作面 -->
+    <Grid x:Name="PdfWorkbenchGrid" Grid.Row="2" IsVisible="{Binding ShowPdfWorkbench}" ColumnDefinitions="140,12,*">
+      <Border x:Name="PdfThumbnailRail" Classes="card" Padding="4">
+        <!-- Md3 主题没有原生 ListBox 模板；必须使用 MdList，容器生成与虚拟化才有完整呈现。 -->
+        <md:MdList x:Name="PdfPageList" ItemsSource="{Binding PdfPages}" SelectedIndex="{Binding PdfPageIndex, Mode=TwoWay}"
+                   Variant="Segmented" ItemSpacing="4" Background="Transparent" BorderThickness="0"
+                   AutomationProperties.Name="PDF 页面">
+          <md:MdList.ItemTemplate>
+            <DataTemplate x:DataType="vm:PdfPageViewModel">
+              <Grid Width="88" HorizontalAlignment="Center" RowDefinitions="Auto,Auto" Margin="0,4">
+                <Border Width="76" Height="{Binding PaperHeight}" CornerRadius="4" ClipToBounds="True"
+                        Background="#FFFDF8" BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                        HorizontalAlignment="Center">
+                  <Grid>
+                    <Image Source="{Binding Thumbnail}" Stretch="Fill" IsVisible="{Binding HasThumbnail}" />
+                    <Border Width="4" HorizontalAlignment="Left" IsVisible="{Binding IsCurrent}"
+                            Background="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                    <md:MdCircularProgressIndicator IsVisible="{Binding IsThumbnailLoading}" IsIndeterminate="True"
+                                                    Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+                <TextBlock Grid.Row="1" Classes="caption" Text="{Binding PageText}" HorizontalAlignment="Center" Margin="0,3,0,0" />
+              </Grid>
+            </DataTemplate>
+          </md:MdList.ItemTemplate>
+        </md:MdList>
+      </Border>
+
+      <Border x:Name="PdfReaderCard" Grid.Column="2" Classes="card" Padding="8">
+        <Grid RowDefinitions="Auto,*" RowSpacing="6">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <TextBlock Classes="caption" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" ToolTip.Tip="{Binding StatusText}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <md:MdIconButton Width="36" Height="36" MinWidth="36" MinHeight="36"
+                               Icon="{x:Static md:MdSymbols.PictureAsPdf}"
+                               Command="{Binding UseDirectPdfCommand}"
+                               IsVisible="{Binding CanSwitchToDirectPdf}"
+                               ToolTip.Tip="回到 OfficeViewer 直接 PDF 控件"
+                               AutomationProperties.Name="切换到 PDF 直接预览" />
+              <md:MdTabs x:Name="PdfReadingModeTabs" Variant="Secondary"
+                         SelectedIndex="{Binding PdfReadingModeIndex, Mode=TwoWay}" IsVisible="{Binding HasPdf}"
+                         AutomationProperties.Name="PDF 阅读模式">
+                <md:MdTabItem Content="单页" />
+                <md:MdTabItem Content="连续" />
+              </md:MdTabs>
+            </StackPanel>
+          </Grid>
+
+          <Grid Grid.Row="1">
+            <md:MdScrollViewer x:Name="PdfSingleScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                               AllowMouseDrag="True" IsVisible="{Binding IsSinglePagePdfMode}">
+              <Grid MinHeight="360">
+                <Border x:Name="PdfPaper" Width="{Binding PdfDisplayWidth}" CornerRadius="4" ClipToBounds="True"
+                        Background="#FFFDF8" BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                        HorizontalAlignment="Center" VerticalAlignment="Top" IsVisible="{Binding HasPdf}">
+                  <Image Source="{Binding PdfImage}" Stretch="Uniform" />
+                </Border>
+              </Grid>
+            </md:MdScrollViewer>
+
+            <!-- Md3 主题下同样使用 MdList；虚拟化容器进入视口后才渲染整页位图。 -->
+            <md:MdList x:Name="PdfContinuousList" Classes="pdf-continuous" ItemsSource="{Binding PdfPages}"
+                       SelectedIndex="{Binding PdfPageIndex, Mode=TwoWay}"
+                       AutoScrollToSelectedItem="False" ItemSpacing="10"
+                       Background="Transparent" BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       IsVisible="{Binding IsContinuousPdfMode}"
+                       AutomationProperties.Name="PDF 连续阅读">
+              <md:MdList.ItemTemplate>
+                <DataTemplate x:DataType="vm:PdfPageViewModel">
+                  <Grid Width="{Binding ReaderWidth}" HorizontalAlignment="Center" RowDefinitions="Auto,Auto" Margin="2,4">
+                    <Border Height="{Binding ReaderHeight}" CornerRadius="4" ClipToBounds="True"
+                            Background="#FFFDF8" BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+                      <Grid>
+                        <Image Source="{Binding PageImage}" Stretch="Fill" IsVisible="{Binding HasPageImage}" />
+                        <StackPanel IsVisible="{Binding !HasPageImage}" Spacing="8"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                          <md:MdCircularProgressIndicator IsVisible="{Binding IsPageLoading}" IsIndeterminate="True"
+                                                          Width="24" Height="24" HorizontalAlignment="Center" />
+                          <TextBlock Classes="caption" Text="{Binding PageLabel}"
+                                     HorizontalAlignment="Center" IsVisible="{Binding !HasPageLoadError}" />
+                          <TextBlock Classes="caption" Text="此页渲染失败" HorizontalAlignment="Center"
+                                     IsVisible="{Binding HasPageLoadError}" />
+                        </StackPanel>
+                        <Border Width="4" HorizontalAlignment="Left" IsVisible="{Binding IsCurrent}"
+                                Background="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                      </Grid>
+                    </Border>
+                    <TextBlock Grid.Row="1" Classes="caption" Text="{Binding PageText}"
+                               HorizontalAlignment="Center" Margin="0,4,0,0" />
+                  </Grid>
+                </DataTemplate>
+              </md:MdList.ItemTemplate>
+            </md:MdList>
+
+            <StackPanel IsVisible="{Binding NeedsPdfPassword}" Width="340" Spacing="10"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Lock}" Size="38" HorizontalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+              <TextBlock Classes="h3" Text="此 PDF 需要密码" HorizontalAlignment="Center" />
+              <TextBlock Classes="caption" Text="密码仅在本次打开期间保存在内存中，不会写入设置。" TextWrapping="Wrap" TextAlignment="Center" />
+              <md:MdTextBox x:Name="PdfPasswordBox" Text="{Binding PdfPasswordInput}" Variant="Outlined" Label="PDF 密码"
+                            IsPassword="True" AutomationProperties.Name="PDF 密码" />
+              <md:MdButton Variant="Filled" Height="42" Content="解锁" Command="{Binding UnlockPdfCommand}" />
+            </StackPanel>
+
+            <TextBlock Classes="caption" Text="{Binding FailureText}" IsVisible="{Binding HasFailure}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Office 工作面：第三方原生只读控件经适配层缩放与释放；DOCX/PPTX 连续滚动，XLSX 由宿主切表。 -->
+    <Grid Grid.Row="2" IsVisible="{Binding ShowOfficeWorkbench}" RowDefinitions="Auto,*" RowSpacing="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="body" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center" ToolTip.Tip="{Binding StatusText}" />
+        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding OfficeCountText}" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" />
+      </Grid>
+      <Border Grid.Row="1" Classes="card" Padding="6" ClipToBounds="True">
+        <Grid>
+          <views:OfficeDocumentViewer x:Name="OfficeViewer"
+                                      Document="{Binding OfficeDocument}"
+                                      SelectedSheetIndex="{Binding OfficeSheetIndex, Mode=TwoWay}"
+                                      PageCount="{Binding OfficePageCount, Mode=TwoWay}"
+                                      SheetCount="{Binding OfficeSheetCount, Mode=TwoWay}"
+                                      HasLoadError="{Binding OfficeViewerLoadFailed, Mode=TwoWay}"
+                                      AutomationProperties.Name="Office 文档工作台" />
+          <TextBlock Classes="caption" Text="{Binding FailureText}" IsVisible="{Binding HasFailure}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

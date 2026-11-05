@@ -1,0 +1,542 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:md="using:Md3.Avalonia.Controls"
+        xmlns:controls="using:MdExplorer.UI.Controls">
+  <Styles.Resources>
+    <!-- Md3 未注册原生 ContextMenu 的无键 ControlTheme（MenuItem/Separator 已被 MdDesktopAdapters 覆盖），在此补齐 -->
+    <ControlTheme x:Key="{x:Type ContextMenu}" TargetType="ContextMenu">
+      <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}" />
+      <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+      </Setter>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"
+                  BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                  CornerRadius="16" ClipToBounds="True" BoxShadow="0 10 30 #24000000">
+            <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="440" AllowMouseDrag="True">
+              <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" />
+            </md:MdScrollViewer>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+
+    <!-- MaterialGridSplitter：16px 热区里只露 2px 轨道与胶囊把手；悬停/拖动时把手伸长并转主色。 -->
+    <ControlTheme x:Key="{x:Type controls:MaterialGridSplitter}" TargetType="controls:MaterialGridSplitter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="MinWidth" Value="16" />
+      <Setter Property="ResizeDirection" Value="Columns" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Grid>
+              <Border x:Name="PART_Track" Width="2" HorizontalAlignment="Center" Opacity="0.55"
+                      Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}">
+                <Border.Transitions>
+                  <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
+                    <DoubleTransition Property="Width" Duration="0:0:0.16" />
+                  </Transitions>
+                </Border.Transitions>
+              </Border>
+              <Border x:Name="PART_Handle" Width="6" Height="56" CornerRadius="3"
+                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                      Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}"
+                      BoxShadow="0 2 8 #14000000">
+                <Border.Transitions>
+                  <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.16" />
+                    <DoubleTransition Property="Height" Duration="0:0:0.18" />
+                    <DoubleTransition Property="Width" Duration="0:0:0.18" />
+                  </Transitions>
+                </Border.Transitions>
+                <StackPanel Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ Border#PART_Handle">
+        <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+        <Setter Property="Height" Value="76" />
+        <Setter Property="Width" Value="7" />
+      </Style>
+      <Style Selector="^:pointerover /template/ Border#PART_Track">
+        <Setter Property="Opacity" Value="0.9" />
+      </Style>
+      <Style Selector="^:pressed /template/ Border#PART_Handle">
+        <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+        <Setter Property="Height" Value="88" />
+        <Setter Property="Width" Value="7" />
+      </Style>
+      <Style Selector="^:pressed /template/ Border#PART_Track">
+        <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Width" Value="3" />
+      </Style>
+      <Style Selector="^:focus-visible /template/ Border#PART_Handle">
+        <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+        <Setter Property="Height" Value="76" />
+      </Style>
+      <Style Selector="^:reduce-motion:pointerover /template/ Border#PART_Handle, ^:reduce-motion:pressed /template/ Border#PART_Handle, ^:reduce-motion:focus-visible /template/ Border#PART_Handle">
+        <Setter Property="Height" Value="56" />
+        <Setter Property="Width" Value="6" />
+      </Style>
+      <Style Selector="^:reduce-motion:pressed /template/ Border#PART_Track">
+        <Setter Property="Width" Value="2" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="TextBlock.h3">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="TextBlock.mono">
+    <Setter Property="FontFamily" Value="Consolas, DejaVu Sans Mono, monospace" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+
+  <Style Selector="SelectableTextBlock.body">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="SelectableTextBlock.mono">
+    <Setter Property="FontFamily" Value="Consolas, DejaVu Sans Mono, monospace" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+  </Style>
+
+  <!-- 通用表面：概念稿的关键不是更艳，而是底板、工作区与卡片之间有稳定的明暗阶梯。 -->
+  <Style Selector="Border.workspace-surface">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="24" />
+    <Setter Property="BoxShadow" Value="0 5 18 #10000000" />
+  </Style>
+
+  <!-- 对照窗格标签（v0.30）：非活动用低对比表面，活动标签抬高到 secondary container。 -->
+  <Style Selector="Border.secondary-tab">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+  </Style>
+  <Style Selector="Border.secondary-tab.active">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="Border.secondary-tab:pointerover">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerHigh.Brush}" />
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="16" />
+    <Setter Property="BoxShadow" Value="0 0 0 #00000000" />
+  </Style>
+  <Style Selector="Border.settings-hero">
+    <Setter Property="BoxShadow" Value="0 2 10 #0A000000" />
+  </Style>
+  <Style Selector="Border.settings-card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+    <Setter Property="CornerRadius" Value="24" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <Style Selector="Border.tap-chip">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="12,9" />
+    <Setter Property="BoxShadow" Value="0 0 0 #00000000" />
+  </Style>
+  <Style Selector="Border.tap-chip:pointerover">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+  </Style>
+
+  <Style Selector="Border.category-card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="BoxShadow" Value="0 0 0 #00000000" />
+  </Style>
+  <Style Selector="Border.category-card:pointerover">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}" />
+  </Style>
+
+  <Style Selector="Border.path-pill">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+
+  <Style Selector="DataGrid.file-details">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="RowBackground" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+  </Style>
+  <Style Selector="DataGrid.file-details DataGridColumnHeader">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="MinHeight" Value="38" />
+  </Style>
+  <Style Selector="DataGrid.file-details DataGridRow:selected DataGridCell">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+
+  <!-- 文件列表/网格容器：静止时轻、悬停时浮起、选中时同时给底色与描边。 -->
+  <Style Selector="md|MdList.file-list ListBoxItem">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Margin" Value="2,1" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Margin" Value="3" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <!-- MdList 生成容器的选中底色画在模板根 Border 上；直接给该部件圆角，避免选中态露出直角。 -->
+  <Style Selector="md|MdList.file-list ListBoxItem /template/ Border#PART_Container">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Margin" Value="2,0" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem /template/ Border#PART_Container">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Margin" Value="2" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem:selected /template/ Border.file-row">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem:selected /template/ Border.file-card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+  <Style Selector="md|MdList.file-list">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem">
+    <Setter Property="Padding" Value="5,3" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem">
+    <Setter Property="Padding" Value="6" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem Border.file-row">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem:pointerover Border.file-row">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem:selected Border.file-row">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem Border.file-card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="BoxShadow" Value="0 0 0 #00000000" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem:pointerover Border.file-card">
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+    <Setter Property="BoxShadow" Value="0 4 14 #10000000" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem:selected Border.file-card">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+
+  <!-- 紧凑密度（设置 → 浏览）：只收紧行高与卡宽，图标井、选中描边与拖放命中区不改。 -->
+  <Style Selector="md|MdList.file-list.dense ListBoxItem">
+    <Setter Property="Padding" Value="4,1" />
+  </Style>
+  <Style Selector="md|MdList.file-list.dense ListBoxItem Border.file-row">
+    <Setter Property="Padding" Value="8,3" />
+  </Style>
+  <Style Selector="md|MdList.file-grid.dense ListBoxItem">
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Margin" Value="1" />
+  </Style>
+  <Style Selector="DataGrid.file-details.dense DataGridRow">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="DataGrid.file-details.dense DataGridCell">
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+
+  <!-- 设置页响应式分类导航：宽屏为 Android Settings 式左侧目的地列表，窄屏为可换行的分类芯片。 -->
+  <Style Selector="md|MdButton.settings-nav-item">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-item.selected">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-chip">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Margin" Value="0,0,6,0" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.settings-nav-chip.selected">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
+  <!-- 设置页的分段选择：文字按钮只靠 selected 底色表达当前值，不额外造控件。 -->
+  <Style Selector="md|MdButton.segmented-choice">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.segmented-choice.selected">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
+  <!-- 桌面工具栏/面包屑不沿用整片品牌青：正文回到墨色，品牌色只留给主动作与状态。 -->
+  <Style Selector="md|MdButton.toolbar-action">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.toolbar-action md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.breadcrumb-segment">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.menu-action">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+
+  <!-- 迷你“搜索岛”：深色胶囊只占导航行一小段，状态变化时通过文字与缩放反馈。 -->
+  <Style Selector="md|MdButton.search-island">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.InverseSurface.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.InverseOnSurface.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.InverseSurface.Brush}" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="md|MdButton.search-island md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.InverseOnSurface.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.search-island:pointerover">
+    <Setter Property="RenderTransform" Value="scale(1.035)" />
+  </Style>
+  <Style Selector="md|MdButton.search-island:pressed">
+    <Setter Property="RenderTransform" Value="scale(0.96)" />
+  </Style>
+
+  <!-- 导航按钮（导轨/抽屉条目共用横向布局微调） -->
+  <Style Selector="md|MdButton.nav-entry">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+    <Setter Property="MinHeight" Value="42" />
+    <Setter Property="RenderTransformOrigin" Value="0%,50%" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+        <BrushTransition Property="Background" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="md|MdButton.nav-entry:pointerover">
+    <Setter Property="RenderTransform" Value="translateX(2px)" />
+  </Style>
+  <Style Selector="md|MdButton.nav-entry:pressed">
+    <Setter Property="RenderTransform" Value="translateX(1px) scale(0.985)" />
+  </Style>
+  <Style Selector="Border.file-card">
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.16" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.file-card:pointerover">
+    <Setter Property="RenderTransform" Value="translateY(-2px)" />
+  </Style>
+  <Style Selector="md|MdButton.nav-entry md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.nav-entry.active">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.nav-entry.active md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
+  <!-- 应用内低动效：根视图挂 reduce-motion 后，取消 Eidoria 自有微交互的位移与过渡。 -->
+  <Style Selector="UserControl.reduce-motion md|MdButton.nav-entry">
+    <Setter Property="RenderTransform" Value="none" />
+    <Setter Property="Transitions"><Transitions /></Setter>
+  </Style>
+  <Style Selector="UserControl.reduce-motion md|MdButton.nav-entry:pointerover">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <Style Selector="UserControl.reduce-motion md|MdButton.nav-entry:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <Style Selector="UserControl.reduce-motion Border.file-card">
+    <Setter Property="RenderTransform" Value="none" />
+    <Setter Property="Transitions"><Transitions /></Setter>
+  </Style>
+  <Style Selector="UserControl.reduce-motion Border.file-card:pointerover">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <!-- v0.12 对标 ai-v3：选中态只落在行/卡本身，不再让 MdList 容器在外圈再画一层薄荷光晕。 -->
+  <Style Selector="md|MdList.file-list ListBoxItem:selected, md|MdList.file-grid ListBoxItem:selected">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="md|MdList.file-list ListBoxItem:selected /template/ Border#PART_Container, md|MdList.file-grid ListBoxItem:selected /template/ Border#PART_Container">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.selection-check">
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+  <Style Selector="md|MdList.file-grid ListBoxItem:selected Border.selection-check">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <!-- 搜索中心类型芯片：图标承担识别，选中态回到 MD3 SecondaryContainer。 -->
+  <Style Selector="md|MdButton.search-kind">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+    <Setter Property="MinWidth" Value="44" />
+    <Setter Property="Padding" Value="10,0" />
+  </Style>
+  <Style Selector="md|MdButton.search-kind md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.search-kind.active">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.search-kind.active md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
+  <!-- 图标事实条与紧凑菜单：只给数值/动作留位置，完整名称走 ToolTip 与无障碍名。 -->
+  <Style Selector="Border.fact-chip">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="8,5" />
+  </Style>
+  <Style Selector="md|MdButton.menu-action">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="10,2" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSurface.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.primary-action md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnPrimary.Brush}" />
+  </Style>
+
+  <!-- Medium 导轨：活动目的地使用 MD3 的横向胶囊指示器，而不是整块按钮染色。 -->
+  <Style Selector="Border.rail-indicator">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="md|MdButton.rail-entry.active Border.rail-indicator">
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}" />
+  </Style>
+  <Style Selector="md|MdButton.rail-entry.active md|MdIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+  </Style>
+
+  <!-- 任务中心：桌面为右下浮卡；Compact 收敛为贴底 Sheet，避免窄屏左右留白与内容截断。 -->
+  <Style Selector="Border.task-center">
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="16,16,16,84" />
+    <Setter Property="MinWidth" Value="320" />
+    <Setter Property="MaxWidth" Value="440" />
+    <Setter Property="CornerRadius" Value="26" />
+  </Style>
+  <Style Selector="Border.task-center.compact">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Margin" Value="0,56,0,0" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MaxWidth" Value="10000" />
+    <Setter Property="CornerRadius" Value="28,28,0,0" />
+  </Style>
+  <Style Selector="md|MdScrollViewer.task-center-list">
+    <Setter Property="MaxHeight" Value="420" />
+  </Style>
+  <Style Selector="md|MdScrollViewer.task-center-list.compact">
+    <Setter Property="MaxHeight" Value="560" />
+  </Style>
+
+  <!-- 双窗格：活动会话只用主色细描边定向，非活动窗格保持完整文字对比度。 -->
+  <Style Selector="Border.dual-pane">
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="CornerRadius" Value="18" />
+  </Style>
+  <Style Selector="Border.dual-pane.dual">
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+  </Style>
+  <Style Selector="Border.dual-pane.dual.active">
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+  </Style>
+
+</Styles>

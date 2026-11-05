@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>28</SupportedOSPlatformVersion>
+    <ApplicationId>dev.mdexplorer.app</ApplicationId>
+    <ApplicationVersion>13</ApplicationVersion>
+    <ApplicationDisplayVersion>0.37.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RootNamespace>MdExplorer.Android</RootNamespace>
+    <IsAotCompatible>false</IsAotCompatible>
+    <!-- Release 时由 CI 打开 Trimming + RunAOTCompilation（见 ci.yml android Job） -->
+  </PropertyGroup>
+  <!--
+    Microsoft.ML.OnnxRuntime also ships Linux RIDs in its shared net10.0 library asset graph.
+    The Android SDK can otherwise copy the glibc Linux libonnxruntime.so over the Android AAR's
+    Bionic library (XA4301), which builds but crashes on device. Keep the Android AAR and remove
+    only Linux native copy/publish items from this Android app head; desktop RIDs are untouched.
+    See microsoft/onnxruntime#29270.
+  -->
+  <Target Name="_RemoveLinuxOnnxNativeAssetsForAndroid"
+          Condition="$(TargetFramework.Contains('-android'))"
+          AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+                            Condition="$([System.String]::Copy('%(NativeCopyLocalItems.PathInPackage)').Contains('linux-'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(ResolvedFileToPublish.PathInPackage)').Contains('linux-'))" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!-- 直接引用以确保宿主选中 net10.0-android 资产与 Android PDFium/Skia 原生库（UI 项目本身是 net10.0） -->
+    <PackageReference Include="PDFtoImage" />
+    <PackageReference Include="Md3.Avalonia.Notifications" />
+    <ProjectReference Include="..\MdExplorer.UI\MdExplorer.UI.csproj" />
+  </ItemGroup>
+</Project>

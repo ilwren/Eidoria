@@ -1,0 +1,177 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.DrawerContentView"
+             x:DataType="vm:ShellViewModel"
+             Background="Transparent">
+  <!-- 品牌区固定在抽屉顶部，只有导航列表滚动；Large 的常驻抽屉与 Compact 的模态抽屉共用同一结构。 -->
+  <Grid RowDefinitions="Auto,*">
+    <Border x:Name="DrawerBrandHeader" Grid.Row="0" Padding="22,16,14,12"
+            Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+            BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="11">
+        <Border Width="40" Height="40" CornerRadius="12" ClipToBounds="True" BoxShadow="0 4 12 #1F000000">
+          <Image Source="avares://MdExplorer.UI/Assets/eidoria.png" Width="40" Height="40" />
+        </Border>
+        <StackPanel VerticalAlignment="Center" Spacing="1">
+          <TextBlock Classes="h2" Text="Eidoria" />
+          <TextBlock Classes="caption" Text="万象屿" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <md:MdScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+      <StackPanel Margin="14,10,14,20" Spacing="4">
+        <md:MdButton Classes="primary-action" Variant="Filled" Height="44" Margin="2,0,2,12"
+                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                     IsVisible="{Binding IsBrowser}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Add}" Size="19" />
+            <TextBlock Text="新建" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button.Flyout>
+            <Flyout Placement="Right">
+              <Border Background="{DynamicResource Md.Sys.Color.Surface.Brush}" CornerRadius="16" Padding="6"
+                      BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+                <StackPanel Spacing="3" MinWidth="160">
+                  <md:MdButton Variant="Text" Content="新建文件夹" Command="{Binding Browser.NewFolderCommand}" />
+                  <md:MdButton Variant="Text" Content="新建文件" Command="{Binding Browser.NewFileCommand}" />
+                </StackPanel>
+              </Border>
+            </Flyout>
+          </Button.Flyout>
+        </md:MdButton>
+
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsHome}" Variant="Text" Command="{Binding GoHomeCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Home}" Size="22" />
+            <TextBlock Text="主页" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsFavoritesPage}" Variant="Text" Command="{Binding GoFavoritesCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Star}" Size="22" />
+            <TextBlock Text="收藏" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsSearchCenterPage}" Variant="Text" Command="{Binding GoSearchCenterCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="22" />
+            <TextBlock Text="搜索中心" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsStorageInsightsPage}" Variant="Text" Command="{Binding GoStorageInsightsCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="22" />
+            <TextBlock Text="存储洞察" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsAutomationPage}" Variant="Text" Command="{Binding GoAutomationCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.AccountTree}" Size="22" />
+            <TextBlock Text="自动化" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsExtensionCenterPage}" Variant="Text" Command="{Binding GoExtensionCenterCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Extension}" Size="22" />
+            <TextBlock Text="扩展中心" FontSize="14.5" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+
+        <Border Height="10" />
+        <ItemsControl ItemsSource="{Binding Places}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:NavEntry">
+              <md:MdButton Classes="nav-entry" Variant="Text" Click="OnNavEntryClick">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <md:MdIcon Glyph="{Binding Glyph}" Size="22" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </md:MdButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Height="10" IsVisible="{Binding Capabilities.IsAndroid}" />
+        <ItemsControl ItemsSource="{Binding AuthorizedRoots}" IsVisible="{Binding Capabilities.IsAndroid}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AuthorizedRootModel">
+              <md:MdButton Classes="nav-entry" Variant="Text" Click="OnAuthorizedRootClick" ToolTip.Tip="{Binding PathToolTip}">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <md:MdIcon Glyph="{Binding StatusGlyph}" Size="22" VerticalAlignment="Center" />
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" />
+                    <TextBlock Classes="caption" Text="{Binding StateText}" />
+                  </StackPanel>
+                </StackPanel>
+              </md:MdButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <md:MdButton Classes="nav-entry" Variant="Text" Command="{Binding PickAuthorizedFolderCommand}"
+                     IsVisible="{Binding Capabilities.IsAndroid}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="22" />
+            <TextBlock Text="授权文件夹…" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+
+        <Border Height="1" Margin="8,12,8,8" Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+        <ItemsControl ItemsSource="{Binding Volumes}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:VolumeItemModel">
+              <md:MdButton Classes="nav-entry" Variant="Text" Height="54" Click="OnVolumeClick"
+                           HorizontalContentAlignment="Stretch" ToolTip.Tip="{Binding UsageText}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" MinWidth="168">
+                  <Border Width="34" Height="34" CornerRadius="10" VerticalAlignment="Center"
+                          Background="{DynamicResource Md.Sys.Color.SurfaceContainer.Brush}">
+                    <md:MdIcon Glyph="{Binding Glyph}" Size="19" Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="1" Classes="caption" Text="{Binding UsedPercentText}" />
+                    </Grid>
+                    <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding UsedPercent}" Height="4" />
+                  </StackPanel>
+                </Grid>
+              </md:MdButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Height="8" IsVisible="{Binding HasFavorites}" />
+        <ItemsControl ItemsSource="{Binding FavoriteItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FileItemViewModel">
+              <md:MdButton Classes="nav-entry" Variant="Text" Click="OnFavoriteClick" IsVisible="{Binding IsFolder}">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="22" />
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                </StackPanel>
+              </md:MdButton>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Height="1" Margin="8,14" Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsTrashPage}" Variant="Text" Command="{Binding GoTrashCommand}"
+                     IsVisible="{Binding Capabilities.CanMoveToTrash}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Delete}" Size="22" />
+            <TextBlock Text="回收站" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+        <md:MdButton Classes="nav-entry" Classes.active="{Binding IsSettingsPage}" Variant="Text" Command="{Binding GoSettingsCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Settings}" Size="22" />
+            <TextBlock Text="设置" VerticalAlignment="Center" />
+          </StackPanel>
+        </md:MdButton>
+      </StackPanel>
+    </md:MdScrollViewer>
+  </Grid>
+</UserControl>

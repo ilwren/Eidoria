@@ -1,0 +1,144 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             xmlns:infra="using:MdExplorer.Infrastructure.Plugins"
+             x:Class="MdExplorer.UI.Views.ExtensionCenterView"
+             x:DataType="vm:ShellViewModel">
+  <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+    <StackPanel MaxWidth="1040" HorizontalAlignment="Center" Margin="24,20,24,32" Spacing="18">
+      <Border CornerRadius="28" Padding="24"
+              Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+              BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+          <Border Width="56" Height="56" CornerRadius="20" VerticalAlignment="Center"
+                  Background="{DynamicResource Md.Sys.Color.PrimaryContainer.Brush}">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Extension}" Size="28" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.OnPrimaryContainer.Brush}" />
+          </Border>
+          <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+            <TextBlock Classes="h1" Text="扩展中心" />
+            <TextBlock Classes="body" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"
+                       Text="管理本机的声明式扩展。当前首发支持 Material 3 种子色主题，不加载 DLL、脚本或外部代码。" />
+          </StackPanel>
+          <md:MdButton Grid.Column="2" Variant="Filled" VerticalAlignment="Center" Click="OnInstallClick"
+                       IsEnabled="{Binding !ExtensionCenter.IsBusy}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Add}" Size="19" />
+              <TextBlock Text="导入 .mepx" VerticalAlignment="Center" />
+            </StackPanel>
+          </md:MdButton>
+        </Grid>
+      </Border>
+
+      <Border CornerRadius="20" Padding="16"
+              Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Info}" Size="22" VerticalAlignment="Top"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+          <StackPanel Grid.Column="1" Spacing="3">
+            <TextBlock Classes="body" Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}"
+                       Text="安全边界：无代码插件" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}"
+                       Text="MEPX v1 仅接受一个 manifest.json 和 theme 能力；包内不允许其他文件。扩展未签名，安装时会先显示发布者、能力与 SHA-256，并要求确认。" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Classes="card" Padding="20">
+        <StackPanel Spacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="h3" Text="本地扩展" />
+              <TextBlock Classes="caption" Text="{Binding ExtensionCenter.PackageCountText}" />
+            </StackPanel>
+            <md:MdIconButton Grid.Column="1" Icon="{x:Static md:MdSymbols.Refresh}"
+                             Command="{Binding ExtensionCenter.RescanCommand}"
+                             ToolTip.Tip="重新扫描本地扩展" AutomationProperties.Name="重新扫描本地扩展" />
+          </Grid>
+
+          <TextBlock Classes="body" Text="{Binding ExtensionCenter.StatusText}" TextWrapping="Wrap" />
+          <TextBlock Classes="caption" TextWrapping="Wrap">
+            <Run Text="本地包目录：" /><Run Text="{Binding ExtensionCenter.PackageDirectory}" />
+          </TextBlock>
+
+          <ItemsControl ItemsSource="{Binding ExtensionCenter.Packages}" IsVisible="{Binding ExtensionCenter.HasPackages}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PluginCardModel">
+                <Border CornerRadius="20" Padding="16" Margin="0,0,0,10"
+                        Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                        BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1">
+                  <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="8">
+                    <StackPanel Spacing="3">
+                      <TextBlock Classes="h3" Text="{Binding Name}" />
+                      <TextBlock Classes="caption" TextWrapping="Wrap">
+                        <Run Text="{Binding Publisher}" /><Run Text=" · v" /><Run Text="{Binding Version}" /><Run Text=" · 主题色" />
+                      </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <md:MdButton Variant="Tonal" Content="应用主题" IsVisible="{Binding HasTheme}"
+                                   Click="OnApplyThemeClick" />
+                      <md:MdIconButton Icon="{x:Static md:MdSymbols.Delete}" Click="OnRemoveClick"
+                                       ToolTip.Tip="移除扩展" AutomationProperties.Name="移除扩展" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="body" TextWrapping="Wrap"
+                               Text="{Binding Description}" />
+                    <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                      <Border Width="28" Height="28" CornerRadius="14"
+                              Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+                        <md:MdIcon Glyph="{x:Static md:MdSymbols.Palette}" Size="16"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="caption" Text="{Binding ThemeSeedColor}" />
+                        <TextBlock Classes="caption" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding HashText}">
+                          <Run Text="SHA-256: " /><Run Text="{Binding HashText}" />
+                        </TextBlock>
+                      </StackPanel>
+                    </Grid>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border CornerRadius="18" Padding="18"
+                  Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                  IsVisible="{Binding !ExtensionCenter.HasPackages}">
+            <StackPanel Spacing="6" HorizontalAlignment="Center">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Extension}" Size="36" HorizontalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Classes="body" Text="还没有安装扩展" HorizontalAlignment="Center" />
+              <TextBlock Classes="caption" Text="导入可信来源的 .mepx 声明式主题包；不提供联网插件市场。"
+                         TextWrapping="Wrap" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card" IsVisible="{Binding ExtensionCenter.HasIssues}">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="h3" Text="需要处理的插件包" />
+          <ItemsControl ItemsSource="{Binding ExtensionCenter.Issues}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="infra:PluginPackageIssue">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,2">
+                  <md:MdIcon Glyph="{x:Static md:MdSymbols.Warning}" Size="18"
+                             Foreground="{DynamicResource Md.Sys.Color.Error.Brush}" />
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Classes="body" Text="{Binding FileName}" />
+                    <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Message}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </md:MdScrollViewer>
+</UserControl>

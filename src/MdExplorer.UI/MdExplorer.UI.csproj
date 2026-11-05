@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MdExplorer.UI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Md3.Avalonia" />
+    <PackageReference Include="Md3.Avalonia.AvaloniaEdit" />
+    <PackageReference Include="Md3.Avalonia.Markdown" />
+    <PackageReference Include="Md3.Avalonia.DataGrid" />
+    <PackageReference Include="Md3.Avalonia.Extra" />
+    <PackageReference Include="Md3.Avalonia.Icons" />
+    <PackageReference Include="Md3.Avalonia.NodifyM" />
+    <PackageReference Include="Md3.Avalonia.Notifications" />
+    <PackageReference Include="NodifyM.Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="PDFtoImage" />
+    <PackageReference Include="OfficeViewer.Avalonia" />
+    <PackageReference Include="BouncyCastle.Cryptography" />
+    <ProjectReference Include="..\MdExplorer.Domain\MdExplorer.Domain.csproj" />
+    <ProjectReference Include="..\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\MdExplorer.Application\MdExplorer.Application.csproj" />
+    <ProjectReference Include="..\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

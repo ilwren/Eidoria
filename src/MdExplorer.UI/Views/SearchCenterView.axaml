@@ -1,0 +1,245 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.SearchCenterView"
+             x:DataType="vm:ShellViewModel">
+  <Grid Margin="20,12,20,20" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+      <md:MdSearchBar x:Name="SearchCenterSearch" Text="{Binding SearchCenterQuery}"
+                      PlaceholderText="{Binding SearchCenterSearchPlaceholderText}"
+                      ShowClearButton="True" ToolTip.Tip="跨全部索引根搜索"
+                      AutomationProperties.Name="跨全部索引根搜索" />
+      <md:MdButton Grid.Column="1" Variant="Filled" Width="48" MinWidth="48" Height="48" Padding="0"
+                   Command="{Binding RunSearchCenterSearchCommand}" ToolTip.Tip="搜索" AutomationProperties.Name="搜索">
+        <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="22" />
+      </md:MdButton>
+    </Grid>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+      <md:MdButton Classes="search-kind" Classes.active="{Binding IsKeywordSearchMode}" Variant="Outlined"
+                   Content="关键词" Command="{Binding SetSearchCenterModeCommand}" CommandParameter="Keyword"
+                   ToolTip.Tip="按文件名关键词匹配" AutomationProperties.Name="关键词搜索" />
+      <md:MdButton Classes="search-kind" Classes.active="{Binding IsSemanticSearchMode}" Variant="Outlined"
+                   Content="AI 语义" Command="{Binding SetSearchCenterModeCommand}" CommandParameter="Semantic"
+                   ToolTip.Tip="根据自然语言含义检索本地索引" AutomationProperties.Name="AI 语义搜索" />
+    </StackPanel>
+    <TextBlock Grid.Row="2" Classes="caption" Text="{Binding SearchCenterModeHintText}" TextWrapping="Wrap" />
+
+    <md:MdScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                       AllowMouseDrag="True">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindAll}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="All"
+                     ToolTip.Tip="全部类型" AutomationProperties.Name="全部类型">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderOpen}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindFolder}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Folder"
+                     ToolTip.Tip="文件夹" AutomationProperties.Name="文件夹">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindImage}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Image"
+                     ToolTip.Tip="图片" AutomationProperties.Name="图片">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Image}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindVideo}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Video"
+                     ToolTip.Tip="视频" AutomationProperties.Name="视频">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Movie}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindAudio}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Audio"
+                     ToolTip.Tip="音频" AutomationProperties.Name="音频">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.MusicNote}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindDocument}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Document"
+                     ToolTip.Tip="文档" AutomationProperties.Name="文档">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Description}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindArchive}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Archive"
+                     ToolTip.Tip="压缩包" AutomationProperties.Name="压缩包">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.FolderZip}" Size="20" />
+        </md:MdButton>
+        <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchKindCode}" Variant="Outlined"
+                     Command="{Binding SetSearchCenterKindCommand}" CommandParameter="Code"
+                     ToolTip.Tip="代码" AutomationProperties.Name="代码">
+          <md:MdIcon Glyph="{x:Static md:MdSymbols.Code}" Size="20" />
+        </md:MdButton>
+      </StackPanel>
+    </md:MdScrollViewer>
+
+    <Grid x:Name="SearchContentGrid" Grid.Row="4" ColumnDefinitions="*,16,320" RowDefinitions="*">
+      <Border x:Name="ResultsCard" Classes="card" Padding="10">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <Grid ColumnDefinitions="*,Auto" Margin="6,2">
+            <TextBlock Classes="body" Text="{Binding SearchCenterStatusText}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+            <md:MdCircularProgressIndicator Grid.Column="1" IsVisible="{Binding IsSearchCenterBusy}"
+                                            IsIndeterminate="True" Width="22" Height="22" />
+          </Grid>
+
+          <Grid Grid.Row="1">
+            <md:MdList ItemsSource="{Binding SearchCenterResults}" Background="Transparent" BorderThickness="0">
+              <md:MdList.ItemTemplate>
+                <DataTemplate x:DataType="vm:FileItemViewModel">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10" Margin="4,5"
+                        Background="Transparent" Tapped="OnResultTapped" Cursor="Hand"
+                        ToolTip.Tip="{Binding FullPath}">
+                    <Border Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
+                            Background="{Binding GlyphBackgroundBrush}">
+                      <md:MdIcon Glyph="{Binding Glyph}" Size="21" Foreground="{Binding GlyphBrush}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CompactMetaText}" />
+                        <TextBlock Grid.Column="2" Classes="caption" Text="{Binding SearchScoreText}"
+                                   IsVisible="{Binding HasSearchScore}" />
+                      </Grid>
+                    </StackPanel>
+                    <md:MdIcon Grid.Column="2" Glyph="{x:Static md:MdSymbols.Star}" Size="17" VerticalAlignment="Center"
+                               IsVisible="{Binding IsFavorite}"
+                               Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                    <md:MdIcon Grid.Column="3" Glyph="{x:Static md:MdSymbols.ChevronRight}" Size="19" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                  </Grid>
+                </DataTemplate>
+              </md:MdList.ItemTemplate>
+            </md:MdList>
+
+            <StackPanel IsVisible="{Binding ShowSearchCenterEmpty}" VerticalAlignment="Center"
+                        HorizontalAlignment="Center" Spacing="8" IsHitTestVisible="False">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="44" HorizontalAlignment="Center"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              <TextBlock Classes="body" Text="{Binding SearchCenterStatusText}" />
+            </StackPanel>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Border x:Name="IndexCard" Grid.Column="2" Classes="card">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" RowSpacing="11">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9">
+            <Border Width="36" Height="36" CornerRadius="11" VerticalAlignment="Center"
+                    Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="20"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+            </Border>
+            <TextBlock Grid.Column="1" Classes="h3" Text="索引" VerticalAlignment="Center" />
+            <Border Grid.Column="2" Classes="fact-chip" VerticalAlignment="Center">
+              <TextBlock Text="{Binding SearchIndexStateText}" />
+            </Border>
+          </Grid>
+
+          <WrapPanel Grid.Row="1" Orientation="Horizontal">
+            <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="索引根">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="17" />
+                <TextBlock Text="{Binding SearchIndexRootCountText}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+            <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="索引条目">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.InsertDriveFile}" Size="17" />
+                <TextBlock Text="{Binding SearchIndexEntryCountText}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+            <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="索引大小">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="17" />
+                <TextBlock Text="{Binding SearchIndexSizeText}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+            <Border Classes="fact-chip" Margin="0,0,6,6" ToolTip.Tip="上次更新">
+              <TextBlock Text="{Binding SearchIndexUpdatedText}" />
+            </Border>
+          </WrapPanel>
+
+          <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+            <TextBlock Classes="body" Text="启用" VerticalAlignment="Center" />
+            <md:MdSwitch Grid.Column="1" IsChecked="{Binding UseSearchIndex}" VerticalAlignment="Center"
+                         ToolTip.Tip="关闭后递归搜索改走实时扫描" AutomationProperties.Name="启用文件名索引" />
+          </Grid>
+
+          <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
+            <TextBlock Classes="h3" Text="范围" VerticalAlignment="Center" />
+            <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                             Icon="{x:Static md:MdSymbols.Add}"
+                             Command="{Binding AddCurrentFolderToSearchIndexCommand}"
+                             ToolTip.Tip="加入当前文件夹" AutomationProperties.Name="加入当前文件夹" />
+          </Grid>
+
+          <md:MdScrollViewer Grid.Row="4" HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+            <StackPanel>
+              <TextBlock Classes="caption" Text="未加入文件夹" Margin="2,4"
+                         IsVisible="{Binding !HasSearchIndexRoots}" />
+              <ItemsControl ItemsSource="{Binding SearchIndexRoots}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SearchIndexRootModel">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" Margin="0,4" ToolTip.Tip="{Binding Path}">
+                      <Border Width="36" Height="36" CornerRadius="11" VerticalAlignment="Center"
+                              Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+                        <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="19"
+                                   Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <md:MdIconButton Grid.Column="2" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                                       Icon="{x:Static md:MdSymbols.Close}" Click="OnRemoveRootClick"
+                                       ToolTip.Tip="移除索引根" AutomationProperties.Name="移除索引根" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </md:MdScrollViewer>
+
+          <WrapPanel Grid.Row="5" Orientation="Horizontal">
+            <md:MdButton Classes="primary-action" Variant="Filled" Margin="0,0,8,8"
+                         Command="{Binding RebuildSearchIndexCommand}" ToolTip.Tip="重建文件名索引">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Refresh}" Size="18" />
+                <TextBlock Text="重建" VerticalAlignment="Center" />
+              </StackPanel>
+            </md:MdButton>
+            <md:MdButton Variant="Outlined" Margin="0,0,8,8"
+                         Command="{Binding ClearSearchIndexCommand}" ToolTip.Tip="清除本地索引数据">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Delete}" Size="18" />
+                <TextBlock Text="清除" VerticalAlignment="Center" />
+              </StackPanel>
+            </md:MdButton>
+          </WrapPanel>
+
+          <StackPanel Grid.Row="6" Spacing="6">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="h3" Text="AI 语义索引" />
+                <TextBlock Classes="caption" Text="{Binding SemanticSearchIndexStatusText}" TextWrapping="Wrap" />
+              </StackPanel>
+              <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                               Icon="{x:Static md:MdSymbols.Delete}" Command="{Binding ClearSemanticSearchIndexCommand}"
+                               IsEnabled="{Binding HasSemanticSearchIndex}"
+                               ToolTip.Tip="清除 AI 向量索引" AutomationProperties.Name="清除 AI 向量索引" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBlock Classes="caption" Text="{Binding SemanticSearchIndexSummaryText}"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <md:MdButton Grid.Column="1" Variant="Outlined" Content="建立 / 更新"
+                           Command="{Binding RebuildSemanticSearchIndexCommand}"
+                           IsEnabled="{Binding CanBuildSemanticSearchIndex}"
+                           ToolTip.Tip="仅索引已加入的本地根与支持的文本摘要" />
+            </Grid>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

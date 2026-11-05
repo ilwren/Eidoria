@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             x:Class="MdExplorer.UI.Views.OfficeDocumentViewer"
+             Background="Transparent"
+             ClipToBounds="True">
+  <!-- OfficeViewer.Avalonia 内部使用原生 ScrollViewer。Eidoria 是 Md3-only 主题，
+       原生 ScrollViewer 没有无键模板；这里只在适配层子树内补一套 MD3 滚动模板，
+       不把原生控件样式泄漏到全局，也不改第三方控件的滚动/虚拟化逻辑。 -->
+  <UserControl.Resources>
+    <ControlTheme x:Key="{x:Type ScrollViewer}" TargetType="ScrollViewer">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+            <ScrollContentPresenter Name="PART_ContentPresenter" Grid.Row="0" Grid.Column="0"
+                                    Background="{TemplateBinding Background}"
+                                    HorizontalSnapPointsType="{TemplateBinding HorizontalSnapPointsType}"
+                                    VerticalSnapPointsType="{TemplateBinding VerticalSnapPointsType}"
+                                    HorizontalSnapPointsAlignment="{TemplateBinding HorizontalSnapPointsAlignment}"
+                                    VerticalSnapPointsAlignment="{TemplateBinding VerticalSnapPointsAlignment}"
+                                    Padding="{TemplateBinding Padding}"
+                                    ScrollViewer.IsScrollInertiaEnabled="{TemplateBinding IsScrollInertiaEnabled}">
+              <ScrollContentPresenter.GestureRecognizers>
+                <ScrollGestureRecognizer CanHorizontallyScroll="{Binding CanHorizontallyScroll, ElementName=PART_ContentPresenter}"
+                                         CanVerticallyScroll="{Binding CanVerticallyScroll, ElementName=PART_ContentPresenter}"
+                                         IsScrollInertiaEnabled="{Binding (ScrollViewer.IsScrollInertiaEnabled), ElementName=PART_ContentPresenter}"
+                                         Offset="{Binding Offset, ElementName=PART_ContentPresenter}"
+                                         Viewport="{Binding Viewport, ElementName=PART_ContentPresenter}"
+                                         Extent="{Binding Extent, ElementName=PART_ContentPresenter}" />
+              </ScrollContentPresenter.GestureRecognizers>
+            </ScrollContentPresenter>
+            <md:MdScrollBar Name="PART_HorizontalScrollBar" Grid.Row="1" Grid.Column="0" Orientation="Horizontal" />
+            <md:MdScrollBar Name="PART_VerticalScrollBar" Grid.Row="0" Grid.Column="1" Orientation="Vertical" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^[AllowAutoHide=True] /template/ ScrollContentPresenter#PART_ContentPresenter">
+        <Setter Property="Grid.RowSpan" Value="2" />
+        <Setter Property="Grid.ColumnSpan" Value="2" />
+      </Style>
+      <Style Selector="^[AllowAutoHide=True] /template/ md|MdScrollBar#PART_VerticalScrollBar">
+        <Setter Property="Grid.Column" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="Margin" Value="0,4,2,4" />
+      </Style>
+      <Style Selector="^[AllowAutoHide=True] /template/ md|MdScrollBar#PART_HorizontalScrollBar">
+        <Setter Property="Grid.Row" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+        <Setter Property="Margin" Value="4,0,4,2" />
+      </Style>
+    </ControlTheme>
+  </UserControl.Resources>
+
+  <LayoutTransformControl x:Name="ScaleHost"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Top" />
+</UserControl>

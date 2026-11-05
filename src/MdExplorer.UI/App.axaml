@@ -1,0 +1,12 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="using:Md3.Avalonia.Themes"
+             xmlns:extraThemes="using:Md3.Avalonia.Extra.Themes"
+             x:Class="MdExplorer.UI.App"
+             RequestedThemeVariant="Default">
+  <Application.Styles>
+    <themes:MaterialTheme />
+    <extraThemes:ExtraTheme />
+    <StyleInclude Source="avares://MdExplorer.UI/Views/AppStyles.axaml" />
+  </Application.Styles>
+</Application>

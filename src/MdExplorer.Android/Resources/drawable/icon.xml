@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <path
+      android:fillColor="#D8F1EC"
+      android:pathData="M0,0h108v108h-108z"/>
+  <!-- Eidoria legacy icon: same folded-sheet foreground as the adaptive icon. -->
+  <!-- Rear sheet -->
+  <path
+      android:fillColor="#84D8BE"
+      android:pathData="M40.5,26.2 h35 q8,0 8,8 v45.6 q0,8 -8,8 h-35 q-8,0 -8,-8 v-45.6 q0,-8 8,-8 Z"/>
+  <!-- Main sheet -->
+  <path
+      android:fillColor="#2478DF"
+      android:pathData="M35,21 h35 q8,0 8,8 v45 q0,8 -8,8 h-35 q-8,0 -8,-8 v-45 q0,-8 8,-8 Z"/>
+  <!-- Quiet strata at the foot of the sheet (closed paths; no clip needed) -->
+  <path
+      android:fillColor="#14FFFFFF"
+      android:pathData="M27,69.4 C38.5,64.2 49.7,73.3 63.3,67.8 C69.1,65.5 74.4,66 78,68.1 L78,74 q0,8 -8,8 h-35 q-8,0 -8,-8 Z"/>
+  <path
+      android:fillColor="#217DD3FC"
+      android:pathData="M27,75.6 C39.5,71.2 50.8,79 64.6,74 C70.3,71.9 74.9,72.4 78,74.1 L78,74 q0,8 -8,8 h-35 q-8,0 -8,-8 Z"/>
+  <!-- Green back page exposed by the folded corner -->
+  <path
+      android:fillColor="#12B981"
+      android:pathData="M35,21 h14.9 C47.2,31.4 41.6,41.1 27,47.7 L27,29 q0,-8 8,-8 Z"/>
+  <!-- Shadow under the folded flap -->
+  <path
+      android:fillColor="#26073B7A"
+      android:pathData="M51.2,23 C48.5,32.8 43.2,42.1 28,48.9 C35,49.8 43.2,48.8 49.4,46 C52.3,38.6 52.5,30 51.2,23 Z"/>
+  <!-- Orange folded flap -->
+  <path
+      android:fillColor="#FF9F2E"
+      android:pathData="M49.9,21 C47.2,31.4 41.6,41.1 27,47.7 C34.3,48.5 41.8,47.5 48.3,44.5 C51.3,36.9 51.5,27.9 49.9,21 Z"/>
+  <path
+      android:fillColor="#57FFE3A3"
+      android:pathData="M49.9,21 C48.6,29.1 45.3,37.5 38.9,44.1 C43.3,37.8 46.2,29.5 46.6,21 Z"/>
+  <path
+      android:fillColor="#00000000"
+      android:pathData="M49.9,21 C47.2,31.4 41.6,41.1 27,47.7"
+      android:strokeWidth="0.7"
+      android:strokeColor="#47E85D26"
+      android:strokeLineCap="round"/>
+</vector>

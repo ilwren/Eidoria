@@ -1,0 +1,283 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="using:Md3.Avalonia.Controls"
+             xmlns:vm="using:MdExplorer.UI.ViewModels"
+             x:Class="MdExplorer.UI.Views.StorageInsightsView"
+             x:DataType="vm:ShellViewModel">
+  <md:MdScrollViewer HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
+    <StackPanel Margin="20,12,20,24" Spacing="14">
+      <Border Classes="card">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+            <Border Width="42" Height="42" CornerRadius="13" VerticalAlignment="Center"
+                    Background="{DynamicResource Md.Sys.Color.SecondaryContainer.Brush}">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="22"
+                         Foreground="{DynamicResource Md.Sys.Color.OnSecondaryContainer.Brush}" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding StorageRootPath}">
+              <TextBlock Classes="h3" Text="{Binding StorageRootName}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="caption" Text="{Binding StorageRootPath}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <md:MdIconButton Grid.Column="2" Width="42" Height="42" MinWidth="42" MinHeight="42"
+                             Icon="{x:Static md:MdSymbols.FolderOpen}"
+                             Command="{Binding UseCurrentFolderForStorageCommand}"
+                             ToolTip.Tip="使用当前文件夹" AutomationProperties.Name="使用当前文件夹" />
+            <md:MdButton Grid.Column="3" Classes="primary-action" Variant="Filled" Height="42"
+                         Command="{Binding AnalyzeStorageCommand}" IsEnabled="{Binding !IsStorageBusy}"
+                         ToolTip.Tip="分析此文件夹" AutomationProperties.Name="分析此文件夹">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="19" />
+                <TextBlock Text="分析" VerticalAlignment="Center" />
+              </StackPanel>
+            </md:MdButton>
+          </Grid>
+
+          <md:MdScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                             AllowMouseDrag="True">
+            <ItemsControl ItemsSource="{Binding Volumes}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VolumeItemModel">
+                  <Border Classes="tap-chip" Width="216" Tapped="OnVolumeTapped" Cursor="Hand"
+                          ToolTip.Tip="{Binding UsageText}">
+                    <StackPanel Spacing="7">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <md:MdIcon Glyph="{Binding Glyph}" Size="19" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Classes="caption" Text="{Binding UsedPercentText}" VerticalAlignment="Center" />
+                      </Grid>
+                      <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding UsedPercent}" Height="5" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </md:MdScrollViewer>
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <TextBlock Classes="body" Text="{Binding StorageStatusText}" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" />
+        <md:MdCircularProgressIndicator Grid.Column="1" IsVisible="{Binding IsStorageAnalyzing}"
+                                        IsIndeterminate="True" Width="22" Height="22" />
+      </Grid>
+
+      <WrapPanel Orientation="Horizontal" IsVisible="{Binding HasStorageAnalysis}">
+        <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="分析总量">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="18" />
+            <TextBlock Classes="h3" Text="{Binding StorageTotalSizeText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+        <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="文件数量">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.InsertDriveFile}" Size="18" />
+            <TextBlock Classes="h3" Text="{Binding StorageFileCountText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+        <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="文件夹数量">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="18" />
+            <TextBlock Classes="h3" Text="{Binding StorageFolderCountText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+        <Border Classes="fact-chip" Margin="0,0,8,8" ToolTip.Tip="分析完整性">
+          <TextBlock Text="{Binding StorageAnalysisStateText}" VerticalAlignment="Center" />
+        </Border>
+      </WrapPanel>
+
+      <StackPanel IsVisible="{Binding ShowStorageEmpty}" HorizontalAlignment="Center" Spacing="8" Margin="0,28">
+        <md:MdIcon Glyph="{x:Static md:MdSymbols.Storage}" Size="46" HorizontalAlignment="Center"
+                   Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+        <TextBlock Classes="body" Text="{Binding StorageStatusText}" />
+      </StackPanel>
+
+      <Grid x:Name="StorageDetailsGrid" ColumnDefinitions="*,16,360" RowDefinitions="Auto"
+            IsVisible="{Binding HasStorageAnalysis}">
+        <Border x:Name="TopFoldersCard" Classes="card">
+          <StackPanel Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="20"
+                         Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+              <TextBlock Classes="h3" Text="子文件夹" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Classes="caption" Text="暂无可统计的子文件夹" IsVisible="{Binding !HasStorageTopFolders}" />
+            <ItemsControl ItemsSource="{Binding StorageTopFolders}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StorageFolderUsageModel">
+                  <Grid RowDefinitions="Auto,Auto" Margin="0,5" ToolTip.Tip="{Binding Path}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" Background="Transparent"
+                            Tapped="OnTopFolderTapped" Cursor="Hand">
+                        <Border Width="38" Height="38" CornerRadius="11" VerticalAlignment="Center"
+                                Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+                          <md:MdIcon Glyph="{x:Static md:MdSymbols.Folder}" Size="20"
+                                     Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="caption" Text="{Binding CountText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding SizeText}" HorizontalAlignment="Right" />
+                          <TextBlock Classes="caption" Text="{Binding PercentText}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                      </Grid>
+                      <md:MdIconButton Grid.Column="1" Width="40" Height="40" MinWidth="40" MinHeight="40"
+                                       Icon="{x:Static md:MdSymbols.Search}" Click="OnAnalyzeFolderClick"
+                                       ToolTip.Tip="分析此文件夹" AutomationProperties.Name="分析此文件夹" />
+                    </Grid>
+                    <md:MdLinearProgressIndicator Grid.Row="1" Minimum="0" Maximum="100" Value="{Binding Percent}"
+                                                  Height="5" Margin="47,5,48,0" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border x:Name="KindsCard" Grid.Column="2" Classes="card">
+          <StackPanel Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <md:MdIcon Glyph="{x:Static md:MdSymbols.InsertDriveFile}" Size="20"
+                         Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+              <TextBlock Classes="h3" Text="类型" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Classes="caption" Text="暂无文件" IsVisible="{Binding !HasStorageKindUsages}" />
+            <ItemsControl ItemsSource="{Binding StorageKindUsages}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StorageKindUsageModel">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" Margin="0,5">
+                    <Border Width="36" Height="36" CornerRadius="11" VerticalAlignment="Center"
+                            Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}">
+                      <md:MdIcon Glyph="{Binding Glyph}" Size="19"
+                                 Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding FileCountText}" />
+                      </Grid>
+                      <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding Percent}" Height="5" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding SizeText}" HorizontalAlignment="Right" />
+                      <TextBlock Classes="caption" Text="{Binding PercentText}" HorizontalAlignment="Right" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="card" IsVisible="{Binding HasStorageAnalysis}">
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.InsertDriveFile}" Size="20"
+                       Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+            <TextBlock Classes="h3" Text="大文件" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Classes="caption" Text="暂无文件" IsVisible="{Binding !HasStorageLargestFiles}" />
+          <ItemsControl ItemsSource="{Binding StorageLargestFiles}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FileItemViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="2,5" Background="Transparent"
+                      Tapped="OnFileTapped" Cursor="Hand" ToolTip.Tip="{Binding FullPath}">
+                  <Border Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
+                          Background="{Binding GlyphBackgroundBrush}">
+                    <md:MdIcon Glyph="{Binding Glyph}" Size="21" Foreground="{Binding GlyphBrush}" />
+                  </Border>
+                  <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SizeText}" VerticalAlignment="Center" />
+                    <md:MdIcon Glyph="{x:Static md:MdSymbols.ChevronRight}" Size="18" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="9">
+            <md:MdIcon Glyph="{x:Static md:MdSymbols.ContentCopy}" Size="20" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+            <TextBlock Grid.Column="1" Classes="h3" Text="重复" VerticalAlignment="Center" />
+            <Border Grid.Column="2" Classes="fact-chip" VerticalAlignment="Center"
+                    IsVisible="{Binding HasStorageDuplicateScan}" ToolTip.Tip="保留一份时可复核的空间">
+              <TextBlock Text="{Binding StorageDuplicateReclaimableText}" />
+            </Border>
+            <md:MdButton Grid.Column="3" Variant="Tonal" Height="40"
+                         Command="{Binding FindStorageDuplicatesCommand}" IsEnabled="{Binding !IsStorageBusy}"
+                         ToolTip.Tip="以 SHA-256 查找完全相同的文件" AutomationProperties.Name="查找重复文件">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <md:MdIcon Glyph="{x:Static md:MdSymbols.Search}" Size="18" />
+                <TextBlock Text="查找" VerticalAlignment="Center" />
+              </StackPanel>
+            </md:MdButton>
+          </Grid>
+
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <TextBlock Classes="body" Text="{Binding StorageDuplicateStatusText}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+            <md:MdCircularProgressIndicator Grid.Column="1" IsVisible="{Binding IsStorageFindingDuplicates}"
+                                            IsIndeterminate="True" Width="22" Height="22" />
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding StorageDuplicateGroups}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StorageDuplicateGroupModel">
+                <Border Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
+                        BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1"
+                        CornerRadius="12" Padding="10" Margin="0,0,0,10">
+                  <StackPanel Spacing="7">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                      <md:MdIcon Glyph="{x:Static md:MdSymbols.ContentCopy}" Size="18" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding SummaryText}" TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="caption" Text="{Binding ShortHash}" VerticalAlignment="Center"
+                                 ToolTip.Tip="{Binding Sha256}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Files}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FileItemViewModel">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="9" Margin="2,4" Background="Transparent"
+                                Tapped="OnFileTapped" Cursor="Hand" ToolTip.Tip="{Binding FullPath}">
+                            <Border Width="36" Height="36" CornerRadius="11" VerticalAlignment="Center"
+                                    Background="{Binding GlyphBackgroundBrush}">
+                              <md:MdIcon Glyph="{Binding Glyph}" Size="19" Foreground="{Binding GlyphBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <md:MdIcon Grid.Column="2" Glyph="{x:Static md:MdSymbols.ChevronRight}" Size="18"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </md:MdScrollViewer>
+</UserControl>

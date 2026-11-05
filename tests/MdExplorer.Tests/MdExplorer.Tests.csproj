@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <EmbeddedResource Include="Fixtures\mini-bert.onnx" LogicalName="MdExplorer.Tests.Fixtures.mini-bert.onnx" />
+    <ProjectReference Include="..\..\src\MdExplorer.Domain\MdExplorer.Domain.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.Application\MdExplorer.Application.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.Infrastructure\MdExplorer.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MdExplorer.UI\MdExplorer.UI.csproj" />
+  </ItemGroup>
+</Project>

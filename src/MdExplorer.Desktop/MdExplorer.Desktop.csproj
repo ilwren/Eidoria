@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Md3.Avalonia.Notifications 的 WinRT 后端只在 Windows 专用 TFM 下被 NuGet 选中；
+         与上游 Gallery 一致，仅在 Windows 构建机切换，Linux 宿主/AOT 仍走普通 net10.0。 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net10.0-windows10.0.19041.0</TargetFramework>
+    <RootNamespace>MdExplorer.Desktop</RootNamespace>
+    <AssemblyName>MdExplorer</AssemblyName>
+    <Product>Eidoria</Product>
+    <AssemblyTitle>Eidoria</AssemblyTitle>
+    <ApplicationIcon>..\MdExplorer.UI\Assets\eidoria.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <IsAotCompatible>false</IsAotCompatible>
+    <!-- Native AOT 由 CI 的发布 Job 以 -p:PublishAot=true 驱动（见 .github/workflows/ci.yml） -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!-- 宿主直接引用，确保 Windows 构建按 windows TFM 选中 WinRT 通知后端。 -->
+    <PackageReference Include="Md3.Avalonia.Notifications" />
+    <ProjectReference Include="..\MdExplorer.UI\MdExplorer.UI.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MdExplorer.Infrastructure</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 模型清单与下载脚本共用同一份文件，避免「脚本下的」和「程序找的」不是一回事 -->
+    <EmbeddedResource Include="..\..\scripts\ai-models.manifest"
+                      LogicalName="MdExplorer.Ai.Models.manifest"
+                      Link="Ai\ai-models.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+    <InternalsVisibleTo Include="MdExplorer.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MdExplorer.Domain\MdExplorer.Domain.csproj" />
+    <ProjectReference Include="..\MdExplorer.Platform.Abstractions\MdExplorer.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\MdExplorer.Application\MdExplorer.Application.csproj" />
+  </ItemGroup>
+</Project>

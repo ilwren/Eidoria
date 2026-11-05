@@ -1,0 +1,343 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # ci-artifacts 分支回传截图与测试日志
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  build-test-ubuntu:
+    name: Build + Test (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Validate local AI model downloader (offline)
+        run: |
+          bash -n scripts/fetch-ai-models.sh
+          bash -n scripts/test-fetch-ai-models.sh
+          bash -n scripts/fetch-real-models-with-fallback.sh
+          python3 -m py_compile scripts/fetch-ai-models-modelscope.py
+          python3 scripts/test-fetch-ai-models-modelscope.py
+          scripts/test-fetch-ai-models.sh
+          scripts/fetch-ai-models.sh --list
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --all --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-asr-tiny --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-classify-yamnet --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only image-vlm-smol --dry-run
+      - name: Restore unit-test project
+        run: |
+          set -o pipefail
+          # Separate platform-specific apps and experimental spikes have dedicated CI jobs;
+          # restoring the unit-test dependency graph avoids requiring every workload here.
+          dotnet restore tests/MdExplorer.Tests 2>&1 | tee restore-output.txt
+      - name: Build
+        run: |
+          set -o pipefail
+          # Build/test failures are mirrored to ci-artifacts because hosted logs may be unavailable.
+          dotnet build tests/MdExplorer.Tests -c Release --no-restore 2>&1 | tee build-output.txt
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          dotnet test tests/MdExplorer.Tests -c Release --no-build 2>&1 | tee test-output.txt
+      - name: Publish test log (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh logs restore-output.txt build-output.txt test-output.txt
+
+  real-model-embedding:
+    name: Real model AI search smoke test (cached)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MDEXPLORER_RUN_REAL_MODEL_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore cached BGE and MiniLM weights
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mdexplorer-real-models
+          key: mdexplorer-real-models-linux-v1-${{ hashFiles('scripts/ai-models.manifest', 'scripts/fetch-ai-models-modelscope.py') }}
+      - name: Configure model directory
+        run: echo "MDEXPLORER_MODELS=$RUNNER_TEMP/mdexplorer-real-models" >> "$GITHUB_ENV"
+      - name: Verify cache or fetch from Hugging Face, hf-mirror, then ModelScope
+        run: |
+          if scripts/fetch-ai-models.sh --dir "$MDEXPLORER_MODELS" --verify; then
+            echo "Verified cached real model files."
+            echo "::notice title=Model cache::Cache hit; model download skipped"
+          else
+            echo "::notice title=Model cache::Cache miss or invalid; fetching models now"
+            rm -rf "$MDEXPLORER_MODELS"
+            scripts/fetch-real-models-with-fallback.sh --dir "$MDEXPLORER_MODELS"
+            scripts/fetch-ai-models.sh --dir "$MDEXPLORER_MODELS" --verify
+          fi
+      - name: Run real-weight AI embedding and semantic search tests
+        run: dotnet test tests/MdExplorer.Tests -c Release --filter FullyQualifiedName~RealModelEmbeddingTests
+
+  ui-screenshots:
+    name: UI screenshots (headless)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install CJK fonts (截图中文字形)
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - name: Render breakpoint screenshots
+        run: |
+          set -o pipefail
+          # 57 个真实窗口长期共用一个无头 Skia 进程时，第三方文档控件的异步排版会让
+          # 原生渲染资源累积并偶发 exit 139。按发现清单轮转拆成四个独立进程，仍覆盖全部用例。
+          dotnet build tests/MdExplorer.Screenshots -c Release 2>&1 | tee screenshot-output.txt
+          mapfile -t screenshot_tests < <(
+            dotnet test tests/MdExplorer.Screenshots -c Release --no-build --list-tests 2>/dev/null \
+              | grep -o 'MdExplorer\.Screenshots\.ScreenshotTests\.[A-Za-z0-9_]*' \
+              | sort -u
+          )
+          if [ "${#screenshot_tests[@]}" -eq 0 ]; then
+            echo "No screenshot tests were discovered." | tee -a screenshot-output.txt
+            exit 1
+          fi
+          echo "Discovered ${#screenshot_tests[@]} screenshot tests; running in 4 isolated processes." | tee -a screenshot-output.txt
+          for partition in 0 1 2 3; do
+            filter=""
+            count=0
+            for index in "${!screenshot_tests[@]}"; do
+              if [ $((index % 4)) -eq "$partition" ]; then
+                filter="${filter:+$filter|}FullyQualifiedName=${screenshot_tests[$index]}"
+                count=$((count + 1))
+              fi
+            done
+            echo "=== Screenshot partition $((partition + 1))/4: $count tests ===" | tee -a screenshot-output.txt
+            dotnet test tests/MdExplorer.Screenshots -c Release --no-build \
+              --filter "$filter" --blame-crash --results-directory "$PWD/TestResults" \
+              2>&1 | tee -a screenshot-output.txt
+          done
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: tests/MdExplorer.Screenshots/bin/Release/**/screenshots/*.png
+          if-no-files-found: warn
+      - name: Publish screenshots (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash .github/publish-artifacts.sh screenshots tests/MdExplorer.Screenshots/bin/Release/net10.0/screenshots/*.png
+          seq="$(find TestResults -name 'Sequence_*.xml' -print -quit 2>/dev/null || true)"
+          if [ -n "$seq" ]; then cp "$seq" blame-sequence.xml; fi
+          bash .github/publish-artifacts.sh screenshot-logs screenshot-output.txt blame-sequence.xml
+
+  publish-desktop:
+    name: Desktop publish (self-contained)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Validate local AI model downloader (offline, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/fetch-ai-models.ps1 -List
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -All -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only audio-asr-tiny -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only audio-classify-yamnet -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only image-vlm-smol -DryRun
+      - name: Unit tests (windows only)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test tests/MdExplorer.Tests -c Release 2>&1 | tee test-output-win.txt
+      - name: Publish test log (回传 ci-artifacts 分支)
+        if: always() && runner.os == 'Windows'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh logs-win test-output-win.txt
+      - name: Publish self-contained
+        run: dotnet publish src/MdExplorer.Desktop -c Release -r ${{ matrix.rid }} --self-contained true -o artifacts/${{ matrix.rid }}
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdexplorer-${{ matrix.rid }}
+          path: artifacts/${{ matrix.rid }}
+
+  publish-aot-linux:
+    name: Desktop publish (Native AOT, linux-x64)
+    runs-on: ubuntu-latest
+    continue-on-error: true # v0.1 阶段为探路 Job；转绿后改为门禁（见 DEVELOPMENT.md §11.5）
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install AOT toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish Native AOT
+        run: dotnet publish src/MdExplorer.Desktop -c Release -r linux-x64 -p:PublishAot=true -o artifacts/linux-x64-aot
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdexplorer-linux-x64-aot
+          path: artifacts/linux-x64-aot
+
+  lua-runtime-aot-spike:
+    name: Lua runtime spike (informational AOT gate)
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true # MoonSharp is not integrated into the app unless every platform gate passes.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install Linux AOT toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Run Lua sandbox tests
+        run: dotnet test tests/MdExplorer.LuaRuntime.Tests -c Release
+      - name: Publish and execute Native AOT probe (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          dotnet publish spikes/LuaPluginRuntime.Lab -c Release -r ${{ matrix.rid }} \
+            --self-contained true -p:PublishAot=true -o artifacts/lua-${{ matrix.rid }}
+          ./artifacts/lua-${{ matrix.rid }}/MdExplorer.LuaPluginRuntime.Lab
+      - name: Publish and execute Native AOT probe (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet publish spikes/LuaPluginRuntime.Lab -c Release -r ${{ matrix.rid }} `
+            --self-contained true -p:PublishAot=true -o artifacts/lua-${{ matrix.rid }}
+          ./artifacts/lua-${{ matrix.rid }}/MdExplorer.LuaPluginRuntime.Lab.exe
+      - name: Upload Lua probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-runtime-probe-${{ matrix.rid }}
+          path: artifacts/lua-${{ matrix.rid }}
+
+  android:
+    name: Android APK (debug-signed)
+    runs-on: ubuntu-latest
+    continue-on-error: true # v0.1 阶段为探路 Job
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install Android workload
+        run: dotnet workload install android
+      - name: Publish trimmed and AOT-compiled Lua Android probe
+        run: |
+          set -o pipefail
+          # Match the x86_64 emulator ABI; the default Android APK is arm64-only.
+          dotnet publish spikes/LuaPluginRuntime.Android -c Release -r android-x64 \
+            -p:PublishTrimmed=true -p:TrimMode=full -p:RunAOTCompilation=true \
+            -o artifacts/lua-android 2>&1 | tee lua-android-output.txt
+      - name: Execute Lua Android probe in emulator
+        continue-on-error: true # Informational Lua gate must not skip the production APK build.
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          script: |
+            set +e
+            report_diagnostics() {
+              python3 -c 'import pathlib,re; lines=pathlib.Path("lua-android-emulator-logcat.txt").read_text(errors="replace").splitlines(); pattern=re.compile(r"LuaRuntimeSpike|FATAL EXCEPTION|AndroidRuntime|INSTALL_FAILED|UnsatisfiedLinkError|dlopen failed|am_crash|Fatal signal|monkey", re.I); selected=[line for line in lines if pattern.search(line)] or lines[-30:]; [print("::error title=Lua Android emulator diagnostic::"+line[-1000:].replace("%","%25").replace(":","%3A").replace(",","%2C")) for line in selected[-30:]]'
+            }
+            adb logcat -c
+            adb install artifacts/lua-android/*.apk
+            install_status=$?
+            if [ "$install_status" -ne 0 ]; then
+              adb logcat -d -v time > lua-android-emulator-logcat.txt
+              report_diagnostics
+              exit "$install_status"
+            fi
+            adb shell monkey -p dev.mdexplorer.luaspike 1
+            launch_status=$?
+            for attempt in $(seq 1 30); do
+              adb logcat -d -v time > lua-android-emulator-logcat.txt
+              if grep -Eq 'LuaRuntimeSpike.*PASS:' lua-android-emulator-logcat.txt; then
+                grep -F 'LuaRuntimeSpike' lua-android-emulator-logcat.txt | tail -20
+                exit 0
+              fi
+              sleep 1
+            done
+            tail -300 lua-android-emulator-logcat.txt
+            report_diagnostics
+            if [ "$launch_status" -ne 0 ]; then exit "$launch_status"; fi
+            exit 1
+      - name: Upload Lua Android probe APK and build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-runtime-android-spike
+          path: |
+            artifacts/lua-android/*.apk
+            lua-android-output.txt
+            lua-android-emulator-logcat.txt
+      - name: Publish APK
+        run: |
+          set -o pipefail
+          # 与 ubuntu 构建同理：Actions 日志在沙箱里取不到，落盘一份随 ci-artifacts 回传。
+          dotnet publish src/MdExplorer.Android -c Release \
+            -p:PublishTrimmed=true -p:RunAOTCompilation=true \
+            -o artifacts/android 2>&1 | tee android-output.txt
+      - name: Verify ONNX Runtime assets inside Android APK
+        run: |
+          set -o pipefail
+          apk="$(find artifacts/android -name '*.apk' -print -quit)"
+          test -n "$apk"
+          python3 scripts/verify-android-onnx-apk.py "$apk" 2>&1 | tee -a android-output.txt
+      - name: Publish android log (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh logs-android android-output.txt lua-android-output.txt lua-android-emulator-logcat.txt
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdexplorer-android
+          path: artifacts/android/*.apk
+          if-no-files-found: warn
