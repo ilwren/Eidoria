@@ -60,6 +60,19 @@ file|<id>|<仓库内路径>
 - 默认调用只下文本嵌入包（≈49 MB）；可选 ASR/VLM **不自动下载**，需显式 `--only audio-asr-tiny` / `--only audio-classify-yamnet` / `--only image-vlm-smol`。`--all` 才下全部（约 316 MB）。PowerShell 对应 `-Only audio-asr-tiny` / `-Only audio-classify-yamnet` / `-Only image-vlm-smol` / `-All`。
 - 命令：`scripts/fetch-ai-models.sh`（Linux/macOS/WSL，GNU 风格 `--list / --only / --all / --dir / --verify / --dry-run / --clean / --force`）、`scripts/fetch-ai-models.ps1`（Windows PowerShell 7，PowerShell 风格 `-List / -Only / -All / -Dir / -Verify / -DryRun / -Clean / -Force`）。
 
+### 3.2.1 应用内下载器（v0.43 起，用户不必再开终端）
+
+设置页「本地 AI」直接下载，不再要求用户跑 PowerShell/bash。实现是 `AiModelDownloader`（`IAiModelDownloader` 端口），与脚本共用同一份清单、同一套目录布局与 `checksums.txt`，所以「脚本下了一半的目录」应用可以直接接着续，反过来也成立。
+
+- **下载源可切换**：自动回落（`huggingface.co` → `hf-mirror.com` → `modelscope.cn`）、只走 HuggingFace、只走 hf-mirror、只走魔搭。显式点名一个源时**不会**偷偷换源；失败原因逐文件回报（HTTP 状态、大小不符、SHA-256 不符分开写）。
+- **粘性源**：一次下载里某个源成功过，后续文件先试它。否则境内网络下每个文件都要先等一次被墙的超时。
+- **两种 URL 形态**：HuggingFace 系用 `<镜像>/<仓库>/resolve/<40 位 revision>/<路径>`；魔搭用 `?Revision=..&FilePath=..`，并先拉 `/api/v1/models/<repo>/repo/files?Revision=..&Recursive=true` 拿文件清单与**服务端给出的 SHA-256**，再逐文件下载。魔搭的固定 revision 与 `scripts/fetch-ai-models-modelscope.py` 里的常量一致；没有核对过的模型不会向魔搭发请求，而是如实报「该源未验证」。
+- **续传与校验**：先写 `.part`（有 `.part` 就带 `Range` 续；服务端忽略 Range 时自动从头重来，不会把新内容接在旧残片后面），通过大小与 SHA-256 校验后才原子改名；记录过 SHA-256 的文件哈希不符就删掉重下一次，仍不符则报错且**不留下成品文件**。没有记录的文件按「首次信任」记录一次，之后可随时用「校验已下载」复核——校验不会把「没有记录」说成通过。
+- **可取消**：走任务中心串行执行，取消时保留 `.part` 供下次续传，取消不产生半截成品。
+- **仍然不做的**：断点信息跨重启只在 `.part` 层面保留（没有独立的任务恢复清单）、没有代理设置界面（走系统/环境变量代理）、没有限速、没有全量镜像搬移（魔搭只覆盖已核对的两个文本模型）。
+
+**脚本仍然保留**，用于离线批量、CI 与无界面环境：`scripts/fetch-ai-models.sh`（Linux/macOS/WSL，`--list / --only / --all / --dir / --verify / --dry-run / --clean / --force`）、`scripts/fetch-ai-models.ps1`（Windows PowerShell 7，`-List / -Only / -All / -Dir / -Verify / -DryRun / -Clean / -Force`）。
+
 ### 3.3 许可链
 
 | 模型 | 权重许可 | 结论 |

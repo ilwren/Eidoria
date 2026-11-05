@@ -37,6 +37,7 @@ public static class AppHost
         IThumbnailCache Thumbnails,
         IContentIndexService ContentIndex,
         AiModelCatalog AiModels,
+        IAiModelDownloader AiModelDownloads,
         PluginPackageCatalog Plugins);
 
     /// <summary>
@@ -86,6 +87,8 @@ public static class AppHost
         var contentIndex = new SqliteContentIndex(Path.Combine(dataDir, "content-index.db"), textFiles);
         var search = new IndexedSearchService(searchIndex, new SearchService(), store);
         var aiModels = new AiModelCatalog(AiModelCatalog.ResolveDirectory(dataDir));
+        // 内置模型下载器：用户不必再去跑 PowerShell/bash 脚本；源与镜像可在设置里切换。
+        var aiModelDownloads = new AiModelDownloader(aiModels);
         var embeddings = new OnnxTextEmbeddingService(aiModels);
         var semanticSearch = new SemanticSearchService(dataDir, searchIndex, store, embeddings);
 
@@ -151,6 +154,7 @@ public static class AppHost
             contentIndex,
             // 端侧 AI 的模型目录：只扫描文件；ONNX Session 在用户调用本地语义搜索时才延迟建立。
             aiModels,
+            aiModelDownloads,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。
             new PluginPackageCatalog(dataDir));
     }

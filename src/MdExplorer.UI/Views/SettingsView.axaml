@@ -616,7 +616,7 @@
           <StackPanel>
             <TextBlock Classes="body" Text="启用端侧 AI" />
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="AI 语义搜索在本机运行，不上传文件、不发起网络请求、不采集统计。先下载默认文本模型，再到搜索中心建立 AI 索引；目前索引文件名与小型纯文本/Markdown 摘要。" />
+                       Text="AI 语义搜索在本机运行，不上传文件、不采集统计；只有「下载模型」这一个动作会联网（可切换下载源）。先下载默认文本模型，再到搜索中心建立 AI 索引；目前索引文件名与小型纯文本/Markdown 摘要。" />
           </StackPanel>
           <md:MdSwitch Grid.Column="1" IsChecked="{Binding EnableLocalAi}" VerticalAlignment="Center" />
         </Grid>
@@ -634,7 +634,7 @@
             <ItemsControl ItemsSource="{Binding LocalAiModels}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AiModelStatusModel">
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,2">
                     <StackPanel Spacing="1">
                       <TextBlock Classes="body" Text="{Binding Name}" />
                       <TextBlock Classes="caption" TextWrapping="Wrap"
@@ -645,27 +645,67 @@
                                  Text="{Binding StatusText}" />
                       <TextBlock Classes="caption" HorizontalAlignment="Right"
                                  Text="{Binding LicenseText}" />
+                      <TextBlock Classes="caption" HorizontalAlignment="Right"
+                                 Text="{Binding SizeText}" />
                     </StackPanel>
+                    <md:MdButton Grid.Column="2" Variant="Text" VerticalAlignment="Center"
+                                 Content="{Binding DownloadButtonText}"
+                                 Command="{Binding DownloadCommand}"
+                                 ToolTip.Tip="{Binding DownloadHint}">
+                    </md:MdButton>
                   </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <StackPanel Spacing="4">
-              <TextBlock Classes="caption" TextWrapping="Wrap"
-                         Text="默认轻量包约 49 MB；权重不随应用分发。" />
-              <TextBlock Classes="caption" TextWrapping="Wrap"
-                         Text="{Binding LocalAiOptionalModelsText}" />
-              <Grid ColumnDefinitions="*,Auto">
-                <SelectableTextBlock Classes="mono" Text="{Binding LocalAiDownloadCommandText}"
-                                     TextWrapping="Wrap" VerticalAlignment="Center" />
-                <md:MdButton Grid.Column="1" Variant="Text" Content="复制命令"
-                             Command="{Binding CopyLocalAiDownloadCommandCommand}" />
-              </Grid>
+            <StackPanel Spacing="6">
+              <TextBlock Classes="body" Text="下载源" />
+              <WrapPanel Orientation="Horizontal">
+                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceAuto}"
+                             Variant="Text" Content="自动回落" Margin="0,0,6,6"
+                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="Auto"
+                             ToolTip.Tip="huggingface.co → hf-mirror.com → modelscope.cn 依次尝试" />
+                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceHuggingFace}"
+                             Variant="Text" Content="HuggingFace" Margin="0,0,6,6"
+                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="HuggingFace" />
+                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceHfMirror}"
+                             Variant="Text" Content="hf-mirror" Margin="0,0,6,6"
+                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="HfMirror" />
+                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceModelScope}"
+                             Variant="Text" Content="魔搭 ModelScope" Margin="0,0,6,6"
+                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="ModelScope" />
+              </WrapPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding AiModelSourceHintText}" />
+
+              <WrapPanel Orientation="Horizontal">
+                <md:MdButton Variant="Filled" Margin="0,0,8,6" Content="下载默认包"
+                             Command="{Binding DownloadDefaultAiModelsCommand}"
+                             IsEnabled="{Binding CanDownloadAiModels}" />
+                <md:MdButton Variant="Outlined" Margin="0,0,8,6" Content="全部下载"
+                             Command="{Binding DownloadAllAiModelsCommand}"
+                             IsEnabled="{Binding CanDownloadAiModels}" />
+                <md:MdButton Variant="Outlined" Margin="0,0,8,6" Content="校验已下载"
+                             Command="{Binding VerifyAiModelsCommand}"
+                             IsEnabled="{Binding CanDownloadAiModels}"
+                             ToolTip.Tip="按 checksums.txt 复核 SHA-256；没有记录的文件会如实标注" />
+              </WrapPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDefaultPackageText}" />
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDownloadStatusText}" />
+
               <TextBlock Classes="caption" TextWrapping="Wrap"
                          Text="{Binding LocalAiModelsDirectoryText}" />
               <md:MdButton Variant="Text" HorizontalAlignment="Left" Content="打开模型目录"
                            Command="{Binding OpenLocalAiFolderCommand}" />
+              <StackPanel Spacing="2">
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="下载走任务中心（可取消；中断后保留 .part，下次接着续）。命令行脚本保留给离线/批量场景：" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <SelectableTextBlock Classes="mono" Text="{Binding LocalAiDownloadCommandText}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <md:MdButton Grid.Column="1" Variant="Text" Content="复制命令"
+                               Command="{Binding CopyLocalAiDownloadCommandCommand}" />
+                </Grid>
+              </StackPanel>
             </StackPanel>
           </StackPanel>
         </Border>

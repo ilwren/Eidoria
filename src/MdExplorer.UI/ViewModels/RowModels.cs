@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia;
+using CommunityToolkit.Mvvm.Input;
 using Md3.Avalonia.Controls;
 using MdExplorer.Domain;
 using MdExplorer.UI.Preview;
@@ -161,7 +162,8 @@ public sealed record AiModelStatusModel(
     bool Installed,
     bool Partial,
     int MissingFileCount,
-    long InstalledBytes)
+    long InstalledBytes,
+    IAsyncRelayCommand? DownloadCommand = null)
 {
     public string SizeText => Installed
         ? Formatting.Bytes(InstalledBytes)
@@ -174,6 +176,15 @@ public sealed record AiModelStatusModel(
             : "未安装";
 
     public string LicenseText => $"许可 {License}";
+
+    /// <summary>行内按钮文案：没装=下载、装了一半=续传、已就绪=重新下载（只补缺失文件）。</summary>
+    public string DownloadButtonText => Installed ? "重新下载" : Partial ? "续传" : "下载";
+
+    public string DownloadHint => Installed
+        ? "已就绪；再点只会补齐缺失文件，已存在的文件不重复下载"
+        : Partial
+            ? "接着上次中断的位置续传（保留 .part）"
+            : "按设置里的下载源取回这个模型";
 
     /// <summary>没装或没装全都算「还没准备好」——设置页据此上色，不说「可用」。</summary>
     public bool NeedsAttention => !Installed;

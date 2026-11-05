@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using Md3.Avalonia.Controls;
 using MdExplorer.Application;
 using MdExplorer.Domain;
+using MdExplorer.Infrastructure.Ai;
 using MdExplorer.Platform.Abstractions;
 using MdExplorer.UI.Services;
 using MdExplorer.UI.Preview;
@@ -193,6 +194,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _showMediaDiagnostics = s.ShowMediaDiagnostics;
         _mediaBackendMode = MediaBackendPreferenceNames.Parse(s.MediaBackendPreference);
         _enableLocalAi = s.EnableLocalAi;
+        _aiModelSourceName = s.AiModelSource;
         _useSearchIndex = s.UseSearchIndex;
         _enableContentIndex = s.EnableContentIndex;
         _isDualPaneEnabled = s.DualPaneEnabled;
@@ -3648,16 +3650,20 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         var statuses = _services.AiModels.Scan();
         foreach (var status in statuses)
         {
+            // 每个模型自带一个下载命令：模板里直接绑 Command，不需要跨模板找父级 DataContext。
+            var definition = status.Definition;
             LocalAiModels.Add(new AiModelStatusModel(
-                status.Definition.Id,
-                status.Definition.Name,
-                status.Definition.Purpose,
-                status.Definition.License,
-                status.Definition.ApproxSizeMb,
+                definition.Id,
+                definition.Name,
+                definition.Purpose,
+                definition.License,
+                definition.ApproxSizeMb,
                 status.Installed,
                 status.Partial,
                 status.MissingFiles.Count,
-                status.InstalledBytes));
+                status.InstalledBytes,
+                new AsyncRelayCommand(() => RunAiModelDownloadAsync(
+                    $"正在下载 {definition.Name}…", [definition.Id], verifyOnly: false))));
         }
 
         var ready = statuses.Count(status => status.Installed);
@@ -3671,6 +3677,13 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         OnPropertyChanged(nameof(LocalAiOptionalModelsText));
         OnPropertyChanged(nameof(HasLocalAiModel));
         OnPropertyChanged(nameof(HasLocalAiTextModel));
+        OnPropertyChanged(nameof(AiModelSource));
+        OnPropertyChanged(nameof(AiModelSourceHintText));
+        OnPropertyChanged(nameof(IsAiSourceAuto));
+        OnPropertyChanged(nameof(IsAiSourceHuggingFace));
+        OnPropertyChanged(nameof(IsAiSourceHfMirror));
+        OnPropertyChanged(nameof(IsAiSourceModelScope));
+        OnPropertyChanged(nameof(LocalAiDefaultPackageText));
         OnPropertyChanged(nameof(CanBuildSemanticSearchIndex));
         _ = RefreshSemanticSearchIndexAsync();
     }
@@ -3696,6 +3709,134 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         {
             Notify("复制失败：可在终端里手动输入这条命令");
         }
+    }
+
+    // ---------- 内置模型下载器（v0.43：不再要求用户去跑脚本） ----------
+
+    /// <summary>当前下载源名（字符串形态，存进设置）；非法值一律收回 Auto。</summary>
+    [ObservableProperty] private string _aiModelSourceName = "Auto";
+    [ObservableProperty] private string _localAiDownloadStatusText = string.Empty;
+    [ObservableProperty] private bool _isLocalAiDownloadBusy;
+
+    public AiModelSource AiModelSource => AiModelSourceNames.Parse(AiModelSourceName);
+    public bool IsAiSourceAuto => AiModelSource == AiModelSource.Auto;
+    public bool IsAiSourceHuggingFace => AiModelSource == AiModelSource.HuggingFace;
+    public bool IsAiSourceHfMirror => AiModelSource == AiModelSource.HfMirror;
+    public bool IsAiSourceModelScope => AiModelSource == AiModelSource.ModelScope;
+    public string AiModelSourceHintText => AiModelSourceNames.Describe(AiModelSource);
+    public bool CanDownloadAiModels => !IsLocalAiDownloadBusy;
+
+    /// <summary>默认轻量包的体积口径，直接由清单算，别手写一个会过期的数字。</summary>
+    public string LocalAiDefaultPackageText
+    {
+        get
+        {
+            var defaults = _services.AiModels.Models.Where(model => model.DownloadByDefault).ToArray();
+            var megabytes = defaults.Sum(model => model.ApproxSizeMb);
+            return defaults.Length == 0
+                ? "清单里没有默认模型"
+                : $"默认轻量包：{string.Join(" + ", defaults.Select(model => model.Name))} 共约 {megabytes} MB";
+        }
+    }
+
+    partial void OnAiModelSourceNameChanged(string value)
+    {
+        // 归一化后再落盘：手改设置文件写错也只会退回 Auto，不会变成「哪个源都不去」。
+        var normalized = AiModelSourceNames.ToName(AiModelSourceNames.Parse(value));
+        _services.SettingsStore.Settings.AiModelSource = normalized;
+        _ = SaveAsync();
+        OnPropertyChanged(nameof(AiModelSource));
+        OnPropertyChanged(nameof(AiModelSourceHintText));
+        OnPropertyChanged(nameof(IsAiSourceAuto));
+        OnPropertyChanged(nameof(IsAiSourceHuggingFace));
+        OnPropertyChanged(nameof(IsAiSourceHfMirror));
+        OnPropertyChanged(nameof(IsAiSourceModelScope));
+    }
+
+    partial void OnIsLocalAiDownloadBusyChanged(bool value) =>
+        OnPropertyChanged(nameof(CanDownloadAiModels));
+
+    [RelayCommand]
+    private void SetAiModelSource(string source) => AiModelSourceName = source;
+
+    [RelayCommand]
+    private Task DownloadDefaultAiModelsAsync() => RunAiModelDownloadAsync(
+        "正在下载默认文本模型…",
+        _services.AiModels.Models.Where(model => model.DownloadByDefault).Select(model => model.Id).ToArray(),
+        verifyOnly: false);
+
+    [RelayCommand]
+    private Task DownloadAiModelAsync(string modelId) => RunAiModelDownloadAsync(
+        "正在下载模型…", [modelId], verifyOnly: false);
+
+    [RelayCommand]
+    private Task DownloadAllAiModelsAsync() => RunAiModelDownloadAsync(
+        "正在下载全部模型…",
+        _services.AiModels.Models.Select(model => model.Id).ToArray(),
+        verifyOnly: false);
+
+    [RelayCommand]
+    private Task VerifyAiModelsAsync() => RunAiModelDownloadAsync(
+        "正在校验模型文件…",
+        _services.AiModels.Models.Select(model => model.Id).ToArray(),
+        verifyOnly: true);
+
+    /// <summary>
+    /// 下载/校验都走任务中心：串行执行、可取消、退出前可看到失败明细。
+    /// 取消时保留 <c>.part</c>，下次接着续；不会留下半截文件被推理读到。
+    /// </summary>
+    private async Task RunAiModelDownloadAsync(string title, IReadOnlyList<string> modelIds, bool verifyOnly)
+    {
+        if (modelIds.Count == 0)
+        {
+            Notify("清单里没有可下载的模型");
+            return;
+        }
+        if (IsLocalAiDownloadBusy)
+        {
+            Notify("已有模型下载在进行，等它结束");
+            return;
+        }
+
+        var source = AiModelSource;
+        AiModelDownloadOutcome? last = null;
+        IsLocalAiDownloadBusy = true;
+        LocalAiDownloadStatusText = verifyOnly
+            ? "正在校验已下载文件…"
+            : $"正在从 {AiModelSourceNames.ToName(source)} 下载…";
+        try
+        {
+            await RunOperationAsync(title, async (progress, ct) =>
+            {
+                last = verifyOnly
+                    ? await _services.AiModelDownloads.VerifyAsync(modelIds, progress, ct).ConfigureAwait(true)
+                    : await _services.AiModelDownloads.DownloadAsync(modelIds, source, progress, ct)
+                        .ConfigureAwait(true);
+                return new OperationOutcome(
+                    last.SucceededCount,
+                    last.Errors,
+                    [],
+                    last.Cancelled,
+                    last.FilesFailed);
+            }).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsLocalAiDownloadBusy = false;
+            RefreshLocalAiState();
+        }
+
+        if (last is null)
+        {
+            LocalAiDownloadStatusText = "下载没有产生结果";
+            return;
+        }
+
+        var summary = verifyOnly
+            ? $"校验：一致 {last.FilesSkipped}、失败 {last.FilesFailed}"
+            : $"下载完成 {last.FilesDownloaded} 个文件、已存在 {last.FilesSkipped} 个、失败 {last.FilesFailed} 个";
+        var notes = last.Notes.Count == 0 ? string.Empty : " · " + string.Join("；", last.Notes.Take(3));
+        LocalAiDownloadStatusText = summary + notes;
     }
 
     [RelayCommand]

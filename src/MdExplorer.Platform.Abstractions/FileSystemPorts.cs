@@ -376,6 +376,7 @@ public sealed class AppSettings
     public bool ShowMediaDiagnostics { get; set; } = true; // 预览卡里显示媒体后端名称与诊断文本
     public string MediaBackendPreference { get; set; } = "Auto"; // Auto | SystemApi | LibMpv；实际后端按可用性裁决并如实告知
     public bool EnableLocalAi { get; set; }              // 端侧 AI 总开关（默认关；模型需用户显式下载，未安装时不假装可用）
+    public string AiModelSource { get; set; } = "Auto";  // Auto | HuggingFace | HfMirror | ModelScope；非法值收回 Auto
     public List<string> OpenTabPaths { get; set; } = [];   // 上次会话的浏览器标签页（按显示顺序）
     public int ActiveTabIndex { get; set; }                // OpenTabPaths 中上次活动标签的下标
     public List<string> RecentFolderPaths { get; set; } = []; // 最近访问文件夹（最新优先，仅本地路径）

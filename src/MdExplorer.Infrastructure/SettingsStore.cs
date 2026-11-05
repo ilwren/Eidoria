@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MdExplorer.Infrastructure.Ai;
 using MdExplorer.Platform.Abstractions;
 
 namespace MdExplorer.Infrastructure;
@@ -110,6 +111,10 @@ public sealed class SettingsStore : ISettingsStore
         // 缩略图档位同理：档位是缓存键的一部分，写进非法值会让同一张图在“未知档”下反复重解码。
         settings.ThumbnailTier = ThumbnailTierNames.ToSettingValue(
             ThumbnailTierNames.Parse(settings.ThumbnailTier));
+
+        // 下载源手改坏了不要紧：认不出来就回 Auto（三源自动回落），比「什么都不下」友好。
+        settings.AiModelSource = AiModelSourceNames.ToName(
+            AiModelSourceNames.Parse(settings.AiModelSource));
         settings.ItemPageSize = Math.Clamp(settings.ItemPageSize, 60, 480);
         settings.RecentItemLimit = Math.Clamp(settings.RecentItemLimit, 6, 60);
         if (!double.IsFinite(settings.PullRefreshTriggerDistance))
