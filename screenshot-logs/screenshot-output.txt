@@ -1,10 +1,10 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 1.3 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 1.3 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 3 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 5.34 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 4.04 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 6.39 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 1.68 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 1.71 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 5 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 5.97 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 4.23 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 7.04 sec).
   MdExplorer.Domain -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/bin/Release/net10.0/MdExplorer.Domain.dll
   MdExplorer.Platform.Abstractions -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/bin/Release/net10.0/MdExplorer.Platform.Abstractions.dll
   MdExplorer.Application -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/bin/Release/net10.0/MdExplorer.Application.dll
@@ -12,8 +12,8 @@
   MdExplorer.Infrastructure -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/bin/Release/net10.0/MdExplorer.Infrastructure.dll
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
   MdExplorer.UI -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/bin/Release/net10.0/MdExplorer.UI.dll
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(150,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
@@ -32,8 +32,8 @@ Build succeeded.
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/TrashService.cs(23,34): warning CA1416: This call site is reachable on all platforms. 'WindowsTrash.MoveToTrash(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(150,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(694,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
@@ -47,29 +47,29 @@ Build succeeded.
     15 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:40.67
+Time Elapsed 00:00:42.97
 Discovered 82 screenshot tests; running in 4 isolated processes.
 === Screenshot partition 1/4: 21 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3172).
+Blame: Attaching crash dump utility to process dotnet (3252).
 
 Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 27 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 2/4: 21 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3379).
+Blame: Attaching crash dump utility to process dotnet (3463).
 
-Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 28 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 27 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 3/4: 20 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3587).
+Blame: Attaching crash dump utility to process dotnet (3670).
 
 Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 38 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 4/4: 20 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3795).
+Blame: Attaching crash dump utility to process dotnet (3879).
 
-Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 18 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 19 s - MdExplorer.Screenshots.dll (net10.0)
