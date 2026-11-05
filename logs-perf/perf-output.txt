@@ -14,29 +14,29 @@ Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/
 A total of 1 test files matched the specified pattern.
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
 [xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
-[xUnit.net 00:00:00.12]   Discovering: MdExplorer.Performance
-[xUnit.net 00:00:00.26]   Discovered:  MdExplorer.Performance
-[xUnit.net 00:00:00.39]   Starting:    MdExplorer.Performance
-  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [213 ms]
+[xUnit.net 00:00:00.18]   Discovering: MdExplorer.Performance
+[xUnit.net 00:00:00.46]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.72]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [494 ms]
   Standard Output Messages:
- [perf] 1 万条目录首批上屏：132.0 ms（首屏 120 行，总数 10000）
- [perf] 补齐剩余 9880 行：30.2 ms
+ [perf] 1 万条目录首批上屏：321.7 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：68.7 ms
 
 
-[xUnit.net 00:00:01.69]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
-  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [925 ms]
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [2 s]
   Standard Output Messages:
- [perf] 内容索引重建 10000 篇：834 ms，库体积 10.74 MB
- [perf] 内容索引查询命中 50 条：14.0 ms
+ [perf] 内容索引重建 10000 篇：2007 ms，库体积 9.79 MB
+ [perf] 内容索引查询命中 50 条：17.7 ms
 
 
   Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [1 ms]
   Standard Output Messages:
- [perf] 组合根 + Shell 构造：0.8 ms
+ [perf] 组合根 + Shell 构造：1.2 ms
 
 
+[xUnit.net 00:00:07.62]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
 
 Test Run Successful.
 Total tests: 3
      Passed: 3
- Total time: 2.0462 Seconds
+ Total time: 8.1236 Seconds
