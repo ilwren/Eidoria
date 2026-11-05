@@ -84,6 +84,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             () => Launcher,
             services.MediaPlayback,
             () => services.SettingsStore.Settings);
+        if (services.MediaBackends is { } mediaBackends)
+            mediaBackends.BackendResolved += (_, _) => OnPropertyChanged(nameof(MediaBackendStatusText));
         DocumentWorkbench = new DocumentWorkbenchViewModel(services.FileSystem, services.TextFiles, this, () => Launcher);
         DocumentWorkbench.CloseRequested += async (_, _) => await CloseDocumentWorkbenchAsync().ConfigureAwait(true);
         DocumentWorkbench.DocumentSaved += async (_, path) => await OnDocumentSavedAsync(path).ConfigureAwait(true);
@@ -187,6 +189,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _playVideoInline = s.PlayVideoInline;
         _mediaAutoPlay = s.MediaAutoPlay;
         _showMediaDiagnostics = s.ShowMediaDiagnostics;
+        _mediaBackendMode = MediaBackendPreferenceNames.Parse(s.MediaBackendPreference);
         _enableLocalAi = s.EnableLocalAi;
         _useSearchIndex = s.UseSearchIndex;
         _isDualPaneEnabled = s.DualPaneEnabled;
@@ -3115,6 +3118,37 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     [ObservableProperty] private bool _playVideoInline;
     [ObservableProperty] private bool _mediaAutoPlay;
     [ObservableProperty] private bool _showMediaDiagnostics = true;
+
+    // ---------- 内嵌媒体后端偏好（平台栈 / libmpv 双后端） ----------
+
+    [ObservableProperty] private MediaBackendPreference _mediaBackendMode;
+
+    public bool IsMediaBackendAuto => MediaBackendMode == MediaBackendPreference.Auto;
+    public bool IsMediaBackendSystem => MediaBackendMode == MediaBackendPreference.SystemApi;
+    public bool IsMediaBackendLibMpv => MediaBackendMode == MediaBackendPreference.LibMpv;
+
+    /// <summary>
+    /// 当前实际用哪个后端、为什么。没注册选择器（无头测试）时如实说“单后端”。
+    /// 文本直接取自选择器的裁决结果，不在 UI 里另写一套判断。
+    /// </summary>
+    public string MediaBackendStatusText
+    {
+        get
+        {
+            var selector = _services.MediaBackends;
+            if (selector is null)
+                return "当前宿主只注册了一个内嵌媒体后端（没有可裁决的第二条路径）。";
+            return selector.IsResolved
+                ? selector.SelectionSummary
+                : "尚未打开过媒体文件：首次播放时按偏好裁决并显示结果。";
+        }
+    }
+
+    public bool HasSecondMediaBackend => _services.MediaBackends is not null;
+
+    [RelayCommand]
+    private void SetMediaBackendPreference(string? value) =>
+        MediaBackendMode = MediaBackendPreferenceNames.Parse(value);
     /// <summary>端侧 AI 总开关（默认关）；关闭后语义索引保留在本机，但不进行推理或检索。</summary>
     [ObservableProperty] private bool _enableLocalAi;
     [ObservableProperty] private bool _isSendingTestSystemNotification;
@@ -3276,6 +3310,19 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     {
         _services.SettingsStore.Settings.ShowMediaDiagnostics = value;
         _ = SaveAsync();
+        Preview.RefreshSettings();
+    }
+
+    partial void OnMediaBackendModeChanged(MediaBackendPreference value)
+    {
+        _services.SettingsStore.Settings.MediaBackendPreference = MediaBackendPreferenceNames.ToSettingValue(value);
+        _ = SaveAsync();
+        OnPropertyChanged(nameof(IsMediaBackendAuto));
+        OnPropertyChanged(nameof(IsMediaBackendSystem));
+        OnPropertyChanged(nameof(IsMediaBackendLibMpv));
+        // 换后端不可能保住当前播放状态：先停掉再重新裁决，不装作可以无缝切换。
+        _services.MediaBackends?.Reset();
+        OnPropertyChanged(nameof(MediaBackendStatusText));
         Preview.RefreshSettings();
     }
 

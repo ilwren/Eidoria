@@ -243,6 +243,16 @@
                       Background="#000000" CornerRadius="12" ClipToBounds="True">
                 <media:MediaFrameSurface Source="{Binding VideoFrameSource}" AutomationProperties.Name="视频画面（推帧）" />
               </Border>
+              <!-- 控件画面：后端自带渲染器（libmpv 的 OpenGL/软件渲染），宿主只摆位置。
+                   注意这个宿主在媒体卡片里常驻：音频也要靠它建立播放上下文（上下文=解码器），
+                   所以只要当前文件是媒体就留在树上，纯音频时靠 HostedSurfaceHeight=0 不占版面——
+                   用 IsVisible 收起会把它从视觉树摘掉，后端的上下文随之释放，声音也就没了。 -->
+              <Border IsVisible="{Binding ShowHostedMediaHost}" Height="{Binding HostedSurfaceHeight}"
+                      Background="#000000" CornerRadius="12" ClipToBounds="True">
+                <media:MediaVideoControlHost Source="{Binding MediaControlHostSource}"
+                                             IncludeVideoSurface="{Binding HostedVideoWantsSurface}"
+                                             AutomationProperties.Name="视频画面（libmpv）" />
+              </Border>
               <!-- 视频默认不在应用内出画面（花屏/不同步/CPU 都实测过）：这里给两个显式入口，
                    用户自己决定是外挂播放器还是内嵌面板，风险写在按钮上面。 -->
               <Border IsVisible="{Binding ShowInlineVideoGate}" CornerRadius="12" Padding="12"

@@ -252,7 +252,16 @@ public sealed partial class PreviewViewModel(
     private bool MediaBackendCanShowVideo =>
         _media is { } media && media.Capabilities.CanPlayVideo &&
         media.RendererKind != MediaRendererKind.None &&
-        (media.RendererKind != MediaRendererKind.FramePush || media is IMediaVideoFrameSource);
+        (media.RendererKind != MediaRendererKind.FramePush || ActiveMedia is IMediaVideoFrameSource) &&
+        (media.RendererKind != MediaRendererKind.HostedControl || ActiveMedia is IMediaVideoControlSource);
+
+    /// <summary>
+    /// 真正在跑的后端本身。裁决层（<see cref="IMediaBackendSelector"/>）只能转发能力位与画面
+    /// 交付方式，装不出 FramePush/NativeSurface/HostedControl 三种实现中的任何一种，
+    /// 所以可选画面端口一律从这里取；非媒体项返回 null，免得为一张图片去实例化解码器。
+    /// </summary>
+    private IMediaPlaybackService? ActiveMedia =>
+        !IsMedia ? null : (_media is IMediaBackendSelector selector ? selector.ActiveBackend : _media);
 
     /// <summary>
     /// 视频是否在应用内嵌面板里出画面。默认关（逐帧抓取可能花屏/音画不同步），
@@ -267,15 +276,46 @@ public sealed partial class PreviewViewModel(
     /// <summary>是否显示媒体后端名称与诊断长文（设置项，默认显示）。</summary>
     public bool ShowMediaDiagnostics => _settings?.Invoke().ShowMediaDiagnostics ?? true;
     /// <summary>后端需要宿主的原生画面窗口（Android TextureView / Windows HWND）。</summary>
-    public IMediaVideoRenderer? VideoRenderer => _media as IMediaVideoRenderer;
+    public IMediaVideoRenderer? VideoRenderer => ActiveMedia as IMediaVideoRenderer;
     public bool ShowNativeVideoSurface =>
         IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
         _media?.RendererKind == MediaRendererKind.NativeSurface;
     /// <summary>后端只推帧（Linux Wayland 的 appsink 路线）；画面由 Avalonia 自己画。</summary>
-    public IMediaVideoFrameSource? VideoFrameSource => _media as IMediaVideoFrameSource;
+    public IMediaVideoFrameSource? VideoFrameSource => ActiveMedia as IMediaVideoFrameSource;
     public bool ShowFrameVideoSurface =>
         IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
         _media?.RendererKind == MediaRendererKind.FramePush && VideoFrameSource is not null;
+    /// <summary>后端自带 Avalonia 控件（libmpv）：渲染器在控件里，宿主只负责摆位置与挂载。</summary>
+    public IMediaVideoControlSource? VideoControlSource => ActiveMedia as IMediaVideoControlSource;
+    /// <summary>
+    /// 交给视图去承载的控件来源。非媒体文件一律交 null：否则选中一张图片也会
+    /// 让 libmpv 建一个解码器（控件常驻是为了音频，不是为了给每种文件开一个播放器）。
+    /// </summary>
+    public IMediaVideoControlSource? MediaControlHostSource => IsMedia ? VideoControlSource : null;
+    /// <summary>
+    /// 媒体卡片里要不要有宿主控件这一层。<see cref="MediaRendererKind.HostedControl"/> 后端对**所有**媒体
+    /// 都需要它：控件里才是 mpv 上下文，没有上下文连音频都没有解码器。其余后端一律不需要。
+    /// </summary>
+    public bool ShowHostedMediaHost =>
+        IsMedia && _media?.RendererKind == MediaRendererKind.HostedControl && VideoControlSource is not null;
+    /// <summary>
+    /// 是否看得见内嵌控件画面（音频与未放行的视频为 false）。
+    /// 注意它只决定“占不占版面”：宿主控件本身仍留在树上，由 <see cref="HostedSurfaceHeight"/> 压成 0 高。
+    /// </summary>
+    public bool ShowHostedVideoSurface =>
+        IsVideoMedia && CanPlayMediaInApp && PlayVideoInline &&
+        _media?.RendererKind == MediaRendererKind.HostedControl && VideoControlSource is not null;
+    /// <summary>
+    /// 控件画面区的高度。0 = 仍在树上但不占版面（纯音频）；非 0 = 真的出画面。
+    /// 不用 IsVisible 收起，是因为那会把它从视觉树摘掉并释放后端上下文。
+    /// </summary>
+    public double HostedSurfaceHeight => ShowHostedVideoSurface ? 280 : 0;
+    /// <summary>
+    /// 宿主画面控件该不该按“要出视频画面”来建：决定后端用 GL 渲染还是软件渲染。
+    /// 与 <see cref="ShowHostedVideoSurface"/> 分开是因为后者还要看探测结果与能力位——
+    /// 能力位为假时控件仍然要存在（音频得有解码器），只是不必开 GPU 表面。
+    /// </summary>
+    public bool HostedVideoWantsSurface => IsVideoMedia && PlayVideoInline;
     /// <summary>对当前文件显式改用内嵌画面（风险提示就在卡片上，用户自己选的）。</summary>
     [ObservableProperty] private bool _forceInlineVideo;
 
@@ -290,12 +330,14 @@ public sealed partial class PreviewViewModel(
     public void RefreshSettings()
     {
         OnPropertyChanged(nameof(PlayVideoInline));
+        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(ShowMediaDiagnostics));
         RaiseMediaState();
     }
 
-    public bool IsMediaPlaying => _media?.State == MediaPlaybackState.Playing;
-    public string MediaBackendName => _media?.Capabilities.BackendName ?? "none";
+    public bool IsMediaPlaying => IsMedia && _media?.State == MediaPlaybackState.Playing;
+    // 这三个只给媒体卡片用；非媒体项给占位值，避免“预览一张图片也要实例化解码后端”。
+    public string MediaBackendName => IsMedia ? _media?.Capabilities.BackendName ?? "none" : "none";
     /// <summary>系统解码器对这个文件的预判（事实来自平台，不是按扩展名猜）。</summary>
     public string MediaProbeText => _mediaProbeText;
     public bool HasMediaProbe =>
@@ -303,13 +345,16 @@ public sealed partial class PreviewViewModel(
     public string MediaProbeReasonText => _mediaProbeReason ?? string.Empty;
     public bool HasMediaProbeReason => IsMedia && !string.IsNullOrWhiteSpace(_mediaProbeReason);
     /// <summary>画面交付方式：纯音频后端或未接视频时为“无画面输出”。</summary>
-    public string MediaRendererText => _media?.RendererKind switch
+    public string MediaRendererText => !IsMedia ? "画面：未接入" : _media?.RendererKind switch
     {
         MediaRendererKind.NativeSurface => "画面：平台原生 Surface",
         MediaRendererKind.FramePush => "画面：宿主帧呈现",
+        MediaRendererKind.HostedControl => "画面：后端控件内嵌（libmpv）",
         _ => "画面：未接入（用系统应用打开）",
     };
-    public string MediaBackendDiagnostic => _media?.Capabilities.Diagnostic ?? "未配置播放后端。";
+    public string MediaBackendDiagnostic => IsMedia
+        ? _media?.Capabilities.Diagnostic ?? "未配置播放后端。"
+        : "未配置播放后端。";
     public string MediaStateText => _media?.State switch
     {
         MediaPlaybackState.Opening => "正在打开…",
@@ -433,6 +478,10 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowHostedMediaHost));
+        OnPropertyChanged(nameof(ShowHostedVideoSurface));
+        OnPropertyChanged(nameof(HostedSurfaceHeight));
+        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(MediaProbeText));
         OnPropertyChanged(nameof(HasMediaProbe));
         OnPropertyChanged(nameof(MediaProbeReasonText));
@@ -447,8 +496,14 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanPlayMediaInApp));
         OnPropertyChanged(nameof(ShowNativeVideoSurface));
         OnPropertyChanged(nameof(ShowFrameVideoSurface));
+        OnPropertyChanged(nameof(ShowHostedMediaHost));
+        OnPropertyChanged(nameof(ShowHostedVideoSurface));
+        OnPropertyChanged(nameof(HostedSurfaceHeight));
+        OnPropertyChanged(nameof(HostedVideoWantsSurface));
         OnPropertyChanged(nameof(VideoRenderer));
         OnPropertyChanged(nameof(VideoFrameSource));
+        OnPropertyChanged(nameof(VideoControlSource));
+        OnPropertyChanged(nameof(MediaControlHostSource));
         OnPropertyChanged(nameof(IsMediaPlaying));
         OnPropertyChanged(nameof(MediaStateText));
         OnPropertyChanged(nameof(MediaPositionText));
@@ -492,7 +547,9 @@ public sealed partial class PreviewViewModel(
     {
         if (_media is null || global::Avalonia.Application.Current is null)
             return;
-        if (IsMediaPlaying)
+        // 只要选中的是媒体文件就保持轮询：打开后要拿到时长、播放要推进进度、
+        // 播完也要能发现“已结束”。只在播放时轮询会漏掉前后两头。
+        if (IsMedia && _media is IMediaPlaybackPoller)
         {
             if (_mediaTimer is not null)
                 return;
@@ -772,6 +829,9 @@ public sealed partial class PreviewViewModel(
             await ProbeMediaAsync(item).ConfigureAwait(true);
             if (generation != _generation)
                 return;
+            // 选中媒体就开始 500 ms 轮询：时长、位置与“已结束”都由后端回报；
+            // 自动播放开关只决定要不要立刻出声，与是否轮询无关。
+            UpdateMediaTimer();
             // 自动播放只在设置里显式打开时生效；视频还必须内嵌出画面，
             // 否则用户听到声音却看不到画面，比不播更糟。
             if ((_settings?.Invoke().MediaAutoPlay ?? false) && CanPlayMediaInApp)

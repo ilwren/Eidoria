@@ -104,6 +104,9 @@ public sealed class SettingsStore : ISettingsStore
         settings.Density = string.Equals(settings.Density, "Compact", StringComparison.OrdinalIgnoreCase)
             ? "Compact"
             : "Comfortable";
+        // 媒体后端偏好：只认三个已知值，手改 JSON 的乱码一律收回 Auto（不让界面进入无法识别的状态）。
+        settings.MediaBackendPreference = MediaBackendPreferenceNames.ToSettingValue(
+            MediaBackendPreferenceNames.Parse(settings.MediaBackendPreference));
         settings.ItemPageSize = Math.Clamp(settings.ItemPageSize, 60, 480);
         settings.RecentItemLimit = Math.Clamp(settings.RecentItemLimit, 6, 60);
         if (!double.IsFinite(settings.PullRefreshTriggerDistance))

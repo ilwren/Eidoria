@@ -33,17 +33,24 @@ public static class AppHost
         ITextFileService TextFiles,
         ISystemNotificationService SystemNotifications,
         IMediaPlaybackService MediaPlayback,
+        MediaBackendSelector? MediaBackends,
         AiModelCatalog AiModels,
         PluginPackageCatalog Plugins);
 
     /// <summary>
-    /// 平台内嵌播放后端的注入点。Android 宿主在 Activity 创建时注册 MediaPlayer 实现；
-    /// 未注册时（桌面、测试）退回明确自述“无后端”的实现，UI 据此只给系统打开入口。
+    /// 平台内嵌播放后端的注入点（平台自带解码栈）。Android 宿主在 Activity 创建时注册
+    /// MediaPlayer 实现；桌面在 Program.Main 里注册 Media Foundation / GStreamer。
     /// </summary>
     public static Func<IMediaPlaybackService>? MediaPlaybackFactory { get; set; }
 
+    /// <summary>
+    /// 可选的 libmpv 后端注入点。只有桌面宿主注册（Android 不提供 libmpv；
+    /// 打包与许可边界见 docs/LIBMPV-SPIKE.md）。未注册时选择器只会用平台栈。
+    /// </summary>
+    public static Func<IMediaPlaybackService>? MpvPlaybackFactory { get; set; }
+
     private const string DefaultMediaDiagnostic =
-        "桌面端暂无内嵌解码后端：Windows 需 Media Foundation、Linux 需系统 FFmpeg，接入前不做静默降级。可用系统应用打开。";
+        "当前宿主没有注册内嵌解码后端（桌面端为 Media Foundation / GStreamer，Android 为 MediaPlayer）。可用系统应用打开。";
 
     /// <param name="dataDirectory">设置/收藏落点；为空时按平台默认（LocalApplicationData/MdExplorer）。</param>
     /// <param name="startFolder">初始文件夹；为空时桌面=用户主目录，Android=个人目录。</param>
@@ -90,6 +97,23 @@ public static class AppHost
             OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsMacOS(),
             UsesAppTrash: trash is AppTrashService);
 
+        // 内嵌媒体后端：平台栈与可选 libmpv 同时注册时交给选择器裁决（偏好落盘、结论写进诊断）；
+        // 两边都没有注册（无头测试、无人注册的宿主）时仍是那个“明确自述无后端”的实现。
+        IMediaPlaybackService mediaPlayback;
+        MediaBackendSelector? mediaBackends = null;
+        if (MediaPlaybackFactory is null && MpvPlaybackFactory is null)
+        {
+            mediaPlayback = new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic);
+        }
+        else
+        {
+            mediaBackends = new MediaBackendSelector(
+                () => store.Settings,
+                MediaPlaybackFactory,
+                MpvPlaybackFactory);
+            mediaPlayback = mediaBackends;
+        }
+
         return new AppServices(
             fileSystem,
             operations,
@@ -113,7 +137,9 @@ public static class AppHost
             new StorageInsightsService(),
             new DelegatingTextFileService(new LocalTextFileService(), new StorageTextFileService(fileSystem)),
             systemNotifications ?? new MdSystemNotificationServiceAdapter(),
-            MediaPlaybackFactory?.Invoke() ?? new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic),
+            // 两条后端都注册了才值得裁决；否则维持原来的“无后端就自述”行为，不让 UI 多一层空壳。
+            mediaPlayback,
+            mediaBackends,
             // 端侧 AI 的模型目录：只扫描文件；ONNX Session 在用户调用本地语义搜索时才延迟建立。
             aiModels,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。

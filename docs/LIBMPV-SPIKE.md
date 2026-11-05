@@ -1,44 +1,95 @@
-# libmpv Avalonia 桌面 Spike
+# libmpv 桌面后端：接入说明、许可证门与待验收项
 
-这是一个隔离验证样例，不替换 Eidoria 当前的媒体后端，也不被正式应用引用或随正式应用发布。样例使用 `HanumanInstitute.LibMpv.Avalonia` 0.10.1（MIT managed wrapper，目标为 .NET 10 / Avalonia 12），直接显示 libmpv 画面并提供打开、播放/暂停、停止和 seek 控件。样例项目列在主 `.slnx` 中，以便 CI 至少编译 managed 集成；它不携带或打包任何 libmpv 原生二进制，编译通过不等于已通过播放验收。
+状态：**v0.39 起 libmpv 已从隔离 Spike 变成正式的可选后端**，与平台自带的系统解码栈并存，由用户在设置里选择。
+`spikes/LibMpvAvaloniaSpike` 仍保留为最小可运行样例（只用来单独验证"包装层 + 原生库"能不能出画面），
+正式应用走 `src/MdExplorer.Desktop/MpvMediaPlaybackService.cs`。
 
-## 运行
+## 1. 为什么同时保留两条后端
 
-先取得一个 **LGPL-only** 的 libmpv 0.40+ 原生构建及其全部动态依赖。启动应用时 `MDEXPLORER_LIBMPV_ROOT` 应指向包含 libmpv 主库和依赖库的目录；未设置时样例按 wrapper 默认规则在应用目录/系统库路径中查找。
+| | 系统解码栈 | libmpv（可选） |
+|---|---|---|
+| 安装成本 | 零（Windows Media Foundation / Linux 发行版 GStreamer / Android MediaPlayer） | 用户自行放入 LGPL-only libmpv 原生库 |
+| 视频画面 | Windows 用 `MediaComposition` 反复取缩略帧（约 12 fps，卡顿可见）；Linux 用 `appsink` 推帧；Android 用 `TextureView` | 包装层自带渲染器（GL / 软件 / Windows 原生子窗口），连续呈现 |
+| 能播什么 | 由系统/发行版决定，探测结果如实给原因 | 由该 libmpv 构建带的 FFmpeg 组件决定 |
+| 许可与体积 | 无新增依赖 | 应用只带 MIT 托管包装；原生库**不进包、不下载** |
 
-PowerShell 示例（路径需替换为你审核过的 libmpv/FFmpeg LGPL-only 构建目录）：
+结论先摆在桌面上：**Windows 上系统栈的取帧路线确实不够流畅**，这正是加 libmpv 的原因；
+但 libmpv 需要用户动手准备原生库，因此两条都留，让实际观感决定去留（D-03）。
+
+## 2. 启用方式
+
+1. 取得一份 **LGPL-only** 的 libmpv 0.40+ 原生构建（`-Dgpl=false` + LGPL FFmpeg 变体）。
+   - Windows x64 可试用社区构建 [w3bward/libmpv-lgpl](https://github.com/w3bward/libmpv-lgpl/releases)（基于固定源码，含 `libmpv-2.dll`、依赖 DLL 与许可证目录；发布说明给出 ZIP SHA-256，验收前请自行核对）。
+   - Windows x64/ARM64 也可用 mpv 的 [development release](https://github.com/mpv-player/mpv/releases/tag/git-release) 中标为 LGPL 的 libmpv ZIP（未稳定的开发快照，不建议作为正式依赖）。
+   - Linux 多数发行版有 `libmpv` 包，但各发行版的 mpv/FFmpeg 编译选项并不一致，**不能仅凭包名认定为 LGPL-only**。
+2. 把原生库及其依赖放到 **Eidoria 程序目录**（最稳：Windows 的依赖解析默认看 exe 所在目录），或者设置
+   `MDEXPLORER_LIBMPV_ROOT` 指向那个目录。若放在别处，Windows 还需要该目录在 `PATH` 中，否则依赖解析不到。
+3. 启动应用 → 设置 → 媒体 → 「内嵌播放后端」选 **自动**（优先 libmpv）或 **libmpv**。
+   选完不重启也行，但**切换后端会停止当前播放**——跨后端保住播放状态是不可能的，界面不装作可以。
+
+诊断入口：预览卡的「媒体后端诊断」会显示后端名、画面交付方式与裁决结论（用了谁、是否回退、为什么）。
+
+### 渲染路线覆盖（排查用）
+
+| 环境变量 | 值 | 说明 |
+|---|---|---|
+| `MDEXPLORER_LIBMPV_RENDERER` | `opengl`（默认） | Avalonia 内的 GL 控件，能跟随圆角裁剪、浮窗与缩放 |
+| | `software` | CPU 渲染，最保守；分辨率高时开销大 |
+| | `native` | Windows 原生子窗口（零拷贝、最快），但画面是独立图层，浮层盖不住它 |
+
+## 3. 代码落点与行为
+
+- 端口：`IMediaVideoControlSource` + `MediaRendererKind.HostedControl`（`src/MdExplorer.Platform.Abstractions/MediaPorts.cs`）。
+  包装层的每个渲染视图都在自己的字段里创建 mpv 上下文，所以"控件存在"与"有解码器"是同一件事；
+  宿主再插一脚只会得到两份解码器，因此这条路线是**后端交出控件**，而不是推帧或原生句柄。
+- 探测：`MpvNativeLibrary` 用 `NativeLibrary.TryLoad` 试装一次（搜索顺序：`MDEXPLORER_LIBMPV_ROOT` → 应用目录 → 系统库路径）。
+  库不在时**连控件都不创建**——包装层在构造视图时就会调 `mpv_create`，那是一个在布局过程中抛出的
+  `DllNotFoundException`，用户只会看到闪退。
+- 裁决：`MediaBackendSelector`（`src/MdExplorer.UI/Services/MediaBackendSelector.cs`）按偏好 + 能力位裁决；
+  **能力位为假的后端不算可用**；显式点名却用不上时在诊断里写"已回退 + 原因"，Auto 不写"回退"。
+- 状态回报：500 ms 属性轮询（`TimePos` / `Duration` / `Pause` / `EofReached` / `IdleActive`），
+  音画由 mpv 自己的事件循环驱动，宿主不参与解码。
+- 打开看门狗：5 s 内没有时长就如实报"这个构建打不开该文件"，不留一个永远"正在打开…"的卡片。
+- 续播：宿主把画面控件摘掉（预览栏收起、切走目的地）时记住文件与位置，挂回来自动接着播。
+- 音频：`includeVideoSurface=false` 时用软件渲染器，不为一个没有画面的文件去开 GL 表面；
+  控件仍然要存在——没有控件就没有上下文，也就没有音频。
+
+## 4. 许可证和分发门
+
+mpv 默认可构建为 GPL；也支持 `-Dgpl=false` 的 LGPL 构建。libmpv 不是独立 codec：它依赖 FFmpeg，
+因此本项目只接受 **LGPL-only FFmpeg** 作为其原生传递依赖，并须确认实际构建没有启用 GPL/nonfree 组件、
+审计随构建带来的其余原生库、许可证文本与对应源码。
+
+`HanumanInstitute.LibMpv.Avalonia`（MIT）**不提供可分发的原生库**：它只把 libmpv 原生二进制列为单独获取的内容。
+本仓因此只引用托管包装（`src/MdExplorer.Desktop` 一个项目），不打包、不下载任何 libmpv 二进制，运行期也不联网。
+若要长期分发"开箱即用"的桌面包，必须另做可复现的 LGPL-only 构建流水线（含源码与许可证清单），
+并重新评估包体积与 LGPL 动态链接要求——这一条仍未做。
+
+## 5. 仍待验收（本版不吹的地方）
+
+1. **真机流畅度对比**：Windows（12 fps 取帧 vs libmpv 连续渲染）、Linux（`appsink` 推帧 vs GL）、硬件解码与 seek 抖动，
+   都还没有实测数字。CI 无显示/音频设备，只能证明接线、契约与降级路径正确。
+2. **Native AOT / Trim**：托管包装未声明 `IsAotCompatible`，通过函数指针调用原生接口。
+   当前 AOT 发布 Job 仍是探路性质；若 AOT 下包装层不可用，探测通过但控件创建失败会**如实降级**（catch → 诊断文案），
+   不会把进程带走。AOT 若成为发布门，需要为这条路径单独立项（预生成委托或排除该后端）。
+3. **Android**：不提供 libmpv（另需可追溯的 LGPL-only Android 预编译库、ABI 覆盖、Surface 生命周期与 AOT 验证），
+   继续用系统 `MediaPlayer` + `TextureView`。
+4. **音频设备切换、字幕与音轨选择**：包装层能力够，但 UI 未开放；不做成"有按钮没效果"。
+5. **崩溃隔离**：原生解码不可信文件时崩溃会带走进程（与 PDFium 同类风险）。当前只靠"打开失败如实报错"，
+   没有做进程外解码；若要彻底隔离，需要进程外 worker（与插件 P2 同一条路）。
+
+## 6. Spike 样例（`spikes/LibMpvAvaloniaSpike`）
+
+隔离样例保留，用来单独验证"包装层 + 某份原生构建"能否出画面，不参与正式应用构建产物：
 
 ```powershell
 $env:MDEXPLORER_LIBMPV_ROOT = 'C:\media\libmpv-lgpl\bin'
 dotnet run --project spikes/LibMpvAvaloniaSpike -c Release
 ```
 
-Linux 示例：
-
 ```bash
 export MDEXPLORER_LIBMPV_ROOT="$HOME/opt/libmpv-lgpl/lib"
 dotnet run --project spikes/LibMpvAvaloniaSpike -c Release
 ```
 
-不设置环境变量时，Linux 也可使用系统的 `libmpv`；但必须先核查发行版构建配置与传递依赖的许可证。样例只接受本地路径，视频窗使用 wrapper 的 Avalonia renderer，不把解码帧回传到 `MediaFrameSurface`。
-
-### 可直接下载的试用构建
-
-- **Windows x64（首选试 Spike）**：社区仓库 [w3bward/libmpv-lgpl](https://github.com/w3bward/libmpv-lgpl/releases/tag/mpv-0.41.0-r1) 发布了基于固定源码的 LGPL libmpv 0.41.0 包，包含 `libmpv-2.dll`、依赖 DLL、headers、许可证目录和构建信息。发布说明给出 ZIP SHA-256：`1522cc89007411a923f83a6402529a9c403c093bb8a4ade918b39aeae91805bc`。此构建的 FFmpeg 禁用了网络支持，适合当前本地文件 Spike；它是社区构建，验收前仍应自行核对校验和与包内容。
-- **Windows x64/ARM64（上游开发构建）**：mpv 的 [development release](https://github.com/mpv-player/mpv/releases/tag/git-release) 提供标注为 LGPL 的 libmpv ZIP，使用 `-Dgpl=false` 和 LGPL FFmpeg 变体；它是未稳定的开发快照，不建议作为正式依赖。
-- **Linux**：多个发行版有系统 `libmpv` 包，但各发行版的 mpv/FFmpeg 编译选项与依赖许可并不一致，不能仅凭包名认定为 LGPL-only。尚未找到适用于所有发行版、可直接放心捆绑的统一官方 Linux LGPL 运行包。
-
-所以现在可以先用现成 Windows x64 包运行这个 Spike；若之后需要**可复现、可审计的 Linux 下载包**，可以另做手动触发的 GitHub Actions 工作流，从固定源码构建 `-Dgpl=false` 的 mpv 与 LGPL FFmpeg，再附上所有运行库、许可证、源码和校验和。仅把 distro 的 `libmpv.so` 复制进 artifact 不足以满足许可与可移植性要求。
-
-## 许可证和分发门
-
-mpv 项目默认可构建为 GPL；它也支持 `-Dgpl=false` 的 LGPL 构建。libmpv 不是独立 codec：它依赖 FFmpeg，因此这个 Spike 接受 **LGPL-only FFmpeg** 作为 libmpv 的原生传递依赖，但必须确认实际构建没有启用 GPL/nonfree 组件，并审计随构建带来的其余原生库、许可证文本和对应源码。不能只看 C# NuGet 包标注的 MIT 就认定整个运行时是 MIT。
-
-`HanumanInstitute.LibMpv.Avalonia` NuGet 包不提供正式应用可直接分发的多平台原生库；其 README 明确把 libmpv 原生二进制列为单独获取的内容，且由社区维护。当前样例仅覆盖 Windows/Linux 桌面，不含 Android。它也尚未验证 Native AOT/Trim；managed wrapper 项目没有声明 `IsAotCompatible` / `IsTrimmable`，而 API 通过函数指针/委托解析调用原生接口，因此正式集成前必须做 AOT/Trim 发布与真机验证。
-
-## 这次要回答的问题
-
-1. Avalonia 12 的桌面渲染器能否稳定承载 libmpv OpenGL/native renderer，并与预览面板裁剪、缩放及窗口重建共存。
-2. 审核后的 LGPL-only 原生构建在 Windows/Linux 的加载、codec 覆盖、硬件解码、seek、音频输出和重复打开/释放是否可靠。
-3. 包体积、transitive DLL/SO、许可证清单以及 Native AOT/Trim 是否可接受。
-4. Android 仍保持现有 `MediaPlayer`/`MediaCodec` 路线；本 Spike 不把桌面 wrapper 的平台兼容性推断成 Android 支持。要统一到 Android，另需确认可追溯的 Android LGPL-only libmpv + FFmpeg 预编译库、ABI 覆盖、许可源码、Surface 生命周期和 AOT/Trim。
+样例项目列在主 `.slnx` 中，CI 至少编译托管集成；它不携带原生二进制，编译通过不等于播放验收通过。

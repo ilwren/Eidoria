@@ -13,7 +13,7 @@ public enum MediaPlaybackState
 
 /// <summary>
 /// 视频画面的交付方式。它决定 UI 用哪种宿主：Avalonia 内的帧呈现器、
-/// 还是平台原生画面（Surface/HWND）。两者不能互相冒充。
+/// 平台原生画面（Surface/HWND），还是后端自带的 Avalonia 控件。三者不能互相冒充。
 /// </summary>
 public enum MediaRendererKind
 {
@@ -25,6 +25,65 @@ public enum MediaRendererKind
 
     /// <summary>后端把解码后的帧推给宿主，由宿主在 Avalonia 内呈现。</summary>
     FramePush,
+
+    /// <summary>
+    /// 后端交出一个 Avalonia 控件，由它自己把画面画进 Avalonia 的视觉树（libmpv 的
+    /// OpenGL/软件渲染走这条）。宿主只负责把控件摆到正确的位置并转交挂载/卸载事件。
+    /// </summary>
+    HostedControl,
+}
+
+/// <summary>
+/// 内嵌媒体后端偏好（设置项，跨启动持久化）。
+/// <para>
+/// 同一台机器上可能同时存在两条可用路径：平台自带解码栈（Windows Media Foundation /
+/// Linux GStreamer / Android MediaPlayer）与可选的 libmpv。前者零安装但受系统能力限制
+/// （Windows 的取帧路线帧率低），后者需要用户自己放一份 LGPL-only 的 libmpv。偏好只表达
+/// 用户的选择，实际用谁由 <c>MediaBackendSelector</c> 按可用性裁决并**如实告知**。
+/// </para>
+/// </summary>
+public enum MediaBackendPreference
+{
+    /// <summary>自动：优先 libmpv（更流畅），没有可用的 libmpv 时用平台自带栈。</summary>
+    Auto,
+
+    /// <summary>只用平台自带解码栈。</summary>
+    SystemApi,
+
+    /// <summary>优先 libmpv；本机没有可加载的 libmpv 时如实回退到平台栈。</summary>
+    LibMpv,
+}
+
+/// <summary>后端偏好的字符串口径（设置文件里存字符串，与 ThemeMode 一致）。</summary>
+public static class MediaBackendPreferenceNames
+{
+    public const string Auto = "Auto";
+    public const string SystemApi = "SystemApi";
+    public const string LibMpv = "LibMpv";
+
+    /// <summary>解析设置值；无法识别时回落 <see cref="MediaBackendPreference.Auto"/>，不抛异常。</summary>
+    public static MediaBackendPreference Parse(string? value) => value switch
+    {
+        _ when string.Equals(value, SystemApi, StringComparison.OrdinalIgnoreCase) => MediaBackendPreference.SystemApi,
+        _ when string.Equals(value, LibMpv, StringComparison.OrdinalIgnoreCase) => MediaBackendPreference.LibMpv,
+        _ => MediaBackendPreference.Auto,
+    };
+
+    public static string ToSettingValue(MediaBackendPreference preference) => preference switch
+    {
+        MediaBackendPreference.SystemApi => SystemApi,
+        MediaBackendPreference.LibMpv => LibMpv,
+        _ => Auto,
+    };
+}
+
+/// <summary>
+/// 后端交出的画面控件。<see cref="Control"/> 是 Avalonia 控件对象（端口层只当 <see cref="object"/>，
+/// 避免抽象层反向依赖 Avalonia）；为 null 时 <see cref="Error"/> 必须是一句人话。
+/// </summary>
+public sealed record MediaVideoControl(object? Control, string? Error = null)
+{
+    public bool IsAvailable => Control is not null;
 }
 
 /// <summary>后端自述能力。UI 只按这里说的显隐控件，不猜平台。</summary>
@@ -127,6 +186,40 @@ public interface IMediaFrameSink
 
     /// <summary>清空画面（停止、切换文件或解码失败）。</summary>
     void Clear();
+}
+
+/// <summary>
+/// 组合多个后端的裁决层实现它。宿主据此拿到“真正在跑的那个后端”，
+/// 才能判断它是否实现了 <see cref="IMediaVideoRenderer"/>、<see cref="IMediaVideoFrameSource"/>、
+/// <see cref="IMediaVideoControlSource"/> 这些可选的画面端口——裁决层自己不可能同时装作三种。
+/// </summary>
+public interface IMediaBackendSelector
+{
+    IMediaPlaybackService? ActiveBackend { get; }
+}
+
+/// <summary>
+/// 自带 Avalonia 控件的后端实现它（<see cref="MediaRendererKind.HostedControl"/>，libmpv 走这条）。
+/// <para>
+/// 为什么不是 <see cref="IMediaVideoRenderer"/> / <see cref="IMediaVideoFrameSource"/>：
+/// libmpv 的托管包装自己持有渲染上下文与 GL/软件渲染器，只能由它的控件创建和销毁上下文；
+/// 宿主再插一脚只会得到两份解码器。所以这里让后端直接交出一个控件，宿主负责摆位置。
+/// </para>
+/// <para>
+/// 实现契约：只在 UI 线程被调用；<see cref="CreateVideoControl"/> 返回的同一个控件对象只能交给宿主一次，
+/// 宿主卸载时必须调用 <see cref="ReleaseVideoControl"/>；没有原生库时返回 null + 原因，不抛异常。
+/// </para>
+/// </summary>
+public interface IMediaVideoControlSource
+{
+    /// <summary>
+    /// 创建画面控件。<paramref name="includeVideoSurface"/> 为 false 时表示当前只播音频
+    /// （或视频画面没被放行），实现应挑一条不需要 GPU 表面的渲染路线，但仍然要建立播放上下文。
+    /// </summary>
+    MediaVideoControl CreateVideoControl(bool includeVideoSurface);
+
+    /// <summary>宿主卸载画面控件；实现应停止播放并释放上下文。</summary>
+    void ReleaseVideoControl();
 }
 
 /// <summary>

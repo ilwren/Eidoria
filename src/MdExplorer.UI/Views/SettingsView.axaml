@@ -502,11 +502,36 @@
               </Border>
           <TextBlock Classes="h3" Text="媒体" VerticalAlignment="Center" />
         </StackPanel>
+        <!-- 后端偏好：平台栈与可选 libmpv 并存，裁决结果由后端自己报出来。 -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasSecondMediaBackend}">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="body" Text="内嵌播放后端" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding MediaBackendStatusText}"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       MaxWidth="360" ToolTip.Tip="{Binding MediaBackendStatusText}" />
+          </Grid>
+          <WrapPanel Orientation="Horizontal">
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsMediaBackendAuto}" Variant="Text"
+                         Content="自动" Margin="0,0,6,0"
+                         Command="{Binding SetMediaBackendPreferenceCommand}" CommandParameter="Auto"
+                         ToolTip.Tip="优先 libmpv（连续渲染更流畅），本机没有可加载的 libmpv 时用系统解码栈" />
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsMediaBackendSystem}" Variant="Text"
+                         Content="系统解码栈" Margin="0,0,6,0"
+                         Command="{Binding SetMediaBackendPreferenceCommand}" CommandParameter="SystemApi"
+                         ToolTip.Tip="只用平台自带解码（Windows Media Foundation / Linux GStreamer / Android MediaPlayer）" />
+            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsMediaBackendLibMpv}" Variant="Text"
+                         Content="libmpv"
+                         Command="{Binding SetMediaBackendPreferenceCommand}" CommandParameter="LibMpv"
+                         ToolTip.Tip="使用你自己放置的 LGPL-only libmpv 原生库；找不到时会如实回退到系统解码栈" />
+          </WrapPanel>
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     Text="两条路径都保留：系统栈零安装但受平台限制（Windows 取帧路线帧率低）；libmpv 连续渲染更接近系统播放器，但需要你自行放入经审核的 LGPL-only 原生库（本应用不打包、不联网下载）。切换后端会停止当前播放。" />
+        </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
             <TextBlock Classes="body" Text="视频默认在应用内嵌播放" />
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="关掉时视频只给「用系统播放器打开 / 仍要内嵌观看」两个入口。内嵌画面是逐帧抓取（目标最高 60 fps），可能出现花屏、音画不同步与较高 CPU；系统播放器始终最稳" />
+                       Text="关掉时视频只给「用系统播放器打开 / 仍要内嵌观看」两个入口。系统栈的内嵌画面是逐帧抓取（目标最高 60 fps），可能出现花屏、音画不同步与较高 CPU；libmpv 后端是连续渲染，通常更流畅" />
           </StackPanel>
           <md:MdSwitch Grid.Column="1" IsChecked="{Binding PlayVideoInline}" VerticalAlignment="Center" />
         </Grid>
