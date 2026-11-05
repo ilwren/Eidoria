@@ -1,15 +1,12 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 202 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 8 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 2 ms).
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3.android' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 8.08 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 8.09 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj (in 8.15 sec).
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3.android' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj : warning NU1903: Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 165 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 3 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 0.9 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 6.06 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 6.52 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Android/MdExplorer.Android.csproj (in 7.65 sec).
   MdExplorer.Domain -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/bin/Release/net10.0/MdExplorer.Domain.dll
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/ContentIndexPorts.cs(41,48): error CS0246: The type or namespace name 'OperationProgress' could not be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj]
+  MdExplorer.Platform.Abstractions -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/bin/Release/net10.0/MdExplorer.Platform.Abstractions.dll
+  MdExplorer.Application -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/bin/Release/net10.0/MdExplorer.Application.dll
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/SqliteContentIndex.cs(94,48): error CS0246: The type or namespace name 'OperationProgress' could not be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj]
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/SqliteContentIndex.cs(25,42): error CS0535: 'SqliteContentIndex' does not implement interface member 'IContentIndexService.RebuildAsync(IReadOnlyList<string>, IProgress<OperationProgress>?, CancellationToken)' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj]
