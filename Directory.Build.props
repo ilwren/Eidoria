@@ -3,7 +3,7 @@
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.53.0</Version>
+    <Version>0.54.0</Version>
     <Authors>MdExplorer contributors</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <!-- Avalonia 编译绑定全局开启（AOT 前提） -->

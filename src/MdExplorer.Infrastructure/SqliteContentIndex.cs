@@ -242,7 +242,7 @@ public sealed class SqliteContentIndex : IContentIndexService
     // ── 查询 ─────────────────────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<ContentSearchHit>> SearchAsync(
-        string query, int maxResults, CancellationToken cancellationToken)
+        string query, int maxResults, CancellationToken cancellationToken, SearchFilter? filter = null)
     {
         var matchQuery = BuildMatchQuery(query);
         if (matchQuery.Length == 0 || maxResults <= 0)
@@ -255,11 +255,34 @@ public sealed class SqliteContentIndex : IContentIndexService
         {
             await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var command = connection.CreateCommand();
-            command.CommandText = """
+            // v0.54：大小 / 修改时间直接在 SQL 里筛——先截断再筛会让「明明有结果却只返回几条」。
+            var conditions = new StringBuilder("WHERE docs_fts MATCH $match");
+            if (filter is { MinBytes: { } minBytes })
+            {
+                conditions.Append(" AND d.size >= $minBytes");
+                command.Parameters.AddWithValue("$minBytes", minBytes);
+            }
+            if (filter is { MaxBytes: { } maxBytes })
+            {
+                conditions.Append(" AND d.size < $maxBytes");
+                command.Parameters.AddWithValue("$maxBytes", maxBytes);
+            }
+            if (filter is { ModifiedAfter: { } after })
+            {
+                conditions.Append(" AND d.mtime >= $after");
+                command.Parameters.AddWithValue("$after", after.ToUnixTimeMilliseconds());
+            }
+            if (filter is { ModifiedBefore: { } before })
+            {
+                conditions.Append(" AND d.mtime <= $before");
+                command.Parameters.AddWithValue("$before", before.ToUnixTimeMilliseconds());
+            }
+
+            command.CommandText = $"""
                 SELECT d.path, d.name, d.raw, d.mtime, d.size
                 FROM docs_fts f
                 JOIN docs d ON d.id = f.rowid
-                WHERE docs_fts MATCH $match
+                {conditions}
                 ORDER BY bm25(docs_fts)
                 LIMIT $limit;
                 """;

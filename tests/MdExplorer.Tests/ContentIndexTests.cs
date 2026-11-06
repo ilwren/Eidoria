@@ -172,6 +172,39 @@ public sealed class ContentIndexTests : IDisposable
         Assert.Equal("预算", hit.Snippet.Substring(hit.MatchOffset, hit.MatchLength));
     }
 
+    // ── v0.54 大小 / 修改时间筛选 ──────────────────────────────────────────
+
+    /// <summary>筛选在 SQL 里做，所以被 LIMIT 截断的永远是「通过筛选之后」的结果。</summary>
+    [Fact]
+    public async Task SearchRespectsSizeAndDateFilters()
+    {
+        Write("notes/small.md", "预算 决算 报告样本");
+        Write("notes/big.md", "预算 决算 报告样本 " + new string('大', 100_000));
+        var oldPath = Write("notes/old.md", "预算 决算 报告样本");
+        File.SetLastWriteTimeUtc(oldPath, DateTime.UtcNow.AddDays(-40));
+        var index = Index();
+        var ct = TestContext.Current.CancellationToken;
+
+        var stats = await index.RebuildAsync([_root], null, ct);
+        Assert.Equal(3, stats.DocumentCount);
+
+        Assert.Equal(3, (await index.SearchAsync("预算", 10, ct)).Count);
+
+        var bigOnly = await index.SearchAsync("预算", 10, ct, new SearchFilter(MinBytes: 60 * 1024));
+        Assert.Single(bigOnly);
+        Assert.Equal("big.md", bigOnly[0].Name);
+
+        var recentOnly = await index.SearchAsync(
+            "预算", 10, ct, new SearchFilter(ModifiedAfter: DateTimeOffset.UtcNow.AddDays(-7)));
+        Assert.Equal(2, recentOnly.Count);
+        Assert.DoesNotContain(recentOnly, hit => hit.Name == "old.md");
+
+        // 上限 1 条 + 大小筛选：先筛后截断，不应该「先截断成 1 条再筛空」。
+        var limited = await index.SearchAsync("预算", 1, ct, new SearchFilter(MinBytes: 60 * 1024));
+        Assert.Single(limited);
+        Assert.Equal("big.md", limited[0].Name);
+    }
+
     // ── v0.49 磁盘 I/O：分块提交、跳过未变文件、原文入库封顶 ────────────────
 
     /// <summary>数一数真正读了几次正文：重建的 I/O 成本几乎都花在这里。</summary>

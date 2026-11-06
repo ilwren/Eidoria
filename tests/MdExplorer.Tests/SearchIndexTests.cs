@@ -174,6 +174,54 @@ public sealed class SearchIndexTests : IDisposable
         Assert.Equal(2, reversed.Count);
     }
 
+    /// <summary>v0.54：大小 / 修改时间筛选在快照层生效，且发生在 MaxResults 截断之前。</summary>
+    [Fact]
+    public async Task Search_AppliesSizeAndDateFilters()
+    {
+        FileIn("report-small.txt");
+        FileIn("report-big.txt", new string('x', 200 * 1024));
+        FileIn("report-old.txt");
+        // 不动文件的修改时间：文件名索引带目录监视，事后改时间戳会让快照被标脏、查询直接返回空
+        // （那条路径由 Search_SkipsDeletedEntries_AndClearRemovesSnapshot 覆盖）。
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        var all = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty), TestContext.Current.CancellationToken));
+        Assert.Equal(3, all.Count);
+
+        var bigOnly = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty, Filter: new SearchFilter(MinBytes: 100 * 1024)),
+            TestContext.Current.CancellationToken));
+        Assert.Single(bigOnly);
+        Assert.Equal("report-big.txt", bigOnly[0].Name);
+
+        var tinyOnly = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty, Filter: new SearchFilter(MaxBytes: 100 * 1024)),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(2, tinyOnly.Count);
+        Assert.DoesNotContain(tinyOnly, item => item.Name == "report-big.txt");
+
+        // 时间边界：全部文件都「刚刚写过」，所以「只保留早于昨天」应当一条不剩，
+        // 「只保留 7 天内」应当三条全在——两个方向都验证到位，又不用改时间戳。
+        var future = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty, Filter: new SearchFilter(ModifiedBefore: DateTimeOffset.UtcNow.AddDays(-1))),
+            TestContext.Current.CancellationToken));
+        Assert.Empty(future);
+
+        var recent = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty, Filter: new SearchFilter(ModifiedAfter: DateTimeOffset.UtcNow.AddDays(-7))),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(3, recent.Count);
+
+        // MaxResults 截断发生在筛选之后：上限 1 条 + 大小筛选，仍然拿到那条大的。
+        var limited = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("report", string.Empty, MaxResults: 1,
+                Filter: new SearchFilter(MinBytes: 100 * 1024)),
+            TestContext.Current.CancellationToken));
+        Assert.Single(limited);
+        Assert.Equal("report-big.txt", limited[0].Name);
+    }
+
     [Fact]
     public async Task Search_SkipsDeletedEntries_AndClearRemovesSnapshot()
     {

@@ -49,9 +49,13 @@ public interface IContentIndexService
     Task<ContentIndexStats> RebuildAsync(
         IReadOnlyList<string> roots, IProgress<OperationProgress>? progress, CancellationToken cancellationToken);
 
-    /// <summary>按全文匹配查询；查询为空或索引未建时返回空列表。</summary>
+    /// <summary>
+    /// 按全文匹配查询；查询为空或索引未建时返回空列表。
+    /// <paramref name="filter"/>（v0.54，大小 / 修改时间）在 SQL 里参与筛选，所以
+    /// <paramref name="maxResults"/> 截断的永远是「通过筛选之后」的结果。
+    /// </summary>
     Task<IReadOnlyList<ContentSearchHit>> SearchAsync(
-        string query, int maxResults, CancellationToken cancellationToken);
+        string query, int maxResults, CancellationToken cancellationToken, SearchFilter? filter = null);
 
     /// <summary>删除全部索引数据（不动用户文件，不动文件名索引）。</summary>
     Task ClearAsync(CancellationToken cancellationToken);

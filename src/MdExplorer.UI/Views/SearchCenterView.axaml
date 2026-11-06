@@ -54,6 +54,48 @@
                        ToolTip.Tip="清空最近搜索词（只动本机设置，不动任何文件）" />
         </StackPanel>
       </md:MdScrollViewer>
+      <!-- 大小 / 修改时间筛选（v0.54）：在索引或 SQL 里就筛掉，不是先取回来再隐藏。 -->
+      <md:MdScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                         AllowMouseDrag="True">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="caption" Text="大小" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchSizeAll}" Variant="Outlined"
+                       Content="全部" Command="{Binding SetSearchSizeFilterCommand}" CommandParameter="Any"
+                       AutomationProperties.Name="大小：全部" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchSizeSmall}" Variant="Outlined"
+                       Content="&lt; 100 KB" Command="{Binding SetSearchSizeFilterCommand}" CommandParameter="Small"
+                       AutomationProperties.Name="大小：小于 100 KB" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchSizeMedium}" Variant="Outlined"
+                       Content="100 KB–1 MB" Command="{Binding SetSearchSizeFilterCommand}" CommandParameter="Medium"
+                       AutomationProperties.Name="大小：100 KB 到 1 MB" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchSizeLarge}" Variant="Outlined"
+                       Content="1–10 MB" Command="{Binding SetSearchSizeFilterCommand}" CommandParameter="Large"
+                       AutomationProperties.Name="大小：1 MB 到 10 MB" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchSizeHuge}" Variant="Outlined"
+                       Content="&gt; 10 MB" Command="{Binding SetSearchSizeFilterCommand}" CommandParameter="Huge"
+                       AutomationProperties.Name="大小：大于 10 MB" />
+          <Border Width="1" Height="20" VerticalAlignment="Center" Margin="2,0"
+                  Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
+          <TextBlock Classes="caption" Text="修改时间" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchDateAll}" Variant="Outlined"
+                       Content="全部" Command="{Binding SetSearchDateFilterCommand}" CommandParameter="Any"
+                       AutomationProperties.Name="修改时间：全部" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchDateToday}" Variant="Outlined"
+                       Content="今天" Command="{Binding SetSearchDateFilterCommand}" CommandParameter="Today"
+                       AutomationProperties.Name="修改时间：今天" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchDateWeek}" Variant="Outlined"
+                       Content="7 天" Command="{Binding SetSearchDateFilterCommand}" CommandParameter="Week"
+                       AutomationProperties.Name="修改时间：最近 7 天" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchDateMonth}" Variant="Outlined"
+                       Content="30 天" Command="{Binding SetSearchDateFilterCommand}" CommandParameter="Month"
+                       AutomationProperties.Name="修改时间：最近 30 天" />
+          <md:MdButton Classes="search-kind" Classes.active="{Binding IsSearchDateYear}" Variant="Outlined"
+                       Content="一年" Command="{Binding SetSearchDateFilterCommand}" CommandParameter="Year"
+                       AutomationProperties.Name="修改时间：最近一年" />
+        </StackPanel>
+      </md:MdScrollViewer>
     </StackPanel>
 
     <md:MdScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"

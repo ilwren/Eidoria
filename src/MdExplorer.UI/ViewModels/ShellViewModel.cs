@@ -2645,6 +2645,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     [ObservableProperty] private string _contentIndexUpdatedText = "尚未建立";
     [ObservableProperty] private string _searchCenterQuery = string.Empty;
     [ObservableProperty] private string _searchCenterKindFilter = "All";
+    [ObservableProperty] private string _searchSizeFilter = SearchFilterPresets.Any;
+    [ObservableProperty] private string _searchDateFilter = SearchFilterPresets.Any;
     [ObservableProperty] private string _semanticSearchIndexStatusText = "尚未建立 AI 语义索引";
     [ObservableProperty] private int _semanticSearchIndexedItemCount;
     [ObservableProperty] private bool _semanticSearchIndexIsCurrent;
@@ -2718,6 +2720,44 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public bool IsSearchKindArchive => SearchCenterKindFilter == nameof(FileKind.Archive);
     public bool IsSearchKindCode => SearchCenterKindFilter == nameof(FileKind.Code);
 
+    // 大小 / 修改时间筛选（v0.54）
+    public bool IsSearchSizeAll => SearchSizeFilter == SearchFilterPresets.Any;
+    public bool IsSearchSizeSmall => SearchSizeFilter == SearchFilterPresets.SizeSmall;
+    public bool IsSearchSizeMedium => SearchSizeFilter == SearchFilterPresets.SizeMedium;
+    public bool IsSearchSizeLarge => SearchSizeFilter == SearchFilterPresets.SizeLarge;
+    public bool IsSearchSizeHuge => SearchSizeFilter == SearchFilterPresets.SizeHuge;
+    public bool IsSearchDateAll => SearchDateFilter == SearchFilterPresets.Any;
+    public bool IsSearchDateToday => SearchDateFilter == SearchFilterPresets.DateToday;
+    public bool IsSearchDateWeek => SearchDateFilter == SearchFilterPresets.DateWeek;
+    public bool IsSearchDateMonth => SearchDateFilter == SearchFilterPresets.DateMonth;
+    public bool IsSearchDateYear => SearchDateFilter == SearchFilterPresets.DateYear;
+    public bool HasActiveSearchFilter => BuildSearchFilter() is not null;
+    /// <summary>筛选生效时的说明（状态栏与提示共用一句话）。</summary>
+    public string ActiveSearchFilterText
+    {
+        get
+        {
+            var parts = new List<string>(2);
+            if (SearchSizeFilter != SearchFilterPresets.Any)
+                parts.Add(SearchSizeFilter switch
+                {
+                    SearchFilterPresets.SizeSmall => "小于 100 KB",
+                    SearchFilterPresets.SizeMedium => "100 KB – 1 MB",
+                    SearchFilterPresets.SizeLarge => "1 – 10 MB",
+                    _ => "大于 10 MB",
+                });
+            if (SearchDateFilter != SearchFilterPresets.Any)
+                parts.Add(SearchDateFilter switch
+                {
+                    SearchFilterPresets.DateToday => "今天修改",
+                    SearchFilterPresets.DateWeek => "最近 7 天",
+                    SearchFilterPresets.DateMonth => "最近 30 天",
+                    _ => "最近一年",
+                });
+            return string.Join(" · ", parts);
+        }
+    }
+
     partial void OnUseSearchIndexChanged(bool value)
     {
         _services.SettingsStore.Settings.UseSearchIndex = value;
@@ -2782,6 +2822,41 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         !HasSearchIndexRoots ? "请先在设置页加入索引根。" :
         !HasContentIndex ? "内容索引尚未建立，建立后可跨文件搜正文。" :
         ContentIndexStatusText;
+
+    partial void OnSearchSizeFilterChanged(string value) => NotifySearchFilterChanged();
+
+    partial void OnSearchDateFilterChanged(string value) => NotifySearchFilterChanged();
+
+    private void NotifySearchFilterChanged()
+    {
+        foreach (var name in new[]
+                 {
+                     nameof(IsSearchSizeAll), nameof(IsSearchSizeSmall), nameof(IsSearchSizeMedium),
+                     nameof(IsSearchSizeLarge), nameof(IsSearchSizeHuge),
+                     nameof(IsSearchDateAll), nameof(IsSearchDateToday), nameof(IsSearchDateWeek),
+                     nameof(IsSearchDateMonth), nameof(IsSearchDateYear),
+                     nameof(HasActiveSearchFilter), nameof(ActiveSearchFilterText),
+                 })
+            OnPropertyChanged(name);
+    }
+
+    [RelayCommand]
+    private void SetSearchSizeFilter(string size) =>
+        SearchSizeFilter = SearchFilterPresets.Normalize(
+            size,
+            [SearchFilterPresets.SizeSmall, SearchFilterPresets.SizeMedium,
+             SearchFilterPresets.SizeLarge, SearchFilterPresets.SizeHuge]);
+
+    [RelayCommand]
+    private void SetSearchDateFilter(string date) =>
+        SearchDateFilter = SearchFilterPresets.Normalize(
+            date,
+            [SearchFilterPresets.DateToday, SearchFilterPresets.DateWeek,
+             SearchFilterPresets.DateMonth, SearchFilterPresets.DateYear]);
+
+    /// <summary>两档筛选取并集；都为「全部」时返回 null（调用方完全不筛）。</summary>
+    private SearchFilter? BuildSearchFilter() =>
+        SearchFilterPresets.Build(SearchSizeFilter, SearchDateFilter, DateTimeOffset.Now);
 
     partial void OnSearchCenterKindFilterChanged(string value)
     {
@@ -2951,7 +3026,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         SearchCenterStatusText = "正在搜索本地索引…";
         try
         {
-            var spec = new SearchSpec(query, string.Empty, kinds, ShowHidden, MaxResults: SearchResultLimit);
+            var spec = new SearchSpec(
+                query, string.Empty, kinds, ShowHidden, MaxResults: SearchResultLimit, Filter: BuildSearchFilter());
             var nameHits = new List<FileItem>(64);
             await foreach (var item in _services.SearchIndex.SearchAsync(spec, cts.Token).ConfigureAwait(true))
                 nameHits.Add(item);
@@ -2970,7 +3046,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 ? "没有匹配结果"
                 : contentCount > 0
                     ? $"{merged.Count} 项 · 文件名 {nameCount} · 正文 {contentCount}{(SearchIndexIsPartial ? " · 部分" : string.Empty)}"
-                    : $"{merged.Count} 项 · 本地索引{(SearchIndexIsPartial ? " · 部分" : string.Empty)}";
+                    : $"{merged.Count} 项 · 本地索引{(SearchIndexIsPartial ? " · 部分" : string.Empty)}"
+                      + (HasActiveSearchFilter ? $" · 筛选：{ActiveSearchFilterText}" : string.Empty);
             await RecordRecentSearchAsync(query).ConfigureAwait(true);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
@@ -3003,7 +3080,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         try
         {
             return await _services.ContentIndex
-                .SearchAsync(query, SearchResultLimit, cancellationToken).ConfigureAwait(true);
+                .SearchAsync(query, SearchResultLimit, cancellationToken, BuildSearchFilter()).ConfigureAwait(true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
         {
@@ -3145,9 +3222,13 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             var hits = await _services.SemanticSearch.SearchAsync(
                     query, kinds, SearchResultLimit, cts.Token)
                 .ConfigureAwait(true);
+            // v0.54：语义结果自带文件事实，大小 / 修改时间筛选在这里就地过一遍；
+            // 置信度按「筛完之后的结果」重算，否则「低置信」的阈值会对不上你实际看到的那几条。
+            var filter = BuildSearchFilter();
+            var visible = filter is null ? hits.ToList() : hits.Where(hit => filter.Matches(hit.Item.Length, hit.Item.LastWriteTime)).ToList();
             // v0.45 可解释性：分数照旧展示，另外标出「陪跑项」与「整次查询没有强匹配」。
-            var confidence = SemanticSearchConfidence.Evaluate([.. hits.Select(hit => hit.Score)]);
-            foreach (var hit in hits)
+            var confidence = SemanticSearchConfidence.Evaluate([.. visible.Select(hit => hit.Score)]);
+            foreach (var hit in visible)
             {
                 SearchCenterResults.Add(new FileItemViewModel(hit.Item)
                 {
@@ -3157,11 +3238,14 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 });
             }
 
-            SearchCenterStatusText = hits.Count == 0
-                ? "没有足够相似的结果；可换个描述，或扩展并重建索引"
+            var semanticFilterNote = HasActiveSearchFilter ? $" · 筛选：{ActiveSearchFilterText}" : string.Empty;
+            SearchCenterStatusText = visible.Count == 0
+                ? (filter is null
+                    ? "没有足够相似的结果；可换个描述，或扩展并重建索引"
+                    : $"没有符合筛选条件的语义结果{semanticFilterNote}")
                 : confidence.HasStrongMatch
-                    ? $"{hits.Count} 项 · 本机语义检索 · {hits[0].ModelName}{(confidence.HasLowConfidence ? $" · {confidence.LowConfidenceCount} 项低置信" : string.Empty)}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}"
-                    : $"{hits.Count} 项 · 最高相似度只有 {confidence.TopScore:P0}，约等于没找到；已按相似度排序供参考，换个说法通常更准";
+                    ? $"{visible.Count} 项 · 本机语义检索 · {visible[0].ModelName}{(confidence.HasLowConfidence ? $" · {confidence.LowConfidenceCount} 项低置信" : string.Empty)}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}{semanticFilterNote}"
+                    : $"{visible.Count} 项 · 最高相似度只有 {confidence.TopScore:P0}，约等于没找到；已按相似度排序供参考，换个说法通常更准{semanticFilterNote}";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -3383,7 +3467,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         try
         {
             var hits = await _services.ContentIndex
-                .SearchAsync(query, SearchResultLimit, cts.Token).ConfigureAwait(true);
+                .SearchAsync(query, SearchResultLimit, cts.Token, BuildSearchFilter()).ConfigureAwait(true);
             foreach (var hit in hits)
             {
                 var extension = Path.GetExtension(hit.Name);
@@ -3407,9 +3491,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 });
             }
 
+            var filterNote = HasActiveSearchFilter ? $" · 筛选：{ActiveSearchFilterText}" : string.Empty;
             SearchCenterStatusText = SearchCenterResults.Count == 0
-                ? "正文里没有匹配；索引只收白名单扩展名且单文件 ≤ 512 KB"
-                : $"{SearchCenterResults.Count} 项 · 全文命中 · {ContentIndexCountText} 篇已索引";
+                ? $"正文里没有匹配；索引只收白名单扩展名且单文件 ≤ 512 KB{filterNote}"
+                : $"{SearchCenterResults.Count} 项 · 全文命中 · {ContentIndexCountText} 篇已索引{filterNote}";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {

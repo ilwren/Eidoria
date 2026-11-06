@@ -414,6 +414,7 @@ public sealed class FileNameIndexService : IFileNameIndexService
             rootPrefix = WithTrailingSeparator(root);
         }
 
+        var filter = spec.Filter;
         var matches = new List<FileNameIndexEntry>();
         foreach (var entry in snapshot.Entries)
         {
@@ -426,6 +427,10 @@ public sealed class FileNameIndexService : IFileNameIndexService
                 continue;
             // v0.52：查询里的空格是 AND（每个词都要出现），不能再按整串子串匹配。
             if (query.Length > 0 && !SearchRanking.Matches(entry.Name, query))
+                continue;
+            // v0.54：大小 / 修改时间筛选。放在 MaxResults 截断之前，否则先截断再筛会出现「结果莫名其妙变少」。
+            if (filter is { IsEmpty: false } &&
+                !filter.Matches(entry.Length, new DateTimeOffset(entry.LastWriteUtcTicks, TimeSpan.Zero)))
                 continue;
             matches.Add(entry);
         }

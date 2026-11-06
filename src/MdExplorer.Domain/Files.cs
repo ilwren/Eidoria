@@ -80,7 +80,9 @@ public sealed record SearchSpec(
     string RootPath,
     IReadOnlySet<FileKind>? Kinds = null,
     bool IncludeHidden = false,
-    int MaxResults = 5000);
+    int MaxResults = 5000,
+    // 大小 / 修改时间筛选（v0.54）；null 或空表示不筛。
+    SearchFilter? Filter = null);
 
 /// <summary>写操作类型与冲突策略（任务队列语义见 DEVELOPMENT.md §5.5，v0.1 为串行执行器）。</summary>
 public enum ConflictPolicy { Overwrite, Skip, KeepBoth }
