@@ -29,6 +29,10 @@ public sealed partial class FileItemViewModel(FileItem model) : ObservableObject
     public string? SearchScoreText { get; init; }
     public bool HasSearchScore => !string.IsNullOrWhiteSpace(SearchScoreText);
 
+    /// <summary>语义命中的可信度标注（v0.45）：分数明显偏低时给出「低置信」，只提示不筛选。</summary>
+    public string? SearchConfidenceText { get; init; }
+    public bool HasSearchConfidence => !string.IsNullOrWhiteSpace(SearchConfidenceText);
+
     /// <summary>全文搜索命中附带原文上下文；其他搜索留空。</summary>
     public string? SearchSnippetText { get; init; }
     public bool HasSearchSnippet => !string.IsNullOrWhiteSpace(SearchSnippetText);

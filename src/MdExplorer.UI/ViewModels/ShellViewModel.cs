@@ -2644,7 +2644,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                     ? "请先启用文件名索引、加入本地文件夹并建立文件名索引。"
                     : !SearchIndexIsCurrent
                         ? "文件名索引需要先重建，之后才能建立 AI 向量索引。"
-                        : $"只在本机索引文件名与受限文本摘要，不保存原文或上传内容。{SemanticSearchIndexStatusText}";
+                        : $"只在本机索引文件名与受限文本摘要，不保存原文或上传内容。{SemanticSearchIndexStatusText}"
+                          + "结果按余弦相似度排序；标注「低置信」的是陪跑项。";
     public bool CanBuildSemanticSearchIndex => EnableLocalAi && HasLocalAiTextModel &&
         UseSearchIndex && HasSearchIndexRoots && SearchIndexIsCurrent && !IsSearchCenterBusy;
     public bool HasLocalAiTextModel => LocalAiModels.Any(model =>
@@ -2944,18 +2945,23 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             var hits = await _services.SemanticSearch.SearchAsync(
                     query, kinds, SearchResultLimit, cts.Token)
                 .ConfigureAwait(true);
+            // v0.45 可解释性：分数照旧展示，另外标出「陪跑项」与「整次查询没有强匹配」。
+            var confidence = SemanticSearchConfidence.Evaluate([.. hits.Select(hit => hit.Score)]);
             foreach (var hit in hits)
             {
                 SearchCenterResults.Add(new FileItemViewModel(hit.Item)
                 {
                     IsFavorite = _services.SettingsStore.IsFavorite(hit.Item.FullPath),
                     SearchScoreText = $"语义 {hit.Score:P0}",
+                    SearchConfidenceText = confidence.IsLowConfidence(hit.Score) ? "低置信" : null,
                 });
             }
 
             SearchCenterStatusText = hits.Count == 0
                 ? "没有足够相似的结果；可换个描述，或扩展并重建索引"
-                : $"{hits.Count} 项 · 本机语义检索 · {hits[0].ModelName}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}";
+                : confidence.HasStrongMatch
+                    ? $"{hits.Count} 项 · 本机语义检索 · {hits[0].ModelName}{(confidence.HasLowConfidence ? $" · {confidence.LowConfidenceCount} 项低置信" : string.Empty)}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}"
+                    : $"{hits.Count} 项 · 最高相似度只有 {confidence.TopScore:P0}，约等于没找到；已按相似度排序供参考，换个说法通常更准";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
