@@ -27,6 +27,7 @@ jobs:
           bash -n scripts/fetch-ai-models.sh
           bash -n scripts/test-fetch-ai-models.sh
           bash -n scripts/fetch-real-models-with-fallback.sh
+          bash -n scripts/accept-real-models.sh
           python3 -m py_compile scripts/fetch-ai-models-modelscope.py
           python3 scripts/test-fetch-ai-models-modelscope.py
           scripts/test-fetch-ai-models.sh
@@ -111,8 +112,20 @@ jobs:
             scripts/fetch-real-models-with-fallback.sh --dir "$MDEXPLORER_MODELS"
             scripts/fetch-ai-models.sh --dir "$MDEXPLORER_MODELS" --verify
           fi
-      - name: Run real-weight AI embedding and semantic search tests
-        run: dotnet test tests/MdExplorer.Tests -c Release --filter FullyQualifiedName~RealModelEmbeddingTests
+      - name: Run real-weight AI embedding, semantic search and acceptance tests
+        env:
+          MDEXPLORER_ACCEPTANCE_REPORT: ${{ github.workspace }}/real-model-report.md
+        run: |
+          set -o pipefail
+          dotnet test tests/MdExplorer.Tests -c Release \
+            --filter "FullyQualifiedName~RealModelEmbeddingTests|FullyQualifiedName~RealModelAcceptanceTests" \
+            2>&1 | tee real-model-tests.txt
+      - name: Publish acceptance report (回传 ci-artifacts 分支)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/publish-artifacts.sh logs-real-model real-model-tests.txt real-model-report.md
 
   ui-screenshots:
     name: UI screenshots (headless)

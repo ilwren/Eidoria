@@ -86,6 +86,25 @@ file|<id>|<仓库内路径>
 
 > 权重只在用户机器上下载，不进入本仓库；`models/` 已在 `.gitignore` 里。
 
+### 3.4 一条命令做端到端验收（v0.44）
+
+真实权重的质量只能靠真跑：下载哪一份、路由选中哪个模型、索引怎么切、查询多慢，都要看数字。
+
+```bash
+scripts/accept-real-models.sh                  # Linux / macOS / WSL
+pwsh scripts/accept-real-models.ps1            # Windows PowerShell 7
+```
+
+这一条命令做三件事：
+
+1. **补齐模型**：先 `--verify`；不完整就按 `huggingface.co → hf-mirror.com → modelscope.cn` 顺序补到同一目录（`fetch-ai-models.sh` 支持续传，不会重下完好的文件）。`--skip-download` 可只跑验收、不联网。
+2. **跑真实权重验收**：`RealModelAcceptanceTests` 用 12 篇合成文档（含 2 篇纯干扰项）建文件名索引 → 建 AI 向量索引 → 用 16 条自然语言查询（中英各 8，刻意不含目标文件名）各跑 3 次。
+3. **打印报告**：Markdown，写到 `artifacts/real-model-acceptance/report.md`（`--out` 可改）。报告含环境指纹（OS/架构/.NET 版本、模型 revision、目录）、四段耗时（文件名索引 / 向量索引 / 首次推理加载 / 查询中位与 P90）、质量指标（Top-1、Top-3、MRR、命中模型分布）与逐条查询明细（期望 vs 实际 Top-1、名次、分数）。
+
+**门槛与报告的边界**：脚本只硬性断言「链路没坏」（16 条里至少一半 Top-1 命中），不设精确质量阈值——合成语料上的分数由模型与 ONNX 运行时版本决定，写死数字只会换来随机变红；真正的硬门禁仍是 `RealModelEmbeddingTests`（相关文本必须比无关文本更像）。要看的是报告里的数字与趋势。
+
+**没被这条命令覆盖的**：真实用户语料（合成语料没有你机器上的文件），GPU/加速器（全程 CPU）、Android 设备、以及并发多查询下的吞吐。退出码：0 通过、1 用法/环境错误、2 模型准备失败、3 验收失败。
+
 ## 4. 应用侧现状（v0.38：A2 第一片）
 
 - `AiModelCatalog` 仍只做文件存在性/体积扫描；模型 Session 不在启动或设置页初始化。`OnnxTextEmbeddingService` 在用户显式建立 AI 索引/搜索时才按需加载 ONNX Session 与本地 `vocab.txt`。
