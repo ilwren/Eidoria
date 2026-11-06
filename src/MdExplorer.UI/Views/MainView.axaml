@@ -550,10 +550,12 @@
                 <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Icon="{x:Static md:MdSymbols.ArrowBack}" Command="{Binding Browser.GoBackCommand}"
                                  IsEnabled="{Binding Browser.CanGoBack}" AutomationProperties.Name="后退" />
                 <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Icon="{x:Static md:MdSymbols.ArrowForward}" Command="{Binding Browser.GoForwardCommand}"
+                                 IsVisible="{Binding ShowPathRowExtras}"
                                  IsEnabled="{Binding Browser.CanGoForward}" AutomationProperties.Name="前进" />
                 <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Icon="{x:Static md:MdSymbols.ArrowUpward}" Command="{Binding Browser.GoUpCommand}"
                                  IsEnabled="{Binding Browser.CanGoUp}" AutomationProperties.Name="上一级" />
                 <md:MdIconButton Width="40" Height="40" MinWidth="40" MinHeight="40" Icon="{x:Static md:MdSymbols.Refresh}" Command="{Binding Browser.RefreshCommand}"
+                                 IsVisible="{Binding ShowPathRowExtras}"
                                  AutomationProperties.Name="刷新" />
               </StackPanel>
               <Border x:Name="PathPill" Grid.Column="1" Classes="path-pill" MinHeight="38" ClipToBounds="True" Tapped="OnBreadcrumbBarTapped">

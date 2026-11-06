@@ -1665,7 +1665,18 @@ public sealed class ScreenshotTests
             Assert.False(shell.ShowBottomNav);
             Assert.True(shell.ShowRail);
             Assert.False(shell.ShowDrawerPane);
+            // 矮视口收起「前进 / 刷新」，把宽度让给路径胶囊。
+            Assert.False(shell.ShowPathRowExtras);
             return Task.CompletedTask;
+        },
+        afterShow: async window =>
+        {
+            await Task.Delay(120);
+            var pathPill = window.GetVisualDescendants().OfType<Border>()
+                .First(border => border.Name == "PathPill");
+            // 400 宽减去 84 导轨、后退/上一级与搜索/溢出：路径胶囊仍要能被读到，不能被压成 0。
+            Assert.True(pathPill.Bounds.Width >= 80,
+                $"路径胶囊只剩 {pathPill.Bounds.Width:0.#} DIP");
         });
 
     /// <summary>

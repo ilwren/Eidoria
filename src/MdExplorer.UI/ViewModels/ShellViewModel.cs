@@ -587,6 +587,13 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// <summary>Compact 编辑地址时让路径输入独占整行，导航/搜索/溢出按钮暂时让位。</summary>
     public bool ShowPathRowActions => !IsCompact || !Browser.IsAddressEditing;
 
+    /// <summary>
+    /// 矮视口（手机横屏 / 分屏小窗）里路径行只剩一百来像素：把「前进 / 刷新」收起来，
+    /// 优先保证「后退 / 上一级 / 路径 / 搜索」可读可点。刷新仍有下拉刷新与 F5，
+    /// 前进可用后退后重走或转回竖屏，不是不可达。
+    /// </summary>
+    public bool ShowPathRowExtras => !IsShortViewport;
+
     partial void OnPageChanged(ShellPage value)
     {
         if (value != ShellPage.Browser)
