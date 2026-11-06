@@ -149,6 +149,31 @@ public sealed class SearchIndexTests : IDisposable
         Assert.Equal("alpha-report.pdf", documents[0].Name);
     }
 
+    /// <summary>v0.52：空格是 AND——「alpha report」不再要求这两个词在名字里连着出现。</summary>
+    [Fact]
+    public async Task Search_TreatsSpacesAsAndAcrossNameTerms()
+    {
+        FileIn("alpha-report.md");
+        FileIn("report-alpha.md");
+        FileIn("alpha.md");
+        FileIn("report.md");
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        var both = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("alpha report", string.Empty), TestContext.Current.CancellationToken));
+        Assert.Equal(2, both.Count);
+
+        // 少一个词就不命中：AND 不是 OR。
+        var single = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("alpha invoice", string.Empty), TestContext.Current.CancellationToken));
+        Assert.Empty(single);
+
+        // 词序无关，重复空白不影响。
+        var reversed = await CollectAsync(_index.SearchAsync(
+            new SearchSpec("  report   alpha ", string.Empty), TestContext.Current.CancellationToken));
+        Assert.Equal(2, reversed.Count);
+    }
+
     [Fact]
     public async Task Search_SkipsDeletedEntries_AndClearRemovesSnapshot()
     {

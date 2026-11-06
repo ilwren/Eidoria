@@ -424,7 +424,8 @@ public sealed class FileNameIndexService : IFileNameIndexService
                 continue;
             if (hasKinds && !spec.Kinds!.Contains((FileKind)entry.Kind))
                 continue;
-            if (query.Length > 0 && !entry.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+            // v0.52：查询里的空格是 AND（每个词都要出现），不能再按整串子串匹配。
+            if (query.Length > 0 && !SearchRanking.Matches(entry.Name, query))
                 continue;
             matches.Add(entry);
         }

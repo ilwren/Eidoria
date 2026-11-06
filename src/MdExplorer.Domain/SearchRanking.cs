@@ -40,13 +40,48 @@ public static class SearchRanking
     /// <summary>不匹配。</summary>
     public const int NoMatch = 0;
 
-    /// <summary>返回 0（不匹配）到 1000（完全相同）之间的档位分。</summary>
+    /// <summary>
+    /// 返回 0（不匹配）到 1000（完全相同）之间的档位分。
+    /// <para>
+    /// v0.52：查询里的空格是 **AND**——每个词都得在文件名里出现，档位分取**最弱的那个词**。
+    /// 「任何一个词匹配得差，整体就往后排」符合直觉，也不用发明一套加权公式。
+    /// </para>
+    /// </summary>
     public static int Score(string? name, string? query)
     {
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(query))
             return NoMatch;
 
-        var needle = query.Trim();
+        var terms = SplitTerms(query);
+        if (terms.Count == 0)
+            return NoMatch;
+        if (terms.Count == 1)
+            return ScoreTerm(name, terms[0]);
+
+        var score = int.MaxValue;
+        foreach (var term in terms)
+        {
+            var single = ScoreTerm(name, term);
+            if (single == NoMatch)
+                return NoMatch;
+            score = Math.Min(score, single);
+        }
+        return score;
+    }
+
+    /// <summary>是否命中（等价于 <see cref="Score"/> 大于 0）：索引侧用它替换整串子串匹配。</summary>
+    public static bool Matches(string? name, string? query) => Score(name, query) > NoMatch;
+
+    /// <summary>按空白切词；连续空白、首尾空白都吃掉。</summary>
+    public static List<string> SplitTerms(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return [];
+        return [.. query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    }
+
+    private static int ScoreTerm(string name, string needle)
+    {
         var stem = Path.GetFileNameWithoutExtension(name);
         var inName = name.Contains(needle, StringComparison.OrdinalIgnoreCase);
         var inStem = stem.Contains(needle, StringComparison.OrdinalIgnoreCase);

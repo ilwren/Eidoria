@@ -88,6 +88,31 @@ public sealed class SearchRankingTests
         Assert.DoesNotContain(ranked, item => item.Name == "预算.md");
     }
 
+    /// <summary>v0.52：空格是 AND——每个词都得出现，档位分取最弱的那个词。</summary>
+    [Fact]
+    public void MultipleTermsAreAndedAndScoredByTheWeakest()
+    {
+        // 两个词都在主名开头 → 两个都算前缀档，取最弱 880。
+        Assert.Equal(SearchRanking.StemPrefix, SearchRanking.Score("budget-report.md", "budget report"));
+        // "2024" 是主名前缀（880），"budget" 只是从词中开始（780）→ 取最弱 780。
+        Assert.Equal(SearchRanking.StemSegmentPrefix, SearchRanking.Score("2024-budget-review.md", "2024 budget"));
+        // 少一个词就不算命中。
+        Assert.Equal(SearchRanking.NoMatch, SearchRanking.Score("budget-report.md", "budget invoice"));
+        Assert.False(SearchRanking.Matches("budget-report.md", "budget invoice"));
+        // 词序无关，重复空白不影响。
+        Assert.True(SearchRanking.Matches("budget-report.md", "  report   budget "));
+        // 中文同样按空格 AND。
+        Assert.True(SearchRanking.Matches("预算决算.md", "决算 预算"));
+        Assert.False(SearchRanking.Matches("预算决算.md", "决算 报销"));
+    }
+
+    [Fact]
+    public void SplitTermsDropsEmptyPieces()
+    {
+        Assert.Equal(["a", "b"], SearchRanking.SplitTerms("  a   b "));
+        Assert.Empty(SearchRanking.SplitTerms("   "));
+    }
+
     [Fact]
     public void RankIsStableForEqualScores()
     {
