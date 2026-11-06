@@ -33,6 +33,13 @@ public sealed partial class FileItemViewModel(FileItem model) : ObservableObject
     public string? SearchConfidenceText { get; init; }
     public bool HasSearchConfidence => !string.IsNullOrWhiteSpace(SearchConfidenceText);
 
+    /// <summary>
+    /// 关键词模式下的命中来源标注（v0.50）：<c>文件名</c> / <c>正文</c>。
+    /// 融合搜索会同时给出两类结果，用户得能一眼分清「为什么它在这里」。
+    /// </summary>
+    public string? SearchSourceText { get; init; }
+    public bool HasSearchSource => !string.IsNullOrWhiteSpace(SearchSourceText);
+
     /// <summary>全文搜索命中附带原文上下文；其他搜索留空。</summary>
     public string? SearchSnippetText { get; init; }
     public bool HasSearchSnippet => !string.IsNullOrWhiteSpace(SearchSnippetText);

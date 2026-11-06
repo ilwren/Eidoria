@@ -106,13 +106,16 @@
                                                 TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
                                                 ToolTip.Tip="命中的词在文中的位置"
                                                 IsVisible="{Binding HasSearchSnippet}" />
-                      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                         <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CompactMetaText}" />
-                        <TextBlock Grid.Column="2" Classes="caption" Text="{Binding SearchScoreText}"
+                        <TextBlock Grid.Column="2" Classes="caption" Text="{Binding SearchSourceText}"
+                                   ToolTip.Tip="这是关键词搜索的命中来源：文件名命中排在正文命中之前。"
+                                   IsVisible="{Binding HasSearchSource}" />
+                        <TextBlock Grid.Column="3" Classes="caption" Text="{Binding SearchScoreText}"
                                    ToolTip.Tip="余弦相似度：越高越接近你的描述；这是排序依据，不是概率。"
                                    IsVisible="{Binding HasSearchScore}" />
-                        <TextBlock Grid.Column="3" Classes="caption" Text="{Binding SearchConfidenceText}"
+                        <TextBlock Grid.Column="4" Classes="caption" Text="{Binding SearchConfidenceText}"
                                    Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"
                                    ToolTip.Tip="相似度接近本次结果的下限：可能是陪跑项，请自己判断。"
                                    IsVisible="{Binding HasSearchConfidence}" />

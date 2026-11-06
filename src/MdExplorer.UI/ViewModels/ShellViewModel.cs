@@ -2673,11 +2673,11 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         ? "搜索已建索引的文件正文"
         : IsSemanticSearchMode
             ? "用自然语言描述要找的文件或笔记"
-            : "搜索已索引文件名";
+            : "搜索已索引文件名，也可搜正文";
     public string SearchCenterModeHintText => IsContentSearchMode
         ? ContentSearchHintText()
         : !IsSemanticSearchMode
-        ? "按名称匹配已加入索引的文件与文件夹。"
+        ? KeywordSearchHintText()
         : !EnableLocalAi
             ? "请先到设置启用本地 AI；所有嵌入推理均在本机运行，不上传内容。"
             : !HasLocalAiTextModel
@@ -2757,6 +2757,19 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             : "输入文件名关键词开始搜索";
 
     /// <summary>内容搜索的引导文案：缺什么就说什么，别让用户对着空列表猜。</summary>
+    /// <summary>
+    /// 关键词模式的提示（v0.50）：按相关度排序，并把正文命中接在后面——
+    /// 用户不必先想「这个词在文件名里还是在正文里」再决定切哪个模式。
+    /// </summary>
+    private string KeywordSearchHintText()
+    {
+        if (!EnableContentIndex)
+            return "按名称匹配已加入索引的文件与文件夹；排序按相关度（同名 > 前缀 > 包含）。";
+        return HasContentIndex
+            ? "按相关度匹配文件名（同名 > 前缀 > 包含），并把已建索引的正文命中也一并列出、标为「正文」。"
+            : "按相关度匹配文件名（同名 > 前缀 > 包含）；启用并建立内容索引后，正文命中也在这里出现。";
+    }
+
     private string ContentSearchHintText() =>
         !EnableContentIndex ? "请先在设置页启用全文内容索引。" :
         !HasSearchIndexRoots ? "请先在设置页加入索引根。" :
@@ -2927,28 +2940,28 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
         IsSearchCenterBusy = true;
         SearchCenterStatusText = "正在搜索本地索引…";
-        var batch = new List<FileItemViewModel>(50);
         try
         {
             var spec = new SearchSpec(query, string.Empty, kinds, ShowHidden, MaxResults: SearchResultLimit);
+            var nameHits = new List<FileItem>(64);
             await foreach (var item in _services.SearchIndex.SearchAsync(spec, cts.Token).ConfigureAwait(true))
-            {
-                batch.Add(new FileItemViewModel(item)
-                {
-                    IsFavorite = _services.SettingsStore.IsFavorite(item.FullPath),
-                });
-                if (batch.Count < 50)
-                    continue;
-                foreach (var result in batch)
-                    SearchCenterResults.Add(result);
-                batch.Clear();
-            }
+                nameHits.Add(item);
 
-            foreach (var result in batch)
+            // v0.50：关键词不再按字母序返回。先按相关性排（同名 > 主名相同 > 前缀 > 词首 > 包含），
+            // 再把正文命中接在后面；两条通道按路径去重，文件名命中优先保留（它也能带上正文摘要）。
+            var ranked = SearchRanking.Rank(nameHits, query);
+            var contentHits = await TrySearchContentForKeywordAsync(query, cts.Token).ConfigureAwait(true);
+            var merged = MergeKeywordResults(ranked, contentHits, kinds, SearchResultLimit);
+            foreach (var result in merged)
                 SearchCenterResults.Add(result);
-            SearchCenterStatusText = SearchCenterResults.Count == 0
+
+            var nameCount = merged.Count(result => string.Equals(result.SearchSourceText, NameHitLabel, StringComparison.Ordinal));
+            var contentCount = merged.Count - nameCount;
+            SearchCenterStatusText = merged.Count == 0
                 ? "没有匹配结果"
-                : $"{SearchCenterResults.Count} 项 · 本地索引{(SearchIndexIsPartial ? " · 部分" : string.Empty)}";
+                : contentCount > 0
+                    ? $"{merged.Count} 项 · 文件名 {nameCount} · 正文 {contentCount}{(SearchIndexIsPartial ? " · 部分" : string.Empty)}"
+                    : $"{merged.Count} 项 · 本地索引{(SearchIndexIsPartial ? " · 部分" : string.Empty)}";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -2959,6 +2972,95 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             if (ReferenceEquals(_searchCenterCts, cts))
                 IsSearchCenterBusy = false;
         }
+    }
+
+    private const string NameHitLabel = "文件名";
+    private const string ContentHitLabel = "正文";
+
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    /// <summary>
+    /// 关键词模式的正文通道（v0.50 融合）：只有内容索引已启用且已建立时才参与，查询至少 2 个字符
+    /// （一个字的全文搜索几乎全是噪声）。读不出来就当没有——不能让正文索引把文件名结果一起拖垮。
+    /// </summary>
+    private async Task<IReadOnlyList<ContentSearchHit>> TrySearchContentForKeywordAsync(
+        string query, CancellationToken cancellationToken)
+    {
+        if (!EnableContentIndex || query.Length < 2 || !HasContentIndex)
+            return [];
+
+        try
+        {
+            return await _services.ContentIndex
+                .SearchAsync(query, SearchResultLimit, cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// 把「文件名命中」与「正文命中」合成一份结果：文件名在前（已按相关性排好），正文按索引给的
+    /// bm25 顺序接在后面，同一路径只留一条。文件名命中也一并带上正文摘要，用户能看到命中上下文。
+    /// </summary>
+    private List<FileItemViewModel> MergeKeywordResults(
+        IReadOnlyList<FileItem> nameHits, IReadOnlyList<ContentSearchHit> contentHits,
+        IReadOnlySet<FileKind>? kinds, int limit)
+    {
+        var results = new List<FileItemViewModel>(Math.Min(limit, nameHits.Count + contentHits.Count));
+        var seen = new HashSet<string>(PathComparer);
+        var snippets = new Dictionary<string, ContentSearchHit>(PathComparer);
+        foreach (var hit in contentHits)
+            snippets[hit.Path] = hit;
+
+        foreach (var item in nameHits)
+        {
+            if (results.Count >= limit)
+                return results;
+            if (!seen.Add(item.FullPath))
+                continue;
+            snippets.TryGetValue(item.FullPath, out var snippet);
+            results.Add(new FileItemViewModel(item)
+            {
+                IsFavorite = _services.SettingsStore.IsFavorite(item.FullPath),
+                SearchSourceText = NameHitLabel,
+                SearchSnippetText = snippet?.Snippet,
+                SearchSnippetHighlightStart = snippet?.MatchOffset ?? -1,
+                SearchSnippetHighlightLength = snippet?.MatchLength ?? 0,
+            });
+        }
+
+        foreach (var hit in contentHits)
+        {
+            if (results.Count >= limit)
+                return results;
+            if (!seen.Add(hit.Path))
+                continue;
+            var extension = Path.GetExtension(hit.Name);
+            var item = new FileItem(
+                FileLocator.FromPath(hit.Path),
+                hit.Name,
+                FileKindClassifier.Classify(hit.Name),
+                hit.Length,
+                hit.LastWriteTime,
+                false,
+                false,
+                extension.Length == 0 ? null : extension);
+            if (kinds is not null && !kinds.Contains(item.Kind))
+                continue;
+            results.Add(new FileItemViewModel(item)
+            {
+                IsFavorite = _services.SettingsStore.IsFavorite(hit.Path),
+                SearchSourceText = ContentHitLabel,
+                SearchSnippetText = hit.Snippet,
+                SearchSnippetHighlightStart = hit.MatchOffset,
+                SearchSnippetHighlightLength = hit.MatchLength,
+            });
+        }
+
+        return results;
     }
 
     private async Task RunSemanticSearchAsync(string query, IReadOnlySet<FileKind>? kinds, CancellationTokenSource cts)
