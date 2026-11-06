@@ -1,6 +1,6 @@
 # Eidoria 端到端验收报告（真实权重）
 
-- 生成时间：2026-11-06 05:39:07 +00:00
+- 生成时间：2026-11-06 05:51:40 +00:00
 - 运行环境：Unix 7.0.0.1019 / X64 / .NET 10.0.14
 - 模型目录：`/home/runner/work/_temp/mdexplorer-real-models`
 - 模型 `text-embed-zh`：BGE small 中文嵌入 · revision `75c43b069aac4d136ba6bc1122f995fedcfd2781` · 512 维
@@ -15,11 +15,11 @@
 
 | 阶段 | 耗时 | 备注 |
 |---|---|---|
-| 首次推理（冷加载 ONNX Session） | 256.0 ms | 输出 512 维 |
-| 文件名索引重建 | 87.4 ms | 12 项、1 个根 |
-| AI 向量索引重建 | 1183.3 ms | 已加载会话；12 项被向量化 |
-| 查询中位延迟 | 7.8 ms | 16 条查询各跑 3 次取中位 |
-| 查询 P90 | 23.7 ms | — |
+| 首次推理（冷加载 ONNX Session） | 252.1 ms | 输出 512 维 |
+| 文件名索引重建 | 93.9 ms | 12 项、1 个根 |
+| AI 向量索引重建 | 1060.3 ms | 已加载会话；12 项被向量化 |
+| 查询中位延迟 | 6.5 ms | 16 条查询各跑 3 次取中位 |
+| 查询 P90 | 15.6 ms | — |
 
 ## 质量
 
@@ -30,22 +30,22 @@
 
 | # | 查询 | 期望 | 实际 Top-1 | 名次 | Top-1 分数 | 该文件分数 | 模型 | 中位延迟 |
 |---|---|---|---|---|---|---|---|---|
-| 1 | 忘记密码了怎么重置 | account-password.md | account-password.md | 1 | 0.663 | 0.663 | BGE small 中文嵌入 | 23.7 ms |
-| 2 | 退货之后退款要等多久 | refund-policy.md | refund-policy.md | 1 | 0.642 | 0.642 | BGE small 中文嵌入 | 28.1 ms |
-| 3 | 番茄和鸡蛋一起炒怎么做 | tomato-egg-recipe.md | tomato-egg-recipe.md | 1 | 0.609 | 0.609 | BGE small 中文嵌入 | 17.0 ms |
-| 4 | 周六周日适合出门吗 | weekend-weather.md | weekend-weather.md | 1 | 0.539 | 0.539 | BGE small 中文嵌入 | 13.8 ms |
-| 5 | 笔记本电池怎么能用久一点 | laptop-battery.md | laptop-battery.md | 1 | 0.594 | 0.594 | BGE small 中文嵌入 | 10.9 ms |
-| 6 | 公司报销要开发票怎么办 | invoice-tax.md | invoice-tax.md | 1 | 0.544 | 0.544 | BGE small 中文嵌入 | 11.3 ms |
-| 7 | 变基时冲突太多想放弃 | git-rebase.md | git-rebase.md | 1 | 0.512 | 0.512 | BGE small 中文嵌入 | 11.3 ms |
-| 8 | 面包的酵种一直不发酵 | sourdough.md | sourdough.md | 1 | 0.626 | 0.626 | BGE small 中文嵌入 | 7.8 ms |
-| 9 | reset a forgotten login password | account-password.md | account-password.md | 1 | 0.601 | 0.601 | MiniLM L6 v2 英文嵌入 | 2.2 ms |
-| 10 | how many days until the money comes back after a return | refund-policy.md | refund-policy.md | 1 | 0.585 | 0.585 | MiniLM L6 v2 英文嵌入 | 2.7 ms |
-| 11 | quick recipe with tomato and egg | tomato-egg-recipe.md | tomato-egg-recipe.md | 1 | 0.681 | 0.681 | MiniLM L6 v2 英文嵌入 | 2.0 ms |
-| 12 | will it rain on the weekend | weekend-weather.md | weekend-weather.md | 1 | 0.487 | 0.487 | MiniLM L6 v2 英文嵌入 | 1.7 ms |
-| 13 | make my laptop battery last longer | laptop-battery.md | laptop-battery.md | 1 | 0.527 | 0.527 | MiniLM L6 v2 英文嵌入 | 1.6 ms |
-| 14 | need a company invoice with tax id | invoice-tax.md | invoice-tax.md | 1 | 0.652 | 0.652 | MiniLM L6 v2 英文嵌入 | 1.9 ms |
-| 15 | too many conflicts during git rebase | git-rebase.md | git-rebase.md | 1 | 0.685 | 0.685 | MiniLM L6 v2 英文嵌入 | 1.9 ms |
-| 16 | sourdough starter is not rising | sourdough.md | sourdough.md | 1 | 0.501 | 0.501 | MiniLM L6 v2 英文嵌入 | 1.7 ms |
+| 1 | 忘记密码了怎么重置 | account-password.md | account-password.md | 1 | 0.663 | 0.663 | BGE small 中文嵌入 | 20.0 ms |
+| 2 | 退货之后退款要等多久 | refund-policy.md | refund-policy.md | 1 | 0.642 | 0.642 | BGE small 中文嵌入 | 13.9 ms |
+| 3 | 番茄和鸡蛋一起炒怎么做 | tomato-egg-recipe.md | tomato-egg-recipe.md | 1 | 0.609 | 0.609 | BGE small 中文嵌入 | 15.6 ms |
+| 4 | 周六周日适合出门吗 | weekend-weather.md | weekend-weather.md | 1 | 0.539 | 0.539 | BGE small 中文嵌入 | 12.5 ms |
+| 5 | 笔记本电池怎么能用久一点 | laptop-battery.md | laptop-battery.md | 1 | 0.594 | 0.594 | BGE small 中文嵌入 | 6.5 ms |
+| 6 | 公司报销要开发票怎么办 | invoice-tax.md | invoice-tax.md | 1 | 0.544 | 0.544 | BGE small 中文嵌入 | 6.5 ms |
+| 7 | 变基时冲突太多想放弃 | git-rebase.md | git-rebase.md | 1 | 0.512 | 0.512 | BGE small 中文嵌入 | 6.4 ms |
+| 8 | 面包的酵种一直不发酵 | sourdough.md | sourdough.md | 1 | 0.626 | 0.626 | BGE small 中文嵌入 | 10.4 ms |
+| 9 | reset a forgotten login password | account-password.md | account-password.md | 1 | 0.601 | 0.601 | MiniLM L6 v2 英文嵌入 | 14.5 ms |
+| 10 | how many days until the money comes back after a return | refund-policy.md | refund-policy.md | 1 | 0.585 | 0.585 | MiniLM L6 v2 英文嵌入 | 10.0 ms |
+| 11 | quick recipe with tomato and egg | tomato-egg-recipe.md | tomato-egg-recipe.md | 1 | 0.681 | 0.681 | MiniLM L6 v2 英文嵌入 | 5.0 ms |
+| 12 | will it rain on the weekend | weekend-weather.md | weekend-weather.md | 1 | 0.487 | 0.487 | MiniLM L6 v2 英文嵌入 | 4.8 ms |
+| 13 | make my laptop battery last longer | laptop-battery.md | laptop-battery.md | 1 | 0.527 | 0.527 | MiniLM L6 v2 英文嵌入 | 4.8 ms |
+| 14 | need a company invoice with tax id | invoice-tax.md | invoice-tax.md | 1 | 0.652 | 0.652 | MiniLM L6 v2 英文嵌入 | 4.9 ms |
+| 15 | too many conflicts during git rebase | git-rebase.md | git-rebase.md | 1 | 0.685 | 0.685 | MiniLM L6 v2 英文嵌入 | 4.3 ms |
+| 16 | sourdough starter is not rising | sourdough.md | sourdough.md | 1 | 0.501 | 0.501 | MiniLM L6 v2 英文嵌入 | 4.8 ms |
 
 ## 怎么读这份报告
 
@@ -53,4 +53,4 @@
 - **Top-1 分数与该文件分数** 是同一模型的余弦相似度；两者差距太小（< 0.05）说明这条查询本身区分度低，不是链路坏了。
 - **延迟** 是 CPU 上的单次查询耗时，含一次查询编码；它不代表批量索引吞吐。
 - 语料是 12 篇合成文档（含 2 篇纯干扰项），查询刻意不含目标文件名，避免退化成关键词匹配。
-- 工作目录：`/tmp/mdexplorer-acceptance/ce2a3bf354214470b00f1bab44129be0`（跑完即删，报告里保留路径便于对照）。
+- 工作目录：`/tmp/mdexplorer-acceptance/116f97a664894006b418893097cd7700`（跑完即删，报告里保留路径便于对照）。
