@@ -451,6 +451,9 @@ public sealed class SqliteContentIndex : IContentIndexService
         var index = needle.Length == 0
             ? 0
             : flat.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+        // 找不到时窗口仍从头开始，但**不能**把这个 0 当成命中位置——
+        // 否则 UI 会把开头三个字当成命中词加亮（v0.48 单测抓到的就是这个）。
+        var found = index;
         if (index < 0)
             index = 0;
 
@@ -459,9 +462,9 @@ public sealed class SqliteContentIndex : IContentIndexService
         var slice = flat.Substring(start, Math.Max(0, length));
         var prefix = start > 0 ? "…" : string.Empty;
         var suffix = start + length < flat.Length ? "…" : string.Empty;
-        if (needle.Length > 0 && index >= start && index + needle.Length <= start + length)
+        if (found >= 0 && needle.Length > 0 && found >= start && found + needle.Length <= start + length)
         {
-            matchOffset = prefix.Length + (index - start);
+            matchOffset = prefix.Length + (found - start);
             matchLength = needle.Length;
         }
 
