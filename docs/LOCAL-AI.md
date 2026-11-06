@@ -103,6 +103,8 @@ pwsh scripts/accept-real-models.ps1            # Windows PowerShell 7
 
 **门槛与报告的边界**：脚本只硬性断言「链路没坏」（16 条里至少一半 Top-1 命中），不设精确质量阈值——合成语料上的分数由模型与 ONNX 运行时版本决定，写死数字只会换来随机变红；真正的硬门禁仍是 `RealModelEmbeddingTests`（相关文本必须比无关文本更像）。要看的是报告里的数字与趋势。
 
+**一次真实观测（CI，run `42148547462`，2 vCPU runner）**：冷加载 ONNX Session 339.8 ms；文件名索引 137.3 ms（12 项）；向量索引 2216.9 ms（12 项，会话已热）；查询中位 15.4 ms、P90 30.3 ms；Top-1 16/16、MRR 1.000，中文 8 条全部路由到 BGE small、英文 8 条全部路由到 MiniLM L6 v2。报告同时记下两个模型的文件数与 SHA-256（`onnx/model_quantized.onnx`），与 `checksums.txt` 一致。
+
 **没被这条命令覆盖的**：真实用户语料（合成语料没有你机器上的文件），GPU/加速器（全程 CPU）、Android 设备、以及并发多查询下的吞吐。退出码：0 通过、1 用法/环境错误、2 模型准备失败、3 验收失败。
 
 ## 4. 应用侧现状（v0.38：A2 第一片）
