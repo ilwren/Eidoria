@@ -700,9 +700,12 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             < 1600 => SizeClass.Large,
             _ => SizeClass.ExtraLarge,
         };
+        // 先算再改：SizeClass 赋过值之后它自然等于 next，「next == SizeClass.Compact」恒为真，
+        // 会让文档工作台永远以为自己是紧凑布局（PDF 宽度、状态文案、Office 排版全跟着错）。
+        var isCompact = next == SizeClass.Compact;
         if (next != SizeClass)
             SizeClass = next;
-        DocumentWorkbench.IsCompactLayout = next == SizeClass.Compact;
+        DocumentWorkbench.IsCompactLayout = isCompact;
     }
 
     public void RefreshPreviewVisibility()

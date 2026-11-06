@@ -212,6 +212,31 @@ public sealed class DocumentWorkbenchTests : IDisposable
         Assert.False(page.HasPageImage);
     }
 
+    /// <summary>
+    /// v0.51：`SetViewportSize` 原先在改完 `SizeClass` 之后才判断 `next == SizeClass.Compact`，
+    /// 那时两者必然相等，文档工作台永远处于紧凑布局（PDF 宽度、状态文案、Office 排版都跟着错）。
+    /// </summary>
+    [Fact]
+    public void DocumentWorkbenchCompactFlagFollowsSizeClass()
+    {
+        var dataDir = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N"), "data")).FullName;
+        var startDir = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N"), "start")).FullName;
+        var shell = AppHost.CreateShell(AppHost.Build(dataDir, startDir));
+
+        shell.SetViewportSize(1440, 900);
+        Assert.Equal(SizeClass.Large, shell.SizeClass);
+        Assert.False(shell.DocumentWorkbench.IsCompactLayout);
+
+        shell.SetViewportSize(390, 844);
+        Assert.Equal(SizeClass.Compact, shell.SizeClass);
+        Assert.True(shell.DocumentWorkbench.IsCompactLayout);
+
+        // Medium 也不算紧凑：紧凑只对应 Compact 一档。
+        shell.SetViewportSize(700, 900);
+        Assert.Equal(SizeClass.Medium, shell.SizeClass);
+        Assert.False(shell.DocumentWorkbench.IsCompactLayout);
+    }
+
     private async Task<(ShellViewModel Shell, string Path)> CreateShellWithFileAsync(string name, string content)
     {
         var dataDir = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N"), "data")).FullName;
