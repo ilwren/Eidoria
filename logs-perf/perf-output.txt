@@ -15,23 +15,23 @@ A total of 1 test files matched the specified pattern.
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
 [xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
 [xUnit.net 00:00:00.19]   Discovering: MdExplorer.Performance
-[xUnit.net 00:00:00.48]   Discovered:  MdExplorer.Performance
-[xUnit.net 00:00:00.69]   Starting:    MdExplorer.Performance
-  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [536 ms]
+[xUnit.net 00:00:00.44]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.66]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [451 ms]
   Standard Output Messages:
- [perf] 1 万条目录首批上屏：298.2 ms（首屏 120 行，总数 10000）
- [perf] 补齐剩余 9880 行：106.5 ms
+ [perf] 1 万条目录首批上屏：264.7 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：59.9 ms
 
 
   Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [2 s]
   Standard Output Messages:
- [perf] 内容索引重建 10000 篇：2340 ms，库体积 4.88 MB
- [perf] 内容索引重建（10000 篇全未变）：85 ms，库体积 4.88 MB
- [perf] 内容索引查询命中 50 条：16.5 ms
+ [perf] 内容索引重建 10000 篇：2384 ms，库体积 4.88 MB
+ [perf] 内容索引重建（10000 篇全未变）：108 ms，库体积 4.88 MB
+ [perf] 内容索引查询命中 50 条：16.8 ms
 
 
-[xUnit.net 00:00:05.89]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
-  Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [1 ms]
+[xUnit.net 00:00:05.67]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [2 ms]
   Standard Output Messages:
  [perf] 组合根 + Shell 构造：1.4 ms
 
@@ -40,4 +40,4 @@ A total of 1 test files matched the specified pattern.
 Test Run Successful.
 Total tests: 3
      Passed: 3
- Total time: 6.4144 Seconds
+ Total time: 6.1784 Seconds
