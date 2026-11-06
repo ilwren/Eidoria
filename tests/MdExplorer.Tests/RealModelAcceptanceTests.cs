@@ -91,24 +91,26 @@ public sealed class RealModelAcceptanceTests
             settings.Settings.UseSearchIndex = true;
             settings.Settings.SearchIndexRootPaths = [root];
 
+            using var embeddings = new OnnxTextEmbeddingService(catalog);
+            var availableModels = embeddings.GetAvailableModels();
+            Assert.NotEmpty(availableModels);
+
+            // 冷加载必须在任何索引重建之前量：重建本身就会把 ONNX Session 建起来。
+            var modelLoadTimer = Stopwatch.StartNew();
+            var warmup = embeddings.Embed(
+                availableModels[0].Id, "预热：建立一次推理会话", isQuery: true, cancellationToken);
+            modelLoadTimer.Stop();
+
             var fileNameIndex = new FileNameIndexService(dataDirectory, settings);
             var nameIndexTimer = Stopwatch.StartNew();
             await fileNameIndex.RebuildAsync(null, cancellationToken);
             nameIndexTimer.Stop();
-
-            using var embeddings = new OnnxTextEmbeddingService(catalog);
-            var availableModels = embeddings.GetAvailableModels();
-            Assert.NotEmpty(availableModels);
+            var nameStats = await fileNameIndex.GetStatsAsync(cancellationToken);
 
             var semantic = new SemanticSearchService(dataDirectory, fileNameIndex, settings, embeddings);
             var semanticIndexTimer = Stopwatch.StartNew();
             var stats = await semantic.RebuildAsync(null, cancellationToken);
             semanticIndexTimer.Stop();
-
-            var modelLoadTimer = Stopwatch.StartNew();
-            var warmup = embeddings.Embed(
-                availableModels[0].Id, "预热：建立一次推理会话", isQuery: true, cancellationToken);
-            modelLoadTimer.Stop();
 
             var results = new List<QueryResult>();
             foreach (var (query, expected) in Queries)
@@ -143,7 +145,7 @@ public sealed class RealModelAcceptanceTests
             }
 
             var report = BuildReport(
-                modelsDirectory!, catalog, availableModels, workspace, stats,
+                modelsDirectory!, catalog, availableModels, workspace, stats, nameStats,
                 nameIndexTimer.Elapsed.TotalMilliseconds,
                 semanticIndexTimer.Elapsed.TotalMilliseconds,
                 modelLoadTimer.Elapsed.TotalMilliseconds,
@@ -187,6 +189,7 @@ public sealed class RealModelAcceptanceTests
         IReadOnlyList<TextEmbeddingModel> models,
         string workspace,
         SemanticSearchStats stats,
+        FileNameIndexStats nameStats,
         double nameIndexMilliseconds,
         double semanticIndexMilliseconds,
         double modelLoadMilliseconds,
@@ -206,14 +209,29 @@ public sealed class RealModelAcceptanceTests
         builder.AppendLine($"- 模型目录：`{modelsDirectory}`");
         foreach (var model in models)
             builder.AppendLine($"- 模型 `{model.Id}`：{model.Name} · revision `{model.Revision}` · {model.Dimensions} 维");
+        foreach (var status in catalog.Scan().Where(status => status.Installed))
+        {
+            builder.AppendLine(
+                $"- 已就绪 `{status.Definition.Id}`：{status.PresentFiles}/{status.TotalFiles} 个文件、" +
+                $"{(status.InstalledBytes / 1024.0 / 1024.0).ToString("F1", CultureInfo.InvariantCulture)} MB");
+        }
+
+        // 权重指纹：与下载脚本打印的是同一份 checksums.txt，出问题能直接比对。
+        var checksumLines = ReadOnnxChecksums(modelsDirectory);
+        if (checksumLines.Count > 0)
+        {
+            builder.AppendLine("- 权重指纹（`onnx/model_quantized.onnx`）：");
+            foreach (var line in checksumLines)
+                builder.AppendLine($"  - `{line}`");
+        }
         builder.AppendLine();
         builder.AppendLine("## 链路段耗时");
         builder.AppendLine();
         builder.AppendLine("| 阶段 | 耗时 | 备注 |");
         builder.AppendLine("|---|---|---|");
-        builder.AppendLine($"| 文件名索引重建 | {nameIndexMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | {stats.IndexedItemCount} 项 |");
-        builder.AppendLine($"| AI 向量索引重建 | {semanticIndexMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | 含 ONNX Session 加载 |");
-        builder.AppendLine($"| 首次推理（模型加载） | {modelLoadMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | 输出 {embeddingDimensions} 维 |");
+        builder.AppendLine($"| 首次推理（冷加载 ONNX Session） | {modelLoadMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | 输出 {embeddingDimensions} 维 |");
+        builder.AppendLine($"| 文件名索引重建 | {nameIndexMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | {nameStats.EntryCount} 项、{nameStats.RootCount} 个根 |");
+        builder.AppendLine($"| AI 向量索引重建 | {semanticIndexMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms | 已加载会话；{stats.IndexedItemCount} 项被向量化 |");
         builder.AppendLine($"| 查询中位延迟 | {Median(latencies).ToString("F1", CultureInfo.InvariantCulture)} ms | 16 条查询各跑 3 次取中位 |");
         builder.AppendLine($"| 查询 P90 | {Percentile(latencies, 0.9).ToString("F1", CultureInfo.InvariantCulture)} ms | — |");
         builder.AppendLine();
@@ -246,6 +264,24 @@ public sealed class RealModelAcceptanceTests
         builder.AppendLine("- 语料是 12 篇合成文档（含 2 篇纯干扰项），查询刻意不含目标文件名，避免退化成关键词匹配。");
         builder.AppendLine($"- 工作目录：`{workspace}`（跑完即删，报告里保留路径便于对照）。");
         return builder.ToString();
+    }
+
+    private static IReadOnlyList<string> ReadOnnxChecksums(string modelsDirectory)
+    {
+        var path = Path.Combine(modelsDirectory, AiModelDownloader.ChecksumsFileName);
+        try
+        {
+            if (!File.Exists(path))
+                return [];
+            return File.ReadAllLines(path)
+                .Where(line => line.Contains("onnx/model_quantized.onnx", StringComparison.Ordinal))
+                .Select(line => line.Trim())
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
     }
 
     private static string ResolveReportPath(string workspace)
