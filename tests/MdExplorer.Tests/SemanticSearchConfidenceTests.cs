@@ -47,12 +47,12 @@ public class SemanticSearchConfidenceTests
     [Fact]
     public void TailingHitsFarBelowTheLeaderAreLowConfidence()
     {
-        // 第一名 0.64 相关；0.41 远低于「第一名 × 0.85 = 0.544」，是陪跑项。
-        var confidence = SemanticSearchConfidence.Evaluate([0.64f, 0.52f, 0.41f]);
+        // 第一名 0.64 → 阈值 max(0.45, 0.64 × 0.85 = 0.544)：0.58 留在界内，0.41 是陪跑项。
+        var confidence = SemanticSearchConfidence.Evaluate([0.64f, 0.58f, 0.41f]);
 
         Assert.True(confidence.HasStrongMatch);
         Assert.Equal(1, confidence.LowConfidenceCount);
-        Assert.False(confidence.IsLowConfidence(0.52f));
+        Assert.False(confidence.IsLowConfidence(0.58f));
         Assert.True(confidence.IsLowConfidence(0.41f));
     }
 
