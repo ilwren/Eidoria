@@ -93,6 +93,8 @@ public static class OfficeDocumentText
             var entry = archive.GetEntry(name);
             if (entry is null || entry.Length <= 0 || entry.Length > MaxEntryBytes)
                 continue;
+            // 不同部件之间补一个换行：否则上一部分末尾的文字会和下一部分首字粘成一个词。
+            AppendBreak(builder);
             using var partStream = entry.Open();
             AppendXmlText(partStream, builder);
         }
@@ -203,31 +205,55 @@ public static class OfficeDocumentText
             builder.Append('\n');
     }
 
-    /// <summary>压掉重复空白与空行；纯空白结果算「没有文字」。</summary>
+    /// <summary>
+    /// 收尾：按行去空白、丢空行、行内压缩空白。
+    /// 美化排版的 XML 会在段落之间留下「换行 + 缩进」的纯空白节点，
+    /// 直接保留会变成一堆空行（v0.47 首轮 CI 就是被这个坑到的）。
+    /// </summary>
     private static string? Cleanup(StringBuilder builder)
     {
         if (builder.Length == 0)
             return null;
 
-        var text = builder.ToString();
-        var output = new StringBuilder(text.Length);
-        var lastWasSpace = false;
-        var newlineRun = 0;
-        foreach (var ch in text)
+        var raw = builder.ToString();
+        var output = new StringBuilder(raw.Length);
+        var line = new StringBuilder(128);
+
+        void FlushLine()
+        {
+            var text = CollapseSpaces(line).Trim();
+            line.Clear();
+            if (text.Length == 0)
+                return;
+            if (output.Length > 0)
+                output.Append('\n');
+            output.Append(text);
+        }
+
+        foreach (var ch in raw)
         {
             if (ch == '\r')
                 continue;
             if (ch == '\n')
             {
-                newlineRun++;
-                lastWasSpace = false;
-                if (newlineRun > 2)
-                    continue;
-                output.Append('\n');
+                FlushLine();
                 continue;
             }
 
-            newlineRun = 0;
+            line.Append(ch);
+        }
+
+        FlushLine();
+        var result = output.ToString();
+        return result.Length == 0 ? null : result;
+    }
+
+    private static string CollapseSpaces(StringBuilder line)
+    {
+        var output = new StringBuilder(line.Length);
+        var lastWasSpace = false;
+        foreach (var ch in line.ToString())
+        {
             if (char.IsWhiteSpace(ch))
             {
                 if (lastWasSpace)
@@ -241,7 +267,6 @@ public static class OfficeDocumentText
             output.Append(ch);
         }
 
-        var trimmed = output.ToString().Trim();
-        return trimmed.Length == 0 ? null : trimmed;
+        return output.ToString();
     }
 }
