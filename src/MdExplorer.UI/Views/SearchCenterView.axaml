@@ -28,7 +28,33 @@
                    Content="AI 语义" Command="{Binding SetSearchCenterModeCommand}" CommandParameter="Semantic"
                    ToolTip.Tip="根据自然语言含义检索本地索引" AutomationProperties.Name="AI 语义搜索" />
     </StackPanel>
-    <TextBlock Grid.Row="2" Classes="caption" Text="{Binding SearchCenterModeHintText}" TextWrapping="Wrap" />
+    <StackPanel Grid.Row="2" Spacing="6">
+      <TextBlock Classes="caption" Text="{Binding SearchCenterModeHintText}" TextWrapping="Wrap" />
+      <!-- 最近搜索（v0.53）：只记真有结果的词，点一下重跑，可一键清除。 -->
+      <md:MdScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                         AllowMouseDrag="True" IsVisible="{Binding HasRecentSearches}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="caption" Text="最近" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <ItemsControl ItemsSource="{Binding RecentSearchChips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="8" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:RecentSearchChipModel">
+                <md:MdButton Classes="search-kind" Variant="Outlined" Content="{Binding Query}"
+                             Command="{Binding RunCommand}" ToolTip.Tip="{Binding Query}"
+                             AutomationProperties.Name="{Binding Query}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <md:MdButton Variant="Text" Content="清除" Command="{Binding ClearRecentSearchesCommand}"
+                       ToolTip.Tip="清空最近搜索词（只动本机设置，不动任何文件）" />
+        </StackPanel>
+      </md:MdScrollViewer>
+    </StackPanel>
 
     <md:MdScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
                        AllowMouseDrag="True">

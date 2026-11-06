@@ -121,6 +121,8 @@ public sealed class SettingsStore : ISettingsStore
             settings.AutoLoadMoreDistance = 320;
         settings.AutoLoadMoreDistance = Math.Clamp(settings.AutoLoadMoreDistance, 120, 600);
         settings.SearchResultLimit = Math.Clamp(settings.SearchResultLimit, 200, 20000);
+        // 最近搜索词：手改 JSON 可能塞进来空白、重复或超长列表，读的时候统一收一遍。
+        settings.RecentSearchQueries = MdExplorer.Domain.RecentSearches.Normalize(settings.RecentSearchQueries);
         settings.AppTrashQuotaBytes = Math.Clamp(
             settings.AppTrashQuotaBytes, 200_000_000, 10_000_000_000);
         settings.AppTrashRetentionDays = Math.Clamp(settings.AppTrashRetentionDays, 1, 365);

@@ -92,10 +92,13 @@ public sealed class SearchRankingTests
     [Fact]
     public void MultipleTermsAreAndedAndScoredByTheWeakest()
     {
-        // 两个词都在主名开头 → 两个都算前缀档，取最弱 880。
-        Assert.Equal(SearchRanking.StemPrefix, SearchRanking.Score("budget-report.md", "budget report"));
-        // "2024" 是主名前缀（880），"budget" 只是从词中开始（780）→ 取最弱 780。
+        // "budget" 是主名前缀（880），"report" 落在分隔符后、算词首（780）→ 取最弱 780。
+        // （两个词不可能同时是「主名前缀」，所以多词命中的档位天然落在 780 及以下。）
+        Assert.Equal(SearchRanking.StemSegmentPrefix, SearchRanking.Score("budget-report.md", "budget report"));
+        // "2024" 是主名前缀（880），"budget" 从词中开始（780）→ 还是 780。
         Assert.Equal(SearchRanking.StemSegmentPrefix, SearchRanking.Score("2024-budget-review.md", "2024 budget"));
+        // 主名中间才出现（词中、非分隔符后）→ 700，仍是「最弱那个词」说了算。
+        Assert.Equal(SearchRanking.StemContains, SearchRanking.Score("oldbudgetdraft.md", "budget oldbudgetdraft"));
         // 少一个词就不算命中。
         Assert.Equal(SearchRanking.NoMatch, SearchRanking.Score("budget-report.md", "budget invoice"));
         Assert.False(SearchRanking.Matches("budget-report.md", "budget invoice"));

@@ -212,6 +212,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _appTrashQuotaBytes = Math.Clamp(s.AppTrashQuotaBytes, 200_000_000, 10_000_000_000);
         _appTrashRetentionDays = Math.Clamp(s.AppTrashRetentionDays, 1, 365);
         RefreshSearchIndexRoots();
+        RefreshRecentSearches(s.RecentSearchQueries);
         RefreshLocalAiState();
         _ = RefreshThumbnailCacheStatsAsync();
         if (_enableContentIndex)
@@ -722,6 +723,9 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public ObservableCollection<FileItemViewModel> RecentFiles { get; } = [];
     public ObservableCollection<TrashItemModel> TrashItems { get; } = [];
     public ObservableCollection<SearchIndexRootModel> SearchIndexRoots { get; } = [];
+    /// <summary>最近搜索词的小胶囊（v0.53）：最新在前，最多 8 条。</summary>
+    public ObservableCollection<RecentSearchChipModel> RecentSearchChips { get; } = [];
+    public bool HasRecentSearches => RecentSearchChips.Count > 0;
     public ObservableCollection<FileItemViewModel> SearchCenterResults { get; } = [];
     public ObservableCollection<StorageKindUsageModel> StorageKindUsages { get; } = [];
     public ObservableCollection<StorageFolderUsageModel> StorageTopFolders { get; } = [];
@@ -2907,6 +2911,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         if (IsContentSearchMode)
         {
             await RunContentSearchAsync(modeQuery, modeKinds, cts).ConfigureAwait(true);
+            await RecordRecentSearchAsync(modeQuery).ConfigureAwait(true);
             return;
         }
 
@@ -2938,6 +2943,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         if (IsSemanticSearchMode)
         {
             await RunSemanticSearchAsync(query, kinds, cts).ConfigureAwait(true);
+            await RecordRecentSearchAsync(query).ConfigureAwait(true);
             return;
         }
 
@@ -2965,6 +2971,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 : contentCount > 0
                     ? $"{merged.Count} 项 · 文件名 {nameCount} · 正文 {contentCount}{(SearchIndexIsPartial ? " · 部分" : string.Empty)}"
                     : $"{merged.Count} 项 · 本地索引{(SearchIndexIsPartial ? " · 部分" : string.Empty)}";
+            await RecordRecentSearchAsync(query).ConfigureAwait(true);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -3064,6 +3071,52 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         }
 
         return results;
+    }
+
+    // ---------- 最近搜索词（v0.53） ----------
+
+    /// <summary>
+    /// 重建最近搜索的小胶囊。每枚自带宽命令，XAML 里就不必做父级 DataContext 查找
+    /// （那种写法一旦模板类型写错就是一屏绑定错误）。
+    /// </summary>
+    private void RefreshRecentSearches(IReadOnlyList<string>? queries)
+    {
+        var normalized = RecentSearches.Normalize(queries);
+        _services.SettingsStore.Settings.RecentSearchQueries = normalized;
+        RecentSearchChips.Clear();
+        foreach (var query in normalized)
+            RecentSearchChips.Add(new RecentSearchChipModel(query, new AsyncRelayCommand(() => RunRecentSearchAsync(query))));
+        OnPropertyChanged(nameof(HasRecentSearches));
+    }
+
+    /// <summary>只记「真有结果的搜索」：一无所获的词留在最近列表里只会误导下一次点击。</summary>
+    private async Task RecordRecentSearchAsync(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || SearchCenterResults.Count == 0)
+            return;
+
+        var current = _services.SettingsStore.Settings.RecentSearchQueries;
+        var updated = RecentSearches.Push(current, query);
+        if (updated.Count == current.Count && updated.SequenceEqual(current, StringComparer.Ordinal))
+            return; // 与现状一致：不写设置文件
+        RefreshRecentSearches(updated);
+        await SaveAsync().ConfigureAwait(true);
+    }
+
+    private async Task RunRecentSearchAsync(string query)
+    {
+        SearchCenterQuery = query;
+        await RunSearchCenterSearchAsync().ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task ClearRecentSearchesAsync()
+    {
+        if (!HasRecentSearches)
+            return;
+        RefreshRecentSearches([]);
+        await SaveAsync().ConfigureAwait(true);
+        Notify("已清除最近搜索");
     }
 
     private async Task RunSemanticSearchAsync(string query, IReadOnlySet<FileKind>? kinds, CancellationTokenSource cts)

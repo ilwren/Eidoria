@@ -383,6 +383,7 @@ public sealed class AppSettings
     public bool UseSearchIndex { get; set; } = true;          // 文件名索引总开关；关闭时递归搜索回落实时扫描
     public bool EnableContentIndex { get; set; }                // 全文内容索引（FTS5）：默认关，需用户显式建立
     public List<string> SearchIndexRootPaths { get; set; } = []; // 用户显式加入的本地索引根（不预置任何目录）
+    public List<string> RecentSearchQueries { get; set; } = [];  // 最近搜索词（最新在前，最多 8 条；v0.53）
     public AutomationWorkflowDefinition AutomationWorkflow { get; set; } = AutomationWorkflowDefinition.CreateDefault();
 }
 
