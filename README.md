@@ -118,5 +118,6 @@ tests/                               单元测试 + 无头截图冒烟
 | [docs/PLUGIN-SYSTEM.md](docs/PLUGIN-SYSTEM.md) | 插件系统计划与可行性评估（AOT 约束下的五机制选型、P0–P3 分期） |
 | [docs/LUA-PLUGIN-SPIKE.md](docs/LUA-PLUGIN-SPIKE.md) | 隔离的 MoonSharp AOT/Trim/Android spike、可运行的安全演示与正式接入门槛（尚未验证） |
 | [docs/LOCAL-AI.md](docs/LOCAL-AI.md) | 本地 AI 接入评估（多模态语义搜图、识图、TTS/ASR：模型许可、体积、A1–A4 分期） |
+| [docs/PDF-TEXT.md](docs/PDF-TEXT.md) | PDF 正文抽取的依赖决策（为什么现有 PDF 依赖取不到字、PdfPig 方案与边界；尚未实现） |
 
 响应式断点（与 Material 3 一致，dp）：Compact `<600` / Medium `600–839` / Expanded `840–1199` / Large `1200–1599` / ExtraLarge `≥1600`。
