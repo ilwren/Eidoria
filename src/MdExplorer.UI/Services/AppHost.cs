@@ -33,7 +33,6 @@ public static class AppHost
         ITextFileService TextFiles,
         ISystemNotificationService SystemNotifications,
         IMediaPlaybackService MediaPlayback,
-        MediaBackendSelector? MediaBackends,
         IThumbnailCache Thumbnails,
         IContentIndexService ContentIndex,
         AiModelCatalog AiModels,
@@ -45,12 +44,6 @@ public static class AppHost
     /// MediaPlayer 实现；桌面在 Program.Main 里注册 Media Foundation / GStreamer。
     /// </summary>
     public static Func<IMediaPlaybackService>? MediaPlaybackFactory { get; set; }
-
-    /// <summary>
-    /// 可选的 libmpv 后端注入点。只有桌面宿主注册（Android 不提供 libmpv；
-    /// 打包与许可边界见 docs/LIBMPV-SPIKE.md）。未注册时选择器只会用平台栈。
-    /// </summary>
-    public static Func<IMediaPlaybackService>? MpvPlaybackFactory { get; set; }
 
     private const string DefaultMediaDiagnostic =
         "当前宿主没有注册内嵌解码后端（桌面端为 Media Foundation / GStreamer，Android 为 MediaPlayer）。可用系统应用打开。";
@@ -105,22 +98,10 @@ public static class AppHost
             OperatingSystem.IsWindows() || OperatingSystem.IsLinux() || OperatingSystem.IsMacOS(),
             UsesAppTrash: trash is AppTrashService);
 
-        // 内嵌媒体后端：平台栈与可选 libmpv 同时注册时交给选择器裁决（偏好落盘、结论写进诊断）；
-        // 两边都没有注册（无头测试、无人注册的宿主）时仍是那个“明确自述无后端”的实现。
-        IMediaPlaybackService mediaPlayback;
-        MediaBackendSelector? mediaBackends = null;
-        if (MediaPlaybackFactory is null && MpvPlaybackFactory is null)
-        {
-            mediaPlayback = new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic);
-        }
-        else
-        {
-            mediaBackends = new MediaBackendSelector(
-                () => store.Settings,
-                MediaPlaybackFactory,
-                MpvPlaybackFactory);
-            mediaPlayback = mediaBackends;
-        }
+        // 内嵌媒体后端只用平台自带解码栈（v0.46 移除 libmpv 方案：实测系统栈更稳）。
+        // 宿主没注册（无头测试、未接线的宿主）时仍是那个“明确自述无后端”的实现。
+        var mediaPlayback = MediaPlaybackFactory?.Invoke()
+            ?? new UnsupportedMediaPlaybackService(DefaultMediaDiagnostic);
 
         return new AppServices(
             fileSystem,

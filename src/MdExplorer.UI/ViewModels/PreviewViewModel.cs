@@ -255,12 +255,11 @@ public sealed partial class PreviewViewModel(
         (media.RendererKind != MediaRendererKind.FramePush || ActiveMedia is IMediaVideoFrameSource);
 
     /// <summary>
-    /// 真正在跑的后端本身。裁决层（<see cref="IMediaBackendSelector"/>）只能转发能力位与画面
-    /// 交付方式，装不出 FramePush / NativeSurface 两种实现中的任何一种，
-    /// 所以可选画面端口一律从这里取；非媒体项返回 null，免得为一张图片去实例化解码器。
+    /// 当前媒体后端实例。可选画面端口（<see cref="IMediaVideoRenderer"/> /
+    /// <see cref="IMediaVideoFrameSource"/>）一律从这里取；非媒体项返回 null，
+    /// 免得为一张图片去实例化解码器。
     /// </summary>
-    private IMediaPlaybackService? ActiveMedia =>
-        !IsMedia ? null : (_media is IMediaBackendSelector selector ? selector.ActiveBackend : _media);
+    private IMediaPlaybackService? ActiveMedia => !IsMedia ? null : _media;
 
     /// <summary>
     /// 视频是否在应用内嵌面板里出画面。默认关（逐帧抓取可能花屏/音画不同步），
@@ -343,6 +342,63 @@ public sealed partial class PreviewViewModel(
             return Math.Clamp(media.Position.TotalMilliseconds * 100 / media.Duration.TotalMilliseconds, 0, 100);
         }
     }
+    /// <summary>
+    /// 进度条可拖动（v0.46）：拖动期间由 <see cref="_mediaSeekHold"/> 接管显示，
+    /// 轮询回来的位置不会把滑块拽回去；拖动一次只认最后一次目标位置。
+    /// </summary>
+    public double MediaSeekPercent
+    {
+        get => _mediaSeekHold ?? MediaProgressPercent;
+        set
+        {
+            if (!CanPlayMediaInApp)
+                return;
+            var target = Math.Clamp(value, 0d, 100d);
+            _mediaSeekHold = target;
+            _mediaSeekError = null;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MediaSeekErrorText));
+            OnPropertyChanged(nameof(HasMediaSeekError));
+            _ = SeekToPercentAsync(target);
+        }
+    }
+
+    private string? _mediaSeekError;
+
+    public string MediaSeekErrorText => _mediaSeekError ?? string.Empty;
+    public bool HasMediaSeekError => !string.IsNullOrWhiteSpace(_mediaSeekError);
+
+    private double? _mediaSeekHold;
+    private int _mediaSeekGeneration;
+
+    private async Task SeekToPercentAsync(double percent)
+    {
+        if (_media is not { Duration.TotalMilliseconds: > 0 } media)
+            return;
+        var generation = ++_mediaSeekGeneration;
+        var target = TimeSpan.FromMilliseconds(media.Duration.TotalMilliseconds * percent / 100d);
+        try
+        {
+            await media.SeekAsync(target).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            // 拖动失败不该留下“滑块停在目标位置、实际没跳”的假象：如实说出来。
+            _mediaSeekError = $"跳转失败：{ex.Message}";
+            OnPropertyChanged(nameof(MediaSeekErrorText));
+            OnPropertyChanged(nameof(HasMediaSeekError));
+        }
+        finally
+        {
+            // 只有最后一次拖动的结果能清掉占位值，否则连续拖动会被前一次清空。
+            if (generation == _mediaSeekGeneration)
+            {
+                _mediaSeekHold = null;
+                RaiseMediaState();
+            }
+        }
+    }
+
     public int MediaVolumePercent
     {
         get => _media?.VolumePercent ?? 100;
@@ -465,6 +521,7 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(MediaPositionText));
         OnPropertyChanged(nameof(MediaDurationText));
         OnPropertyChanged(nameof(MediaProgressPercent));
+        OnPropertyChanged(nameof(MediaSeekPercent));
         OnPropertyChanged(nameof(MediaVolumePercent));
         OnPropertyChanged(nameof(MediaBackendName));
         OnPropertyChanged(nameof(MediaBackendDiagnostic));
@@ -729,8 +786,24 @@ public sealed partial class PreviewViewModel(
 
     public async Task LoadAsync(FileItem? item)
     {
+        // v0.46：尺寸档变化、浮窗开关、视图重挂都会再走一次 LoadAsync（同一个文件）。
+        // 只要内容没被放掉、播放还在同一个文件上，就什么都不用重建——
+        // 否则每拉一次窗口边框就停一次播放、进度归零（用户实测反馈）。
+        var sameItem = item is not null && CurrentItem is { } current &&
+            string.Equals(current.FullPath, item.FullPath, StringComparison.Ordinal);
+        if (sameItem && !IsPayloadReleased && IsMedia && _mediaPath is not null &&
+            _media is { State: MediaPlaybackState.Playing or MediaPlaybackState.Paused } )
+        {
+            return;
+        }
+
+        // 同一个文件即使要重载内容（例如刚被放掉），也不该顺手把正在播的媒体停掉。
+        var retainMedia = sameItem && _mediaPath is not null &&
+            _media is { State: MediaPlaybackState.Playing or MediaPlaybackState.Paused or MediaPlaybackState.Opening };
+
         var generation = ++_generation;
-        await StopMediaIfAnyAsync().ConfigureAwait(true);
+        if (!retainMedia)
+            await StopMediaIfAnyAsync().ConfigureAwait(true);
         // 停媒体是异步的：等它返回时可能已经有更新的一次 LoadAsync 接管了预览。
         // 旧代次若继续往下写状态，就会把新选中的文件清成空白（v0.32 反馈的浮窗空内容）。
         if (generation != _generation)

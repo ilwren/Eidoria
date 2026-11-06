@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# v0.46：同一分支上连续 push 时，新的 run 直接取代排队/在跑的旧 run。
+# 十来个 Job 一轮要十几分钟，压着一堆过期 run 排队只会让反馈更慢。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write # ci-artifacts 分支回传截图与测试日志
 

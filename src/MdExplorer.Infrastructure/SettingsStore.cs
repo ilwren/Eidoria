@@ -105,9 +105,6 @@ public sealed class SettingsStore : ISettingsStore
         settings.Density = string.Equals(settings.Density, "Compact", StringComparison.OrdinalIgnoreCase)
             ? "Compact"
             : "Comfortable";
-        // 媒体后端偏好：只认三个已知值，手改 JSON 的乱码一律收回 Auto（不让界面进入无法识别的状态）。
-        settings.MediaBackendPreference = MediaBackendPreferenceNames.ToSettingValue(
-            MediaBackendPreferenceNames.Parse(settings.MediaBackendPreference));
         // 缩略图档位同理：档位是缓存键的一部分，写进非法值会让同一张图在“未知档”下反复重解码。
         settings.ThumbnailTier = ThumbnailTierNames.ToSettingValue(
             ThumbnailTierNames.Parse(settings.ThumbnailTier));

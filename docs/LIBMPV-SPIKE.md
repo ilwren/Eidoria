@@ -1,3 +1,9 @@
+> **状态：已撤销（v0.46，2026-11-06）**
+>
+> 维护者在真实设备上实测后决定**移除 libmpv 方案**：系统解码栈整体更稳，libmpv 路线（外部原生库 + 属性轮询 + 独立渲染线程）并没有换来可感知的流畅度收益。
+> 本仓已删除 `MpvMediaPlaybackService`、`MpvNativeLibrary`、`MediaBackendSelector`、`MediaBackendPreference` 设置项、`HanumanInstitute.LibMpv` 依赖与 `spikes/LibMpvAvaloniaSpike`。
+> 本文保留为**决策记录**：它写清了当时为什么尝试、边界条件在哪、以及真机验收清单长什么样。播放体验的后续改进（可拖动进度条、改尺寸不中断播放、零分配帧缓冲）都做在系统栈这一侧。
+
 # libmpv 桌面后端：接入说明、许可证门与待验收项
 
 状态：**v0.39 起 libmpv 是正式的桌面端可选后端**，与平台自带的系统解码栈并存，由用户在设置里选择。

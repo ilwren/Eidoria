@@ -237,7 +237,7 @@
                       Background="#000000" CornerRadius="12" ClipToBounds="True">
                 <media:MediaSurfaceHost Renderer="{Binding VideoRenderer}" AutomationProperties.Name="视频画面" />
               </Border>
-              <!-- 推帧画面：后端（Linux appsink / Windows MediaComposition 取帧 / 桌面 libmpv 软件渲染）
+              <!-- 推帧画面：后端（Linux appsink / Windows MediaComposition 取帧）
                    把帧推给宿主，Avalonia 自己画。与原生画面互斥：只有 RendererKind=FramePush 的后端才走这里。 -->
               <Border IsVisible="{Binding ShowFrameVideoSurface}" Height="280"
                       Background="#000000" CornerRadius="12" ClipToBounds="True">
@@ -294,8 +294,14 @@
                 <TextBlock Classes="caption" Text="{Binding MediaPositionText}" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="2" Classes="caption" Text="{Binding MediaDurationText}" VerticalAlignment="Center" />
               </Grid>
-              <md:MdLinearProgressIndicator Minimum="0" Maximum="100" Value="{Binding MediaProgressPercent}" Height="4"
-                                            Margin="0,-6,0,0" IsVisible="{Binding CanPlayMediaInApp}" />
+              <Slider Minimum="0" Maximum="100" Value="{Binding MediaSeekPercent, Mode=TwoWay}"
+                      IsSnapToTickEnabled="False" Margin="0,-10,0,-6" Height="28"
+                      IsVisible="{Binding CanPlayMediaInApp}"
+                      AutomationProperties.Name="播放进度"
+                      ToolTip.Tip="拖动跳转播放位置；系统解码栈跳转可能需要一秒重新定位" />
+              <TextBlock Classes="caption" Text="{Binding MediaSeekErrorText}" TextWrapping="Wrap"
+                         IsVisible="{Binding HasMediaSeekError}"
+                         Foreground="{DynamicResource Md.Sys.Color.Error.Brush}" />
 
               <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding CanPlayMediaInApp}" HorizontalAlignment="Center">
                 <md:MdIconButton Icon="{x:Static md:MdSymbols.Replay10}" Command="{Binding SeekMediaBackwardCommand}"

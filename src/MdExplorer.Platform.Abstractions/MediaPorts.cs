@@ -25,53 +25,9 @@ public enum MediaRendererKind
 
     /// <summary>
     /// 后端把解码后的帧推给宿主，由宿主在 Avalonia 内呈现（Linux GStreamer 的 appsink、
-    /// Windows MediaComposition 取帧、桌面 libmpv 的软件渲染都走这条）。
+    /// Windows MediaComposition 取帧、Android TextureView 之外的帧通道都走这条）。
     /// </summary>
     FramePush,
-}
-
-/// <summary>
-/// 内嵌媒体后端偏好（设置项，跨启动持久化）。
-/// <para>
-/// 同一台机器上可能同时存在两条可用路径：平台自带解码栈（Windows Media Foundation /
-/// Linux GStreamer / Android MediaPlayer）与可选的 libmpv。前者零安装但受系统能力限制
-/// （Windows 的取帧路线帧率低），后者需要用户自己放一份 LGPL-only 的 libmpv。偏好只表达
-/// 用户的选择，实际用谁由 <c>MediaBackendSelector</c> 按可用性裁决并**如实告知**。
-/// </para>
-/// </summary>
-public enum MediaBackendPreference
-{
-    /// <summary>自动：优先 libmpv（更流畅），没有可用的 libmpv 时用平台自带栈。</summary>
-    Auto,
-
-    /// <summary>只用平台自带解码栈。</summary>
-    SystemApi,
-
-    /// <summary>优先 libmpv；本机没有可加载的 libmpv 时如实回退到平台栈。</summary>
-    LibMpv,
-}
-
-/// <summary>后端偏好的字符串口径（设置文件里存字符串，与 ThemeMode 一致）。</summary>
-public static class MediaBackendPreferenceNames
-{
-    public const string Auto = "Auto";
-    public const string SystemApi = "SystemApi";
-    public const string LibMpv = "LibMpv";
-
-    /// <summary>解析设置值；无法识别时回落 <see cref="MediaBackendPreference.Auto"/>，不抛异常。</summary>
-    public static MediaBackendPreference Parse(string? value) => value switch
-    {
-        _ when string.Equals(value, SystemApi, StringComparison.OrdinalIgnoreCase) => MediaBackendPreference.SystemApi,
-        _ when string.Equals(value, LibMpv, StringComparison.OrdinalIgnoreCase) => MediaBackendPreference.LibMpv,
-        _ => MediaBackendPreference.Auto,
-    };
-
-    public static string ToSettingValue(MediaBackendPreference preference) => preference switch
-    {
-        MediaBackendPreference.SystemApi => SystemApi,
-        MediaBackendPreference.LibMpv => LibMpv,
-        _ => Auto,
-    };
 }
 
 /// <summary>后端自述能力。UI 只按这里说的显隐控件，不猜平台。</summary>
@@ -177,17 +133,7 @@ public interface IMediaFrameSink
 }
 
 /// <summary>
-/// 组合多个后端的裁决层实现它。宿主据此拿到“真正在跑的那个后端”，
-/// 才能判断它是否实现了 <see cref="IMediaVideoRenderer"/>、<see cref="IMediaVideoFrameSource"/>
-/// 这些可选的画面端口——裁决层自己不可能同时装作两种。
-/// </summary>
-public interface IMediaBackendSelector
-{
-    IMediaPlaybackService? ActiveBackend { get; }
-}
-
-/// <summary>
-/// 只能把帧推给宿主的后端实现它（Linux GStreamer appsink、Windows MediaComposition 取帧、桌面 libmpv 软件渲染）。
+/// 只能把帧推给宿主的后端实现它（Linux GStreamer appsink、Windows MediaComposition 取帧）。
 /// 与 <see cref="IMediaVideoRenderer"/> 并列：二者互斥，实现只能选一种，否则“画面在哪”说不清。
 /// </summary>
 public interface IMediaVideoFrameSource

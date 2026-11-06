@@ -209,17 +209,18 @@ public partial class MainView : UserControl
         if (size.Width <= 0 || size.Height <= 0)
             return;
 
-        var maxWidth = Math.Max(300, size.Width - 20);
-        var maxHeight = Math.Max(360, size.Height - 96);
+        // v0.46：矮视口（手机横屏 390 高、分屏小窗）下旧下限 300×360 会把浮窗顶出屏幕，
+        // 这里把下限压到 280×200，并让高度真正服从视口。
+        var maxWidth = Math.Max(280, size.Width - 20);
+        var maxHeight = Math.Max(200, size.Height - 72);
         var width = double.IsNaN(FloatingPreview.Width) || FloatingPreview.Width <= 0
             ? Math.Min(340, maxWidth)
             : FloatingPreview.Width;
-        FloatingPreview.Width = Math.Clamp(width, 300, maxWidth);
+        FloatingPreview.Width = Math.Clamp(width, 280, maxWidth);
         FloatingPreview.MaxHeight = maxHeight;
-        if (double.IsNaN(FloatingPreview.Height) || FloatingPreview.Height <= 0)
-            FloatingPreview.Height = DesignedPreviewHeight(size);
-        else
-            FloatingPreview.Height = Math.Min(FloatingPreview.Height, maxHeight);
+        FloatingPreview.Height = double.IsNaN(FloatingPreview.Height) || FloatingPreview.Height <= 0
+            ? Math.Min(DesignedPreviewHeight(size), maxHeight)
+            : Math.Min(FloatingPreview.Height, maxHeight);
 
         if (FloatingPreview.X + FloatingPreview.Width > size.Width - 8)
             FloatingPreview.X = Math.Max(8, size.Width - FloatingPreview.Width - 8);

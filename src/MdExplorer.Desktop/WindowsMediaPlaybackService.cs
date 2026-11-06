@@ -19,7 +19,7 @@ namespace MdExplorer.Desktop;
 /// 为什么不把画面交给 <see cref="WinRtMediaPlayer"/>：它没有把视频画进外部 HWND/位图的 API，
 /// 帧服务模式（<c>IsVideoFrameServerEnabled</c>）只能拷贝到 D3D Surface，需要自带 D3D 互操作组件；
 /// 而 <c>IMFMediaEngine</c> 要手写 COM vtable。两者都要在真机上验证才知道对不对，
-/// 取帧循环以 60 fps 为上限，并按播放器时钟采样，实际帧率仍受系统解码与宿主绘制速度限制。
+/// 取帧循环以 30 fps 为上限，并按播放器时钟采样，实际帧率仍受系统解码与宿主绘制速度限制。
 /// </para>
 /// </summary>
 internal sealed class WindowsMediaPlaybackService
@@ -29,10 +29,14 @@ internal sealed class WindowsMediaPlaybackService
     private const int FrameWidth = 480;
     private const int FrameHeight = 270;
 
-    /// <summary>按最多 60 fps 采样；真实帧率由系统解码耗时和 UI 绘制速度共同决定。</summary>
-    private const int TargetFrameRate = 60;
+    /// <summary>
+    /// 按最多 30 fps 采样；真实帧率由系统解码耗时和 UI 绘制速度共同决定。
+    /// v0.46 从 60 降到 30：每次取帧都是一次真正的解码，60 fps 在预览窗格里换来的
+    /// 观感提升很有限，CPU 却翻倍（用户反馈占用偏高）；30 fps 仍能跟上绝大多数视频。
+    /// </summary>
+    private const int TargetFrameRate = 30;
     private static readonly TimeSpan FramePeriod = TimeSpan.FromSeconds(1d / TargetFrameRate);
-    private static readonly TimeSpan MinimumFrameAdvance = TimeSpan.FromMilliseconds(8);
+    private static readonly TimeSpan MinimumFrameAdvance = TimeSpan.FromMilliseconds(16);
 
     private readonly WinRtMediaPlayer? _player;
     private readonly object _gate = new();
@@ -464,7 +468,7 @@ internal sealed class WindowsMediaPlaybackService
                 return new MediaProbeResult(
                     true, true, true,
                     $"视频 · 系统解码 · 取帧目标最高 {TargetFrameRate} fps",
-                    "画面按播放器时间轴由 MediaComposition 取出后交给 Avalonia 绘制，采样间隔已覆盖 30/60 fps 视频；" +
+                    "画面按播放器时间轴由 MediaComposition 取出后交给 Avalonia 绘制，采样间隔覆盖 30 fps 视频；" +
                     "实际帧率仍随解码与绘制负载变化；" +
                     "HEVC 需系统扩展、DTS/AC-3 默认缺失，完整播放请用系统应用打开。");
             }

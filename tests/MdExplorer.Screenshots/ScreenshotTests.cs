@@ -15,6 +15,7 @@ using MdExplorer.UI.Preview;
 using MdExplorer.UI.Services;
 using MdExplorer.UI.ViewModels;
 using MdExplorer.UI.Views;
+using Md3.Avalonia.Controls;
 using Md3.Avalonia.Extra.Controls;
 using Xunit;
 
@@ -1631,6 +1632,71 @@ public sealed class ScreenshotTests
             Assert.Contains("视频", shell.Preview.MediaProbeText, StringComparison.Ordinal);
             Assert.Contains("画面宿主", shell.Preview.MediaProbeReasonText, StringComparison.Ordinal);
         }));
+
+    // ---------- v0.47 折叠屏 / 手机横屏 / Android 小窗 ----------
+
+    /// <summary>
+    /// 手机横屏（844×390）：宽度落在 Expanded，但高度只有 390。常驻抽屉 + 底部导航都会把内容挤没，
+    /// 所以矮视口统一收敛到「导轨 + 收起抽屉 + 预览改覆盖页」。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task ShortLandscape_UsesRailInsteadOfBottomNav() => await CaptureAsync(
+        "83-short-landscape-rail.png", 844, 390, shell =>
+        {
+            Assert.True(shell.IsShortViewport, $"height={shell.SizeClass}");
+            Assert.False(shell.ShowBottomNav);
+            Assert.False(shell.ShowDrawerPane);
+            Assert.True(shell.ShowRail);
+            return Task.CompletedTask;
+        },
+        afterShow: async window =>
+        {
+            await Task.Delay(120);
+            var bottomNav = window.GetVisualDescendants().OfType<MdNavigationBar>().FirstOrDefault();
+            Assert.True(bottomNav is null || !bottomNav.IsEffectivelyVisible, "矮视口不该出现底部导航");
+        });
+
+    /// <summary>Android 分屏小窗（400×520）：比手机还矮，仍然必须恰好有一个导航面，且不是底栏。</summary>
+    [AvaloniaFact]
+    public async Task ShortSplitWindow_KeepsExactlyOneNavigationSurface() => await CaptureAsync(
+        "84-short-split-window-rail.png", 400, 520, shell =>
+        {
+            Assert.True(shell.IsShortViewport);
+            Assert.False(shell.ShowBottomNav);
+            Assert.True(shell.ShowRail);
+            Assert.False(shell.ShowDrawerPane);
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// 折叠屏展开/合起（673×841 → 1200×841 → 673×841）：不重启就切换导航面，
+    /// 且任何时候「底栏 / 抽屉 / 导轨」恰好一个可见。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Foldable_UnfoldResizeSwitchesNavigationSurface() => await CaptureAsync(
+        "85-foldable-unfold-resize.png", 673, 841, shell =>
+        {
+            // 合起：Medium，导轨；展开到 1200 后应变成常驻抽屉。
+            Assert.False(shell.IsShortViewport);
+            Assert.True(shell.ShowRail);
+            shell.SetViewportSize(1200, 841);
+            Assert.Equal(SizeClass.Large, shell.SizeClass);
+            Assert.True(shell.ShowDrawerPane);
+            Assert.False(shell.ShowRail);
+            Assert.False(shell.ShowBottomNav);
+            // 再折回：抽屉收起，导轨回来，内容不被留在 0 宽。
+            shell.SetViewportSize(673, 841);
+            Assert.True(shell.ShowRail);
+            Assert.False(shell.ShowDrawerPane);
+            return Task.CompletedTask;
+        },
+        afterShow: async window =>
+        {
+            await Task.Delay(120);
+            var visibleNavs = window.GetVisualDescendants().OfType<MdNavigationBar>()
+                .Count(nav => nav.IsEffectivelyVisible);
+            Assert.InRange(visibleNavs, 0, 1);
+        });
 
     private static Task WithStubMediaAsync(Func<Task> body) =>
         WithStubMediaAsync(body, static () => new StubMediaPlayback());

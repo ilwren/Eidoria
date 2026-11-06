@@ -85,8 +85,6 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             () => Launcher,
             services.MediaPlayback,
             () => services.SettingsStore.Settings);
-        if (services.MediaBackends is { } mediaBackends)
-            mediaBackends.BackendResolved += (_, _) => OnPropertyChanged(nameof(MediaBackendStatusText));
         DocumentWorkbench = new DocumentWorkbenchViewModel(services.FileSystem, services.TextFiles, this, () => Launcher);
         DocumentWorkbench.CloseRequested += async (_, _) => await CloseDocumentWorkbenchAsync().ConfigureAwait(true);
         DocumentWorkbench.DocumentSaved += async (_, path) => await OnDocumentSavedAsync(path).ConfigureAwait(true);
@@ -192,7 +190,6 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _playVideoInline = s.PlayVideoInline;
         _mediaAutoPlay = s.MediaAutoPlay;
         _showMediaDiagnostics = s.ShowMediaDiagnostics;
-        _mediaBackendMode = MediaBackendPreferenceNames.Parse(s.MediaBackendPreference);
         _enableLocalAi = s.EnableLocalAi;
         _aiModelSourceName = s.AiModelSource;
         _useSearchIndex = s.UseSearchIndex;
@@ -549,17 +546,39 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public bool IsAutomationPage => Page == ShellPage.Automation;
     public bool IsExtensionCenterPage => Page == ShellPage.ExtensionCenter;
 
+    private double _viewportHeight;
+
     public bool IsCompact => SizeClass == SizeClass.Compact;
     public bool IsMedium => SizeClass == SizeClass.Medium;
     public bool IsExpandedOrAbove => SizeClass >= SizeClass.Expanded;
     public bool IsLargeOrAbove => SizeClass >= SizeClass.Large;
     public bool IsCompactOrMedium => SizeClass <= SizeClass.Medium;
-    public bool ShowBottomNav => IsCompact;
-    public bool ShowRail => IsMedium;
-    public bool ShowDrawerPane => IsExpandedOrAbove;
-    public bool ShowPreviewPaneNow => IsExpandedOrAbove && SettingsStore.Settings.ShowPreviewPane && Preview.HasItem;
+    /// <summary>
+    /// 矮视口阈值（DIP）。手机横屏常见 360–440、Android 分屏小窗也常低于 560，
+    /// 这类屏幕上竖向空间比宽度更稀缺：底部导航与常驻抽屉都会把内容挤成一条缝。
+    /// </summary>
+    public const double ShortViewportThreshold = 560;
+
+    /// <summary>当前视口是不是「矮」的（手机横屏、分屏小窗、矮桌面窗口）。</summary>
+    public bool IsShortViewport => _viewportHeight > 0 && _viewportHeight < ShortViewportThreshold;
+
+    /// <summary>底部导航：只在「窄且不矮」时出现（小屏竖屏手机、折叠屏合起态）。</summary>
+    public bool ShowBottomNav => IsCompact && !IsShortViewport;
+
+    /// <summary>常驻抽屉：Expanded 以上且不矮。矮视口一律退成导轨，把高度还给内容。</summary>
+    public bool ShowDrawerPane => IsExpandedOrAbove && !IsShortViewport;
+
+    /// <summary>
+    /// 导轨兜底：三种导航面（底栏 / 抽屉 / 导轨）永远恰好有一个可用——
+    /// 折叠屏展开（宽度变大）与手机横屏（高度变小）都不会出现「没有导航」的状态。
+    /// </summary>
+    public bool ShowRail => !ShowDrawerPane && !ShowBottomNav;
+
+    public bool ShowPreviewPaneNow => IsExpandedOrAbove && !IsShortViewport &&
+        SettingsStore.Settings.ShowPreviewPane && Preview.HasItem;
     public bool ShowPreviewPaneEffective => IsBrowser && ShowPreviewPaneNow;
-    public bool ShowPreviewPageNow => IsPreviewPageOpen && IsCompactOrMedium;
+    /// <summary>预览页：没有常驻预览栏时（含矮视口）改为覆盖式预览页，而不是挤一列。</summary>
+    public bool ShowPreviewPageNow => IsPreviewPageOpen && !ShowPreviewPaneNow;
     /// <summary>Compact 单标签时隐藏标签轨，避免与顶栏标题重复；出现第二个标签后即显示。</summary>
     public bool ShowBrowserTabs => !IsCompact || Browser.HasMultipleTabs;
     /// <summary>完整面包屑只在非 Compact 显示；窄屏折叠为当前目录胶囊。</summary>
@@ -598,6 +617,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         foreach (var name in new[]
                  {
                      nameof(IsCompact), nameof(IsMedium), nameof(IsExpandedOrAbove), nameof(IsLargeOrAbove), nameof(IsCompactOrMedium),
+                     nameof(IsShortViewport),
                      nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane), nameof(ShowBrowserTabs),
                      nameof(ShowBreadcrumbBar), nameof(ShowCompactPath), nameof(ShowPathRowActions),
                      nameof(ShowPreviewPaneNow), nameof(ShowPreviewPageNow), nameof(ShowPreviewPaneEffective),
@@ -651,6 +671,20 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// <summary>由视图在尺寸变化时调用（开发文档 §7：MD3 五档断点）。</summary>
     public void SetViewportSize(double widthDip, double heightDip)
     {
+        var wasShort = IsShortViewport;
+        _viewportHeight = heightDip;
+        if (wasShort != IsShortViewport)
+        {
+            foreach (var name in new[]
+                     {
+                         nameof(IsShortViewport), nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane),
+                         nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
+                     })
+                OnPropertyChanged(name);
+            if (ShowDrawerPane)
+                IsDrawerOpen = false;
+        }
+
         var next = widthDip switch
         {
             < 600 => SizeClass.Compact,
@@ -1220,7 +1254,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public void OnFileOpened(FileItemViewModel item)
     {
         _ = Browser.RecordRecentFileAsync(item.FullPath);
-        if (!IsCompactOrMedium)
+        // 矮视口（手机横屏 / 分屏小窗）没有常驻预览栏，同样走覆盖式预览页。
+        if (!IsCompactOrMedium && !IsShortViewport)
             return;
         IsPreviewPageOpen = true;
         // 浮窗只显示 Preview 的内容。选集没有把这一项交给预览时（重复点同一项、
@@ -3351,37 +3386,6 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     [ObservableProperty] private bool _mediaAutoPlay;
     [ObservableProperty] private bool _showMediaDiagnostics = true;
 
-    // ---------- 内嵌媒体后端偏好（平台栈 / libmpv 双后端） ----------
-
-    [ObservableProperty] private MediaBackendPreference _mediaBackendMode;
-
-    public bool IsMediaBackendAuto => MediaBackendMode == MediaBackendPreference.Auto;
-    public bool IsMediaBackendSystem => MediaBackendMode == MediaBackendPreference.SystemApi;
-    public bool IsMediaBackendLibMpv => MediaBackendMode == MediaBackendPreference.LibMpv;
-
-    /// <summary>
-    /// 当前实际用哪个后端、为什么。没注册选择器（无头测试）时如实说“单后端”。
-    /// 文本直接取自选择器的裁决结果，不在 UI 里另写一套判断。
-    /// </summary>
-    public string MediaBackendStatusText
-    {
-        get
-        {
-            var selector = _services.MediaBackends;
-            if (selector is null)
-                return "当前宿主只注册了一个内嵌媒体后端（没有可裁决的第二条路径）。";
-            return selector.IsResolved
-                ? selector.SelectionSummary
-                : "尚未打开过媒体文件：首次播放时按偏好裁决并显示结果。";
-        }
-    }
-
-    public bool HasSecondMediaBackend => _services.MediaBackends is not null;
-
-    [RelayCommand]
-    private void SetMediaBackendPreference(string? value) =>
-        MediaBackendMode = MediaBackendPreferenceNames.Parse(value);
-
     // ---------- 缩略图档位与磁盘缓存 ----------
 
     /// <summary>
@@ -3610,19 +3614,6 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     {
         _services.SettingsStore.Settings.ShowMediaDiagnostics = value;
         _ = SaveAsync();
-        Preview.RefreshSettings();
-    }
-
-    partial void OnMediaBackendModeChanged(MediaBackendPreference value)
-    {
-        _services.SettingsStore.Settings.MediaBackendPreference = MediaBackendPreferenceNames.ToSettingValue(value);
-        _ = SaveAsync();
-        OnPropertyChanged(nameof(IsMediaBackendAuto));
-        OnPropertyChanged(nameof(IsMediaBackendSystem));
-        OnPropertyChanged(nameof(IsMediaBackendLibMpv));
-        // 换后端不可能保住当前播放状态：先停掉再重新裁决，不装作可以无缝切换。
-        _services.MediaBackends?.Reset();
-        OnPropertyChanged(nameof(MediaBackendStatusText));
         Preview.RefreshSettings();
     }
 

@@ -38,6 +38,9 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
     private readonly object _pendingFrameGate = new();
     private PendingFrame? _pendingFrame;
     private bool _frameDispatchPending;
+    // v0.46：帧缓冲池。此前每帧都 new byte[]——1080p 一帧 8 MB，60 fps 就是每秒 500 MB 垃圾，
+    // 表现为 CPU 高、内存抖动、画面一顿一顿。现在生产者从池里取、UI 消费完再还回池：稳态零分配。
+    private byte[]? _spareFrame;
 
     static MediaFrameSurface()
     {
@@ -76,7 +79,7 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
             return;
 
         // 解码线程只负责拷贝紧凑帧；UI 调度只保留最新待绘帧，不能让慢绘制把整段视频排成消息队列。
-        var frame = new byte[(int)frameLength];
+        var frame = RentFrame((int)frameLength);
         if (stride == rowBytes)
         {
             bgra8888[..frame.Length].CopyTo(frame);
@@ -91,6 +94,9 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
         var postToUiThread = false;
         lock (_pendingFrameGate)
         {
+            // 上一帧还没画就被新帧顶掉时，把它的缓冲区直接还回池，别扔给 GC。
+            if (_pendingFrame is { } superseded && superseded.Pixels.Length == frame.Length)
+                _spareFrame = superseded.Pixels;
             _pendingFrame = new PendingFrame(frame, width, height);
             if (!_frameDispatchPending)
             {
@@ -137,6 +143,18 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
         context.DrawImage(bitmap, source, target);
     }
 
+    /// <summary>从池里取一块够大的缓冲；尺寸变了就换新（旧的自然被丢弃）。只能由解码线程调用。</summary>
+    private byte[] RentFrame(int length)
+    {
+        var spare = _spareFrame;
+        if (spare is not null && spare.Length == length)
+        {
+            _spareFrame = null;
+            return spare;
+        }
+        return new byte[length];
+    }
+
     private void PresentCore(byte[] frame, int width, int height)
     {
         EnsureBitmap(width, height);
@@ -174,14 +192,18 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
             _pendingFrame = null;
             _frameDispatchPending = false;
         }
-        if (pending is { } frame)
-            PresentCore(frame.Pixels, frame.Width, frame.Height);
+        if (pending is not { } frame)
+            return;
+        PresentCore(frame.Pixels, frame.Width, frame.Height);
+        // 画完把缓冲还给解码线程；只留一块，多余的自然回收。
+        _spareFrame = frame.Pixels;
     }
 
     private void ClearCore()
     {
         lock (_pendingFrameGate)
             _pendingFrame = null;
+        _spareFrame = null;
         FrameSize = default;
         InvalidateVisual();
     }
