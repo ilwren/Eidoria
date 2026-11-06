@@ -28,6 +28,9 @@ public sealed class SqliteContentIndex : IContentIndexService
     /// <summary>单文件正文上限（与文档口径一致）；超过的文件不进索引。</summary>
     public const long MaxFileBytes = 512 * 1024;
 
+    /// <summary>Office / OpenDocument 文档的体积上限（v0.47）：压缩包里有大量版式，不能按纯文本口径卡 512 KB。</summary>
+    public const long MaxDocumentBytes = 32L * 1024 * 1024;
+
     /// <summary>只索引这些扩展名的正文；其余类型连打开都不打开。</summary>
     public static readonly IReadOnlyList<string> IndexedExtensions =
     [
@@ -156,9 +159,11 @@ public sealed class SqliteContentIndex : IContentIndexService
                 string? text;
                 try
                 {
-                    var snapshot = await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
-                        .ConfigureAwait(false);
-                    text = snapshot.Text;
+                    // v0.47：Office / ODF 走正文抽取（ZIP + XML 流式扫文本）。
+                    text = OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
+                        ? OfficeDocumentText.TryExtract(file.FullName)
+                        : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
+                            .ConfigureAwait(false)).Text;
                 }
                 catch (OperationCanceledException)
                 {
@@ -722,11 +727,15 @@ public sealed class SqliteContentIndex : IContentIndexService
 
                     if (entry is not FileInfo file)
                         continue;
-                    if (!IndexedExtensions.Contains(Path.GetExtension(file.Name), StringComparer.OrdinalIgnoreCase))
+                    var extension = Path.GetExtension(file.Name);
+                    var isDocument = OfficeDocumentText.IsSupportedExtension(extension);
+                    if (!isDocument &&
+                        !IndexedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
                         continue;
                     try
                     {
-                        if (file.Length <= 0 || file.Length > MaxFileBytes)
+                        var limit = isDocument ? MaxDocumentBytes : MaxFileBytes;
+                        if (file.Length <= 0 || file.Length > limit)
                             continue;
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
