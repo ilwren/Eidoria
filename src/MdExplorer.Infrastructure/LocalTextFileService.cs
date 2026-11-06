@@ -120,9 +120,11 @@ public sealed class LocalTextFileService : ITextFileService
 
     private static async Task<byte[]> ReadAllBytesAsync(string path, long maxBytes, CancellationToken cancellationToken)
     {
+        // v0.49：顺序读提示。索引重建会整目录地读一遍，告诉 OS 这是顺序访问能少一次
+        // 前瞻式随机读的猜测，也方便内核合并成更大的 I/O。
         await using var stream = new FileStream(
             path, FileMode.Open, FileAccess.Read, FileShare.Read,
-            bufferSize: 81920, useAsync: true);
+            bufferSize: 81920, options: FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var memory = new MemoryStream();
         var buffer = new byte[81920];
         int read;

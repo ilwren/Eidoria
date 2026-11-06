@@ -25,6 +25,76 @@ public sealed class SearchIndexTests : IDisposable
         _index = new FileNameIndexService(_dataDir, _settings);
     }
 
+    private static FileNameIndexEntry Entry(string path, long length = 10, long ticks = 1) => new()
+    {
+        Path = path,
+        Name = Path.GetFileName(path),
+        Kind = (int)FileKind.File,
+        Length = length,
+        LastWriteUtcTicks = ticks,
+        Extension = Path.GetExtension(path),
+    };
+
+    private static FileNameIndexSnapshot Snapshot(string root, params FileNameIndexEntry[] entries) => new()
+    {
+        BuiltAtUtc = DateTimeOffset.UtcNow,
+        Roots = [root],
+        Entries = [.. entries],
+    };
+
+    /// <summary>v0.49：内容没变就别重写整份 JSON（上万条时这是一次纯写盘、零收益）。</summary>
+    [Fact]
+    public void SnapshotsEquivalentIgnoresBuiltTimeButNotFacts()
+    {
+        var first = Snapshot(_root, Entry(Path.Combine(_root, "a.txt")), Entry(Path.Combine(_root, "b.txt"), 20, 2));
+        var sameContent = Snapshot(_root, Entry(Path.Combine(_root, "b.txt"), 20, 2), Entry(Path.Combine(_root, "a.txt")));
+        sameContent.BuiltAtUtc = first.BuiltAtUtc.AddHours(1);
+
+        Assert.True(FileNameIndexService.SnapshotsEquivalent(first, sameContent));
+        Assert.True(FileNameIndexService.SnapshotsEquivalent(first, first));
+
+        // 长度 / 时间戳 / 新增条目 / 根配置 / 部分态，任一不同都必须重写。
+        Assert.False(FileNameIndexService.SnapshotsEquivalent(
+            first, Snapshot(_root, Entry(Path.Combine(_root, "a.txt"), 11), Entry(Path.Combine(_root, "b.txt"), 20, 2))));
+        Assert.False(FileNameIndexService.SnapshotsEquivalent(
+            first, Snapshot(_root, Entry(Path.Combine(_root, "a.txt")), Entry(Path.Combine(_root, "b.txt"), 20, 2),
+                Entry(Path.Combine(_root, "c.txt")))));
+        Assert.False(FileNameIndexService.SnapshotsEquivalent(
+            first, Snapshot(Path.Combine(_root, "other"), Entry(Path.Combine(_root, "a.txt")),
+                Entry(Path.Combine(_root, "b.txt"), 20, 2))));
+
+        var partial = Snapshot(_root, Entry(Path.Combine(_root, "a.txt")), Entry(Path.Combine(_root, "b.txt"), 20, 2));
+        partial.IsPartial = true;
+        Assert.False(FileNameIndexService.SnapshotsEquivalent(first, partial));
+
+        // 没有旧快照时一定得写。
+        Assert.False(FileNameIndexService.SnapshotsEquivalent(null, first));
+    }
+
+    [Fact]
+    public async Task RebuildDoesNotRewriteSnapshotWhenNothingChanged()
+    {
+        FileIn("a.txt");
+        FileIn("sub/b.md");
+        var indexPath = Path.Combine(_dataDir, "filename-index-v1.json");
+
+        await _index.RebuildAsync(null, CancellationToken.None);
+        Assert.True(File.Exists(indexPath));
+        var writtenAt = File.GetLastWriteTimeUtc(indexPath);
+        var bytes = await File.ReadAllBytesAsync(indexPath);
+
+        // 同一实例第二次重建：内存里就有旧快照，内容等价 → 一次都不写盘。
+        await _index.RebuildAsync(null, CancellationToken.None);
+        Assert.Equal(writtenAt, File.GetLastWriteTimeUtc(indexPath));
+
+        // 冷启动的新实例（只能从盘上读旧快照）：同样不该重写。
+        var reopened = new FileNameIndexService(_dataDir, _settings);
+        var stats = await reopened.RebuildAsync(null, CancellationToken.None);
+        Assert.Equal(3, stats.EntryCount); // a.txt + sub 目录 + sub/b.md
+        Assert.Equal(writtenAt, File.GetLastWriteTimeUtc(indexPath));
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(indexPath));
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_baseDir, recursive: true); } catch (IOException) { }

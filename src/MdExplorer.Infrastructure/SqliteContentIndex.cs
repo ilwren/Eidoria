@@ -42,6 +42,12 @@ public sealed class SqliteContentIndex : IContentIndexService
 
     private const int SnippetWindow = 60;
 
+    /// <summary>
+    /// 存进 <c>docs.raw</c> 的正文上限（v0.49）：摘要只需要命中处的一个窗口，没必要为一篇大文件
+    /// 反复写几百 KB。超出后**检索仍然覆盖全文**（分词用的是完整正文），只是摘要回落到开头。
+    /// </summary>
+    public const int MaxStoredRawChars = 40_000;
+
     private readonly string _databasePath;
     private readonly ITextFileService _textFiles;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -106,100 +112,124 @@ public sealed class SqliteContentIndex : IContentIndexService
         try
         {
             await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-            // 整次重建放在一个事务里：中途取消或抛错就整体回滚，已有索引保持原样。
-            await using var transaction = connection.BeginTransaction();
+            await ConfigureForBulkWriteAsync(connection, cancellationToken).ConfigureAwait(false);
 
             // 现有索引：path -> (id, mtime, size)。未变的文件直接跳过，避免整库重解。
-            var existing = new Dictionary<string, (long Id, long Mtime, long Size)>(StringComparer.Ordinal);
-            await using (var read = connection.CreateCommand())
-            {
-                read.Transaction = transaction;
-                read.CommandText = "SELECT id, path, mtime, size FROM docs;";
-                await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    existing[reader.GetString(1)] = (reader.GetInt64(0), reader.GetInt64(2), reader.GetInt64(3));
-            }
+            var existing = await LoadExistingAsync(connection, cancellationToken).ConfigureAwait(false);
 
             var candidates = EnumerateCandidates(normalizedRoots, cancellationToken);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var done = 0;
             var total = candidates.Count;
+            var writesInChunk = 0;
 
-            foreach (var file in candidates)
+            // v0.49：分块提交。此前整次重建压在一个事务里——WAL 会把「读到的所有正文」攒到最后一次
+            // 提交才落盘，几十万篇时表现为持续读写 + 结束瞬间的一大波写；现在每 CommitBatch 篇提交一次，
+            // 磁盘 I/O 被摊平，取消也只丢当前这一块（已提交的保留，下次重建补齐）。
+            var transaction = connection.BeginTransaction();
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                seen.Add(file.FullName);
-                done++;
-                if (done % 25 == 0 || done == total)
+                foreach (var file in candidates)
                 {
-                    progress?.Report(new OperationProgress(
-                        total == 0 ? 0 : (double)done / total, file.Name, done, total));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    seen.Add(file.FullName);
+                    done++;
+                    if (done % 25 == 0 || done == total)
+                    {
+                        progress?.Report(new OperationProgress(
+                            total == 0 ? 0 : (double)done / total, file.Name, done, total));
+                    }
+
+                    long mtime;
+                    long length;
+                    try
+                    {
+                        // 存 unix 毫秒而不是 Ticks：查询侧要按毫秒还原成 DateTimeOffset，
+                        // 两边必须是同一个单位，否则命中结果的时间会离谱。
+                        mtime = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeMilliseconds();
+                        length = file.Length;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        continue; // 枚举后文件被删/改名：跳过，下一轮再校准
+                    }
+
+                    if (existing.TryGetValue(file.FullName, out var known) &&
+                        known.Mtime == mtime && known.Size == length)
+                    {
+                        continue; // 没变：不读正文、不写库——这是「重建很吃盘」的主要来源
+                    }
+
+                    string? text;
+                    try
+                    {
+                        // Office / ODF 走正文抽取（ZIP + XML 流式扫文本）。
+                        text = OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
+                            ? OfficeDocumentText.TryExtract(file.FullName)
+                            : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
+                                .ConfigureAwait(false)).Text;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                        or InvalidDataException or NotSupportedException or ArgumentException)
+                    {
+                        // 读不了的文件（超过上限、无权限、编码不认识）不进索引，也不让整次重建失败。
+                        text = null;
+                    }
+
+                    if (text is null)
+                    {
+                        if (existing.TryGetValue(file.FullName, out var stale))
+                        {
+                            await DeleteDocumentAsync(connection, transaction, stale.Id, cancellationToken)
+                                .ConfigureAwait(false);
+                            writesInChunk++;
+                        }
+                    }
+                    else
+                    {
+                        await UpsertDocumentAsync(
+                            connection, transaction, file, text, mtime, length,
+                            existing.TryGetValue(file.FullName, out var current) ? current.Id : null,
+                            cancellationToken).ConfigureAwait(false);
+                        writesInChunk++;
+                    }
+
+                    if (writesInChunk < CommitBatch)
+                        continue;
+
+                    transaction.Commit();
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                    transaction = connection.BeginTransaction();
+                    writesInChunk = 0;
+                    await PaceAsync(cancellationToken).ConfigureAwait(false);
                 }
 
-                long mtime;
-                long length;
-                try
+                // 消失在根里的文档：删掉，避免「文件早删了还能搜到」。
+                foreach (var (path, row) in existing)
                 {
-                    // 存 unix 毫秒而不是 Ticks：查询侧要按毫秒还原成 DateTimeOffset，
-                    // 两边必须是同一个单位，否则命中结果的时间会离谱。
-                    mtime = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeMilliseconds();
-                    length = file.Length;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    continue; // 枚举后文件被删/改名：跳过，下一轮再校准
-                }
-
-                if (existing.TryGetValue(file.FullName, out var known) &&
-                    known.Mtime == mtime && known.Size == length)
-                {
-                    continue; // 没变：跳过解码
-                }
-
-                string? text;
-                try
-                {
-                    // v0.47：Office / ODF 走正文抽取（ZIP + XML 流式扫文本）。
-                    text = OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
-                        ? OfficeDocumentText.TryExtract(file.FullName)
-                        : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
-                            .ConfigureAwait(false)).Text;
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-                    or InvalidDataException or NotSupportedException or ArgumentException)
-                {
-                    // 读不了的文件（超过上限、无权限、编码不认识）不进索引，也不让整次重建失败。
-                    text = null;
-                }
-
-                if (text is null)
-                {
-                    if (existing.TryGetValue(file.FullName, out var stale))
-                        await DeleteDocumentAsync(connection, transaction, stale.Id, cancellationToken)
-                            .ConfigureAwait(false);
-                    continue;
-                }
-
-                await UpsertDocumentAsync(
-                    connection, transaction, file, text, mtime, length,
-                    existing.TryGetValue(file.FullName, out var current) ? current.Id : null,
-                    cancellationToken).ConfigureAwait(false);
-            }
-
-            // 消失在根里的文档：删掉，避免「文件早删了还能搜到」。
-            foreach (var (path, row) in existing)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!seen.Contains(path))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (seen.Contains(path))
+                        continue;
                     await DeleteDocumentAsync(connection, transaction, row.Id, cancellationToken).ConfigureAwait(false);
+                }
+
+                await WriteRootsIfChangedAsync(connection, transaction, normalizedRoots, cancellationToken)
+                    .ConfigureAwait(false);
+                transaction.Commit();
+            }
+            finally
+            {
+                // 未提交的事务在这里回滚：取消/失败只丢当前这一块，已提交的分块留在库里。
+                await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
-            await WriteRootsAsync(connection, transaction, normalizedRoots, cancellationToken).ConfigureAwait(false);
-            transaction.Commit();
+            // 收尾把 WAL 折回主库并截断：否则 -wal 会一直挂着上次重建的大小，
+            // 用户看到「占了多少盘」虚高，下次打开还要读一遍 WAL。
+            await CheckpointAsync(connection, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -563,11 +593,86 @@ public sealed class SqliteContentIndex : IContentIndexService
         }
     }
 
+    /// <summary>每多少条写库提交一次（v0.49）。500 条大约几十毫秒，既能摊平 I/O 又不至于提交过频。</summary>
+    public const int CommitBatch = 500;
+
+    /// <summary>每个分块之间让出磁盘的毫秒数：给同机其它应用（含用户自己）留出 I/O 机会。</summary>
+    private const int PaceMilliseconds = 12;
+
+    /// <summary>批量写入前的连接级调优：只为重建服务，普通查询不受影响。</summary>
+    private static async Task ConfigureForBulkWriteAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        // 16 MB 页缓存（负数 = KiB）：把索引页留在内存里，减少重建过程中反复回读；
+        // temp_store=MEMORY 让 FTS5 的排序中间结果不落到临时文件。
+        command.CommandText = """
+            PRAGMA cache_size=-16384;
+            PRAGMA temp_store=MEMORY;
+            PRAGMA wal_autocheckpoint=1000;
+            """;
+        try
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException)
+        {
+            // 老构建不认某个 PRAGMA 也不该让重建失败：这些只是优化。
+        }
+    }
+
+    private static Task PaceAsync(CancellationToken cancellationToken) =>
+        PaceMilliseconds <= 0 ? Task.CompletedTask : Task.Delay(PaceMilliseconds, cancellationToken);
+
+    private static async Task<Dictionary<string, (long Id, long Mtime, long Size)>> LoadExistingAsync(
+        SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var existing = new Dictionary<string, (long Id, long Mtime, long Size)>(StringComparer.Ordinal);
+        await using var read = connection.CreateCommand();
+        read.CommandText = "SELECT id, path, mtime, size FROM docs;";
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            existing[reader.GetString(1)] = (reader.GetInt64(0), reader.GetInt64(2), reader.GetInt64(3));
+        return existing;
+    }
+
+    private static async Task CheckpointAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+        try
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException)
+        {
+            // 有读者正开着（例如用户刚好在搜索）时不能截断：留给下一次，不影响索引正确性。
+        }
+    }
+
+    /// <summary>根配置没变就不写 meta：避免「什么都没改，重建一次却写了一遍库」。</summary>
+    private static async Task WriteRootsIfChangedAsync(
+        SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<string> roots,
+        CancellationToken cancellationToken)
+    {
+        await using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT value FROM meta WHERE key='roots';";
+            var current = await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+            if (string.Equals(current, string.Join('\n', roots), StringComparison.Ordinal))
+                return;
+        }
+
+        await WriteRootsAsync(connection, transaction, roots, cancellationToken).ConfigureAwait(false);
+    }
+
     private static async Task UpsertDocumentAsync(
         SqliteConnection connection, SqliteTransaction transaction, FileInfo file, string text,
         long mtimeMs, long length, long? existingId, CancellationToken cancellationToken)
     {
         var tokens = ExpandForIndex(text);
+        // 分词吃全文（保证「文件深处的内容也能被搜到」），入库的原文只留前 4 万字符（摘要够用）。
+        var storedRaw = text.Length <= MaxStoredRawChars ? text : text[..MaxStoredRawChars];
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         if (existingId is { } id)
         {
@@ -580,7 +685,7 @@ public sealed class SqliteContentIndex : IContentIndexService
             update.Parameters.AddWithValue("$mtime", mtimeMs);
             update.Parameters.AddWithValue("$size", length);
             update.Parameters.AddWithValue("$now", now);
-            update.Parameters.AddWithValue("$raw", text);
+            update.Parameters.AddWithValue("$raw", storedRaw);
             update.Parameters.AddWithValue("$id", id);
             await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
@@ -604,7 +709,7 @@ public sealed class SqliteContentIndex : IContentIndexService
         insert.Parameters.AddWithValue("$mtime", mtimeMs);
         insert.Parameters.AddWithValue("$size", length);
         insert.Parameters.AddWithValue("$now", now);
-        insert.Parameters.AddWithValue("$raw", text);
+        insert.Parameters.AddWithValue("$raw", storedRaw);
         await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         await using var lastId = connection.CreateCommand();

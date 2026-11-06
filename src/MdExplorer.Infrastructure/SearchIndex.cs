@@ -70,7 +70,11 @@ public sealed class FileNameIndexService : IFileNameIndexService
             _invalidated = false;
             var built = await Task.Run(
                 () => BuildSnapshot(roots, progress, cancellationToken), cancellationToken).ConfigureAwait(false);
-            await WriteSnapshotAsync(built, cancellationToken).ConfigureAwait(false);
+            // v0.49：内容与上次完全一致时不重写快照。用户点两次「重建」、或目录没变却触发重建时，
+            // 旧实现会把整份 JSON（上万条）重写一遍——纯写盘、零收益。
+            var previous = _snapshot ?? await ReadSnapshotFromDiskAsync(cancellationToken).ConfigureAwait(false);
+            if (!SnapshotsEquivalent(previous, built))
+                await WriteSnapshotAsync(built, cancellationToken).ConfigureAwait(false);
             _snapshot = built;
             _loaded = true;
             UpdateWatchers(built);
@@ -198,6 +202,33 @@ public sealed class FileNameIndexService : IFileNameIndexService
         finally
         {
             _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 直接读盘上的快照（调用方必须已持有 <see cref="_gate"/>——<see cref="EnsureLoadedAsync"/> 会再抢一次锁）。
+    /// 只用于重建前的「要不要写盘」比较；读不出来就当没有旧快照。
+    /// </summary>
+    private async Task<FileNameIndexSnapshot?> ReadSnapshotFromDiskAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!File.Exists(_indexPath))
+                return null;
+            await using var stream = new FileStream(
+                _indexPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+            var loaded = await JsonSerializer.DeserializeAsync(
+                stream, FileNameIndexJsonContext.Default.FileNameIndexSnapshot, cancellationToken)
+                .ConfigureAwait(false);
+            if (loaded is null || loaded.Version != 1)
+                return null;
+            loaded.Roots ??= [];
+            loaded.Entries ??= [];
+            return loaded;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 
@@ -406,6 +437,38 @@ public sealed class FileNameIndexService : IFileNameIndexService
         if (matches.Count > spec.MaxResults)
             matches.RemoveRange(spec.MaxResults, matches.Count - spec.MaxResults);
         return matches;
+    }
+
+    /// <summary>
+    /// 两份快照在「索引内容」上是否等价（v0.49）：忽略构建时间，只看根配置、是否部分、以及每条路径的
+    /// 全部可见事实。等价就说明重写这份 JSON 没有任何收益，直接跳过写盘。
+    /// </summary>
+    internal static bool SnapshotsEquivalent(FileNameIndexSnapshot? previous, FileNameIndexSnapshot next)
+    {
+        if (previous is null || previous.IsPartial != next.IsPartial)
+            return false;
+        if (!RootsEqual(previous.Roots, next.Roots))
+            return false;
+        if (previous.Entries.Count != next.Entries.Count)
+            return false;
+
+        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var index = new Dictionary<string, FileNameIndexEntry>(previous.Entries.Count, comparer);
+        foreach (var entry in previous.Entries)
+            index[entry.Path] = entry;
+
+        foreach (var entry in next.Entries)
+        {
+            if (!index.TryGetValue(entry.Path, out var old))
+                return false;
+            if (old.Name != entry.Name || old.Kind != entry.Kind || old.Length != entry.Length ||
+                old.LastWriteUtcTicks != entry.LastWriteUtcTicks || old.IsHidden != entry.IsHidden ||
+                old.HasHiddenAncestor != entry.HasHiddenAncestor || old.IsSymlink != entry.IsSymlink ||
+                old.Extension != entry.Extension)
+                return false;
+        }
+
+        return true;
     }
 
     private async Task WriteSnapshotAsync(FileNameIndexSnapshot snapshot, CancellationToken cancellationToken)

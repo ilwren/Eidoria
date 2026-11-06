@@ -27,6 +27,12 @@ public sealed class PerformanceSmokeTests : IClassFixture<TenThousandFileTree>
     /// <summary>1 万个文本文件建内容索引：v0.41 的规模上界（此前只在小目录验证过）。</summary>
     private const double ContentIndexRebuildCeilingMs = 180_000;
 
+    /// <summary>
+    /// 文件全未变时再重建一次内容索引（v0.49）：这时只该走目录枚举与元数据比对，
+    /// 不读正文、不写库。上界取得很宽——这里要抓的是「退化回重读全部正文」。
+    /// </summary>
+    private const double ContentIndexUnchangedRebuildCeilingMs = 20_000;
+
     /// <summary>内容索引查询：库已建好后的单次检索。</summary>
     private const double ContentIndexQueryCeilingMs = 5_000;
 
@@ -102,6 +108,25 @@ public sealed class PerformanceSmokeTests : IClassFixture<TenThousandFileTree>
         Assert.True(
             rebuild.Elapsed.TotalMilliseconds < ContentIndexRebuildCeilingMs,
             $"内容索引重建耗时 {rebuild.Elapsed.TotalMilliseconds:F0} ms，超过 CI 上界 {ContentIndexRebuildCeilingMs:F0} ms");
+
+        // v0.49：同样的目录、文件一个没变，再来一次重建。正常情况下这一步只读目录元数据。
+        var again = Stopwatch.StartNew();
+        var second = await services.ContentIndex.RebuildAsync([_tree.BulkDirectory], null, ct);
+        again.Stop();
+
+        _output.WriteLine(
+            $"[perf] 内容索引重建（{second.DocumentCount} 篇全未变）：{again.Elapsed.TotalMilliseconds:F0} ms，" +
+            $"库体积 {second.IndexBytes / 1024.0 / 1024.0:F2} MB");
+
+        Assert.Equal(stats.DocumentCount, second.DocumentCount);
+        Assert.True(
+            again.Elapsed.TotalMilliseconds < ContentIndexUnchangedRebuildCeilingMs,
+            $"未变文件的重建耗时 {again.Elapsed.TotalMilliseconds:F0} ms，超过上界 " +
+            $"{ContentIndexUnchangedRebuildCeilingMs:F0} ms——说明又去重读正文了");
+        // 什么都没变就不该往库里加东西。
+        Assert.True(
+            second.IndexBytes <= stats.IndexBytes,
+            $"未变文件的重建把库体积从 {stats.IndexBytes} 涨到了 {second.IndexBytes}");
 
         var query = Stopwatch.StartNew();
         var hits = await services.ContentIndex.SearchAsync("性能冒烟样本", 50, ct);

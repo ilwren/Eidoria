@@ -36,7 +36,9 @@ public sealed record ContentSearchHit(
 /// 索引数据只存本机应用数据目录，原文不落库——只存被分词的正文副本用于摘要。
 /// <para>
 /// 契约：<see cref="RebuildAsync"/> 是可取消的全量校准（未变的文件跳过、消失的文件删除），
-/// 取消或失败时不得破坏已有索引；<see cref="SearchAsync"/> 只读，允许与重建并发。
+/// 写库按批提交（v0.49）：**取消保留已完成的分批**，只丢当前这一批，下次重建补齐；
+/// 任何情况下都不得破坏已提交的索引。索引根没变时不再重写根配置。
+/// <see cref="SearchAsync"/> 只读，允许与重建并发。
 /// </para>
 /// </summary>
 public interface IContentIndexService

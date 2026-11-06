@@ -172,6 +172,114 @@ public sealed class ContentIndexTests : IDisposable
         Assert.Equal("预算", hit.Snippet.Substring(hit.MatchOffset, hit.MatchLength));
     }
 
+    // ── v0.49 磁盘 I/O：分块提交、跳过未变文件、原文入库封顶 ────────────────
+
+    /// <summary>数一数真正读了几次正文：重建的 I/O 成本几乎都花在这里。</summary>
+    private sealed class CountingTextFiles(ITextFileService inner) : ITextFileService
+    {
+        public int Reads { get; private set; }
+
+        public Task<TextFileSnapshot> ReadAsync(string path, long maxBytes, CancellationToken cancellationToken)
+        {
+            Reads++;
+            return inner.ReadAsync(path, maxBytes, cancellationToken);
+        }
+
+        public Task<TextFileSnapshot> SaveAsync(
+            TextFileSnapshot expected, string text, bool overwriteChanged, CancellationToken cancellationToken) =>
+            inner.SaveAsync(expected, text, overwriteChanged, cancellationToken);
+    }
+
+    [Fact]
+    public async Task SecondRebuildReadsNothingWhenFilesAreUnchanged()
+    {
+        for (var index = 0; index < 30; index++)
+            Write($"notes/doc-{index}.md", $"第 {index} 篇：季度预算与决算口径说明。\n");
+
+        var counting = new CountingTextFiles(new LocalTextFileService());
+        var index2 = new SqliteContentIndex(Path.Combine(_root, "content.db"), counting);
+
+        var first = await index2.RebuildAsync([_root], null, CancellationToken.None);
+        Assert.Equal(30, first.DocumentCount);
+        Assert.Equal(30, counting.Reads);
+
+        var second = await index2.RebuildAsync([_root], null, CancellationToken.None);
+
+        Assert.Equal(30, second.DocumentCount);
+        // 关键断言：第二次重建一篇正文都不该读——元数据没变就什么都不用做。
+        Assert.Equal(30, counting.Reads);
+    }
+
+    [Fact]
+    public async Task SecondRebuildDoesNotGrowTheDatabase()
+    {
+        Write("notes/a.md", "预算与决算口径。");
+        Write("notes/b.md", "退货流程说明。");
+        var index = Index();
+
+        var first = await index.RebuildAsync([_root], null, CancellationToken.None);
+        Assert.True(first.IndexBytes > 0);
+
+        var second = await index.RebuildAsync([_root], null, CancellationToken.None);
+
+        // 收尾 checkpoint 之后 WAL 已折回主库：没有新增写入，体积就该一模一样。
+        Assert.Equal(first.IndexBytes, second.IndexBytes);
+        Assert.Equal(first.DocumentCount, second.DocumentCount);
+    }
+
+    [Fact]
+    public async Task CancellingMidwayKeepsCommittedBatches()
+    {
+        // 分批只与「写了多少条」有关：造 3 批多一点，取消后应留下整批的进度，而不是全丢。
+        var count = SqliteContentIndex.CommitBatch * 2 + 40;
+        for (var index = 0; index < count; index++)
+            Write($"bulk/doc-{index}.md", $"第 {index} 篇：性能冒烟样本。\n");
+
+        var index2 = Index("partial.db");
+        using var cts = new CancellationTokenSource();
+        var progress = new InlineProgress(value =>
+        {
+            if (value.ItemsDone >= count / 2)
+                cts.Cancel();
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => index2.RebuildAsync([_root], progress, cts.Token));
+
+        var stats = await index2.GetStatsAsync(CancellationToken.None);
+
+        // 取消不是「白干」：已提交的分批留在库里，下次重建补齐剩下的。
+        Assert.True(stats.DocumentCount > 0, "取消后不该一篇都不剩");
+        Assert.True(stats.DocumentCount < count, $"取消后不该已经索引完全部 {count} 篇");
+    }
+
+    private sealed class InlineProgress(Action<OperationProgress> report) : IProgress<OperationProgress>
+    {
+        public void Report(OperationProgress value) => report(value);
+    }
+
+    [Fact]
+    public async Task LargeFileIsSearchableButItsStoredRawIsCapped()
+    {
+        var tail = "结尾处的独特词甲乙丙";
+        var content = new string('前', SqliteContentIndex.MaxStoredRawChars + 5_000) + tail;
+        Write("notes/long.md", content);
+        Write("notes/small.md", "短文档");
+        var index = Index();
+
+        var stats = await index.RebuildAsync([_root], null, CancellationToken.None);
+        var hits = await index.SearchAsync("甲乙丙", 10, CancellationToken.None);
+
+        // 检索覆盖全文：词在 4 万字符之后也能搜到。
+        Assert.True(stats.DocumentCount >= 1);
+        Assert.Single(hits);
+        Assert.Equal("long.md", hits[0].Name);
+        // 入库原文封顶带来的已知代价：摘要只从保留的前 4 万字符里截，
+        // 所以词在更深处时能搜到、但摘要里看不到它，也不给高亮区间。
+        Assert.DoesNotContain("甲乙丙", hits[0].Snippet, StringComparison.Ordinal);
+        Assert.Equal(-1, hits[0].MatchOffset);
+    }
+
     // ── 真实 SQLite 往返 ──────────────────────────────────────────────────
 
     [Fact]
