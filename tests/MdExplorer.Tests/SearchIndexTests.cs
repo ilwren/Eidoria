@@ -29,7 +29,7 @@ public sealed class SearchIndexTests : IDisposable
     {
         Path = path,
         Name = Path.GetFileName(path),
-        Kind = (int)FileKind.File,
+        Kind = (int)FileKind.Text,
         Length = length,
         LastWriteUtcTicks = ticks,
         Extension = Path.GetExtension(path),
