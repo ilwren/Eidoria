@@ -3244,6 +3244,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 {
                     IsFavorite = _services.SettingsStore.IsFavorite(hit.Path),
                     SearchSnippetText = hit.Snippet,
+                    SearchSnippetHighlightStart = hit.MatchOffset,
+                    SearchSnippetHighlightLength = hit.MatchLength,
                 });
             }
 

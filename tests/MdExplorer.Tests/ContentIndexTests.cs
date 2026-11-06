@@ -129,6 +129,49 @@ public sealed class ContentIndexTests : IDisposable
         Assert.Equal("a b c", SqliteContentIndex.BuildSnippet("a\n\n\t b   c", string.Empty));
     }
 
+    [Fact]
+    public void SnippetReportsWhereTheMatchSits()
+    {
+        // v0.48：摘要里那一段高亮的位置由索引层给出，UI 不再自己搜关键词。
+        var raw = new string('甲', 200) + "预算表" + new string('乙', 200);
+        var snippet = SqliteContentIndex.BuildSnippet(raw, "预算表", out var offset, out var length);
+
+        Assert.True(offset >= 0);
+        Assert.Equal("预算表", snippet.Substring(offset, length));
+        // 头部省略号也要算进偏移，否则高亮会整体错一位。
+        Assert.StartsWith("…", snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SnippetOffsetsSurviveCaseInsensitiveLatinMatch()
+    {
+        var snippet = SqliteContentIndex.BuildSnippet("Quarterly BUDGET review", "budget", out var offset, out var length);
+
+        Assert.Equal("BUDGET", snippet.Substring(offset, length));
+    }
+
+    [Fact]
+    public void SnippetWithoutMatchHasNoHighlight()
+    {
+        SqliteContentIndex.BuildSnippet("第一行 第二行", "找不到", out var offset, out var length);
+
+        Assert.Equal(-1, offset);
+        Assert.Equal(0, length);
+    }
+
+    [Fact]
+    public async Task SearchResultCarriesHighlightOffsets()
+    {
+        Write("notes/budget.md", "# 计划\n\n季度预算与决算口径说明。\n");
+        var index = Index();
+        await index.RebuildAsync([_root], null, CancellationToken.None);
+
+        var hit = Assert.Single(await index.SearchAsync("预算", 10, CancellationToken.None));
+
+        Assert.True(hit.MatchOffset >= 0);
+        Assert.Equal("预算", hit.Snippet.Substring(hit.MatchOffset, hit.MatchLength));
+    }
+
     // ── 真实 SQLite 往返 ──────────────────────────────────────────────────
 
     [Fact]

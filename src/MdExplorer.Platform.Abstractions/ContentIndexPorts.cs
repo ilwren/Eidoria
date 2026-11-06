@@ -19,12 +19,16 @@ public sealed record ContentIndexStats(
 /// 一条全文命中。<see cref="Snippet"/> 是从原文里截出来的上下文窗口，
 /// 带省略号，不含索引内部的分词形态（那东西人看不懂，也不该出现在界面上）。
 /// </summary>
+/// <param name="MatchOffset">命中词在 <paramref name="Snippet"/> 里的起点；-1 表示没有可高亮区间。</param>
+/// <param name="MatchLength">命中词长度；0 表示没有可高亮区间。</param>
 public sealed record ContentSearchHit(
     string Path,
     string Name,
     string Snippet,
     DateTimeOffset LastWriteTime,
-    long Length);
+    long Length,
+    int MatchOffset = -1,
+    int MatchLength = 0);
 
 /// <summary>
 /// 内容（全文）索引端口。默认关闭的增强能力：只索引用户显式加入的本地根，

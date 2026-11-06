@@ -37,6 +37,10 @@ public sealed partial class FileItemViewModel(FileItem model) : ObservableObject
     public string? SearchSnippetText { get; init; }
     public bool HasSearchSnippet => !string.IsNullOrWhiteSpace(SearchSnippetText);
 
+    /// <summary>命中词在 <see cref="SearchSnippetText"/> 里的位置（v0.48）；-1 表示不高亮。</summary>
+    public int SearchSnippetHighlightStart { get; init; } = -1;
+    public int SearchSnippetHighlightLength { get; init; }
+
     /// <summary>搜索结果中展示父目录（普通浏览时由 Browser 关闭）。</summary>
     // 详细信息视图列（纯显示字符串；排序由 Browser 的 FileItemOrdering 管线负责）
     public string SizeText => Model.IsFolder ? "—" : Formatting.Bytes(Model.Length);

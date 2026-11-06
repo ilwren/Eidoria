@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:md="using:Md3.Avalonia.Controls"
              xmlns:vm="using:MdExplorer.UI.ViewModels"
+             xmlns:controls="using:MdExplorer.UI.Controls"
              x:Class="MdExplorer.UI.Views.SearchCenterView"
              x:DataType="vm:ShellViewModel">
   <Grid Margin="20,12,20,20" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10">
@@ -98,9 +99,13 @@
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="caption" Text="{Binding SearchSnippetText}" TextWrapping="Wrap"
-                                 MaxLines="2" TextTrimming="CharacterEllipsis"
-                                 IsVisible="{Binding HasSearchSnippet}" />
+                      <controls:HighlightedText Classes="caption" Text="{Binding SearchSnippetText}"
+                                                HighlightStart="{Binding SearchSnippetHighlightStart}"
+                                                HighlightLength="{Binding SearchSnippetHighlightLength}"
+                                                HighlightBrush="{DynamicResource Md.Sys.Color.Primary.Brush}"
+                                                TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                ToolTip.Tip="命中的词在文中的位置"
+                                                IsVisible="{Binding HasSearchSnippet}" />
                       <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                         <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CompactMetaText}" />

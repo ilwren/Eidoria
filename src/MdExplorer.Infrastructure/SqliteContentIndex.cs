@@ -239,12 +239,15 @@ public sealed class SqliteContentIndex : IContentIndexService
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 var raw = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                var snippet = BuildSnippet(raw, query, out var matchOffset, out var matchLength);
                 hits.Add(new ContentSearchHit(
                     reader.GetString(0),
                     reader.GetString(1),
-                    BuildSnippet(raw, query),
+                    snippet,
                     DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(3)),
-                    reader.GetInt64(4)));
+                    reader.GetInt64(4),
+                    matchOffset,
+                    matchLength));
             }
         }
         catch (Exception ex) when (ex is SqliteException or IOException)
@@ -428,8 +431,18 @@ public sealed class SqliteContentIndex : IContentIndexService
     }
 
     /// <summary>从原文里截一段带上下文的窗口；找不到原查询时退回开头。</summary>
-    internal static string BuildSnippet(string raw, string query)
+    internal static string BuildSnippet(string raw, string query) =>
+        BuildSnippet(raw, query, out _, out _);
+
+    /// <summary>
+    /// 同上，另外给出命中词在返回摘要里的偏移量（v0.48 高亮用）。
+    /// 偏移量按**摘要字符串**计，不含前缀省略号之外的任何假设——
+    /// UI 直接照着切三段，不需要自己再搜一遍关键词。
+    /// </summary>
+    internal static string BuildSnippet(string raw, string query, out int matchOffset, out int matchLength)
     {
+        matchOffset = -1;
+        matchLength = 0;
         if (string.IsNullOrWhiteSpace(raw))
             return string.Empty;
 
@@ -446,6 +459,12 @@ public sealed class SqliteContentIndex : IContentIndexService
         var slice = flat.Substring(start, Math.Max(0, length));
         var prefix = start > 0 ? "…" : string.Empty;
         var suffix = start + length < flat.Length ? "…" : string.Empty;
+        if (needle.Length > 0 && index >= start && index + needle.Length <= start + length)
+        {
+            matchOffset = prefix.Length + (index - start);
+            matchLength = needle.Length;
+        }
+
         return prefix + slice + suffix;
     }
 
