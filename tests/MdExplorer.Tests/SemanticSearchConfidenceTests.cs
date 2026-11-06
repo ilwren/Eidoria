@@ -1,4 +1,5 @@
 using MdExplorer.Infrastructure.Ai;
+using Xunit;
 
 namespace MdExplorer.Tests;
 
@@ -39,7 +40,8 @@ public class SemanticSearchConfidenceTests
 
         Assert.False(confidence.HasStrongMatch);
         Assert.Equal(3, confidence.LowConfidenceCount);
-        Assert.All([0.31f, 0.28f, 0.19f], score => Assert.True(confidence.IsLowConfidence(score)));
+        foreach (var score in new[] { 0.31f, 0.28f, 0.19f })
+            Assert.True(confidence.IsLowConfidence(score));
     }
 
     [Fact]
