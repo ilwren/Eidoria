@@ -1,22 +1,12 @@
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/bin/Release/net10.0/MdExplorer.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-[xUnit.net 00:00:01.40]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
-[xUnit.net 00:00:01.40]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
-[xUnit.net 00:00:01.40]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:03.48]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:03.49]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [1 ms]
+[xUnit.net 00:00:03.49]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
-[xUnit.net 00:00:03.09]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
+[xUnit.net 00:00:03.83]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
   Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
-[xUnit.net 00:00:03.50]     MdExplorer.Tests.FoldablePostureTests.ShellReservesTheHingeBandOnlyWhileHalfFolded [FAIL]
-  Failed MdExplorer.Tests.FoldablePostureTests.ShellReservesTheHingeBandOnlyWhileHalfFolded [5 ms]
-  Error Message:
-   Assert.True() Failure
-Expected: True
-Actual:   False
-  Stack Trace:
-     at MdExplorer.Tests.FoldablePostureTests.ShellReservesTheHingeBandOnlyWhileHalfFolded() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/FoldablePostureTests.cs:line 163
-   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
-Failed!  - Failed:     1, Passed:   435, Skipped:     4, Total:   440, Duration: 7 s - MdExplorer.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   436, Skipped:     4, Total:   440, Duration: 5 s - MdExplorer.Tests.dll (net10.0)
