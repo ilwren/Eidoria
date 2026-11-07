@@ -23,6 +23,9 @@ namespace MdExplorer.Android;
 /// </summary>
 public sealed class AndroidFoldablePostureSource : Java.Lang.Object, ISensorEventListener, IFoldablePostureSource
 {
+    /// <summary><c>android.hardware.Sensor.TYPE_HINGE_ANGLE</c> 的原始值（API 30 起）。</summary>
+    private const int HingeAngleSensorType = 36;
+
     private readonly Activity _activity;
     private readonly SensorManager? _sensors;
     private readonly Sensor? _hinge;
@@ -38,8 +41,9 @@ public sealed class AndroidFoldablePostureSource : Java.Lang.Object, ISensorEven
         try
         {
             _sensors = activity.GetSystemService(Context.SensorService) as SensorManager;
-            // 用字符串类型而不是 int 常量：TYPE_HINGE_ANGLE 的 int 形式在绑定里已标 obsolete。
-            _hinge = _sensors?.GetDefaultSensor(Sensor.StringTypeHingeAngle);
+            // Sensor.TYPE_HINGE_ANGLE = 36（API 30）。绑定里那个 int 常量已标 obsolete，
+            // 而 SensorType 枚举未见 HingeAngle 成员，这里按原值强转，语义与系统常量一一对应。
+            _hinge = _sensors?.GetDefaultSensor((SensorType)HingeAngleSensorType);
             if (_sensors is not null && _hinge is not null)
                 _registered = _sensors.RegisterListener(this, _hinge, SensorDelay.Normal);
         }
@@ -65,7 +69,7 @@ public sealed class AndroidFoldablePostureSource : Java.Lang.Object, ISensorEven
     public void OnSensorChanged(SensorEvent? e)
     {
         var values = e?.Values;
-        if (values is null || values.Length == 0)
+        if (values is null || values.Count == 0)
             return;
 
         _lastAngle = values[0];
