@@ -57,7 +57,7 @@ public sealed class MainActivity : AvaloniaMainActivity
         base.OnDestroy();
     }
 
-    public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
+    public override void OnConfigurationChanged(global::Android.Content.Res.Configuration newConfig)
     {
         base.OnConfigurationChanged(newConfig);
         // 旋转/分屏后窗口横竖可能变了：铰链走向要跟着重算（Attribute 里已声明不重建 Activity）。

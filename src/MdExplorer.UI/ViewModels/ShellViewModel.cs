@@ -628,8 +628,12 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         ? "下半屏留给预览：选中一个文件即在这里显示。"
         : "右半屏留给预览：选中一个文件即在这里显示。";
 
-    /// <summary>底部导航：只在「窄且不矮」时出现（小屏竖屏手机、折叠屏合起态）。</summary>
-    public bool ShowBottomNav => IsCompact && !IsShortViewport;
+    /// <summary>
+    /// 底部导航：只在「窄且不矮」时出现（小屏竖屏手机、折叠屏合起态）。
+    /// 半折叠时一律不出现（v0.58）：底栏挂在窗口最底下，书本式会横跨铰链、桌面式会落进副半屏，
+    /// 两种都是「一半按钮藏在折缝里」，宁可退回导轨。
+    /// </summary>
+    public bool ShowBottomNav => IsCompact && !IsShortViewport && !IsHalfFolded;
 
     /// <summary>常驻抽屉：Expanded 以上且不矮。矮视口一律退成导轨，把高度还给内容。</summary>
     public bool ShowDrawerPane => IsExpandedOrAbove && !IsShortViewport;
@@ -811,6 +815,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                      nameof(FoldSecondaryWidth), nameof(FoldSecondaryHeight), nameof(FoldSecondaryHint),
                      nameof(ShowFoldSecondaryHint), nameof(ShowFoldSecondaryPreview),
                      nameof(FoldSecondaryPreviewSource),
+                     // 导航面也随半折叠变：底栏收起、导轨兜底。
+                     nameof(IsShortViewport), nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane),
                      nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
                  })
             OnPropertyChanged(name);

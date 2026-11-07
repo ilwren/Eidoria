@@ -159,9 +159,11 @@ public sealed class FoldablePostureTests : IDisposable
         Assert.Equal(616, shell.FoldPrimaryMargin.Right, 3);
         Assert.Equal(0, shell.FoldPrimaryMargin.Bottom);
         Assert.Equal(584, shell.FoldSecondaryWidth, 3);
-        // 主区只有 584 宽：断点必须按主区算（Medium），否则抽屉+预览栏会一起塞进半屏里。
-        Assert.True(shell.IsMedium);
+        // 主区只有 584 宽：断点必须按主区算（584 → Compact），否则抽屉+预览栏会一起塞进半屏里。
+        // 但底栏挂在窗口最底下、会横跨铰链，所以半折叠时一律不起底栏，导航退成导轨。
+        Assert.True(shell.IsCompact);
         Assert.True(shell.ShowRail);
+        Assert.False(shell.ShowBottomNav);
         Assert.False(shell.ShowDrawerPane);
         // 常驻预览栏让位给副半屏，两半各摆一套预览只会互相挤。
         Assert.False(shell.ShowPreviewPaneNow);

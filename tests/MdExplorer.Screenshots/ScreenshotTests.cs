@@ -1725,10 +1725,12 @@ public sealed class ScreenshotTests
             Assert.Equal(616, shell.FoldPrimaryMargin.Right, 3);
             Assert.Equal(0, shell.FoldPrimaryMargin.Bottom);
             Assert.Equal(584, shell.FoldSecondaryWidth, 3);
-            // 书本式竖向本来就够高，不该被误判成矮视口；主区 584 宽按 Medium 排（导轨），不出抽屉。
+            // 书本式竖向本来就够高，不该被误判成矮视口；主区 584 宽 → Compact，
+            // 但底栏会横跨铰链，所以半折叠时只有导轨。
             Assert.False(shell.IsShortViewport);
-            Assert.True(shell.IsMedium);
+            Assert.True(shell.IsCompact);
             Assert.True(shell.ShowRail);
+            Assert.False(shell.ShowBottomNav);
             Assert.False(shell.ShowDrawerPane);
             return Task.CompletedTask;
         },
