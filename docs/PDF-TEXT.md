@@ -53,6 +53,8 @@ xref 暴力扫描、内联图像、token/资源缓存），正好是「畸形件
 | 文案 | 设置页「全文内容索引」说明、搜索中心「全文」模式提示都写明「含文本型 PDF 与 Office 文档；扫描件需 OCR，本版不做」 |
 | 测试 | `PdfDocumentTextTests`（正文可取 / 扩展名闸 / 扫描件 null / 坏件与缺件 null / 多页顺序）+ `ContentIndexTests`（PDF 能被搜到、坏 PDF 不影响重建） |
 | 预览 | **零改动**：OfficeViewer 直接控件与 PDFtoImage 光栅照旧 |
+| 体积量测（v0.57 CI 产物 zip 对比 v0.56） | linux-x64 Native AOT 73.19 → **77.16 MB（+3.97 MB）**；linux-x64 自包含 75.08 → 76.94 MB（+1.86 MB）；win-x64 145.02 → 146.89 MB（+1.86 MB）；Android（多 ABI 合集）188.43 → 195.49 MB（+7.06 MB，单 ABI 远小于此）。**AOT 与 Android trimming 两门继续绿，未出现 PdfPig 相关 trim 警告**，因此没有启用 §3 第 5 条的任何降级手段 |
+| CI | run `42330712910`：十 Job 全绿；单测 424 例（420 过 / 4 跳过，较 v0.56 的 417 多 7 例） |
 
 ## 4. 验收口径（实施时照抄）
 
