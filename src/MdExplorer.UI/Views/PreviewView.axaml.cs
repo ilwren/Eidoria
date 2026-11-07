@@ -10,7 +10,15 @@ public partial class PreviewView : UserControl
 {
     private PreviewViewModel? _vm;
 
-    public PreviewView() => InitializeComponent();
+    public PreviewView()
+    {
+        InitializeComponent();
+        // v0.55：自动播放要等「画面管道接通」再开始，否则推帧后端可能白丢首帧、留下黑框。
+        FrameVideoSurface.SinkAttached += OnVideoFrameSinkAttached;
+    }
+
+    private void OnVideoFrameSinkAttached(object? sender, EventArgs e) =>
+        _vm?.NotifyVideoFrameSinkAttached();
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -20,6 +28,8 @@ public partial class PreviewView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnVmPropertyChanged;
+            // 视图问得到「画面控件此刻挂上了没」：自动播放据此决定立刻开播还是等一格。
+            _vm.FrameSinkAttachedProbe = () => FrameVideoSurface.IsSinkAttached;
             ApplySource();
         }
     }

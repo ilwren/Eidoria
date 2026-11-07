@@ -275,6 +275,72 @@ public sealed class MediaPlaybackTests
     }
 
     [Fact]
+    public async Task FramePushAutoplayWaitsUntilTheHostSurfaceIsAttached()
+    {
+        // v0.55：用户报「第一次预览媒体不出画面，动一下才有」。
+        // 推帧后端的画面面还没挂上就开播，首帧落进空档＝一块黑框；这里要求「等挂上再播」。
+        var settings = new AppSettings { PlayVideoInline = true, MediaAutoPlay = true };
+        var backend = new FakeMediaPlaybackService(canPlayAudio: true, canPlayVideo: true);
+        var preview = CreatePreviewWithSettings(backend, settings);
+        preview.FrameSinkAttachedProbe = static () => false;
+
+        await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
+
+        Assert.True(preview.ShowFrameVideoSurface);
+        Assert.Equal(0, backend.OpenCount);
+        Assert.False(preview.IsMediaPlaying);
+
+        // PreviewView 把 MediaFrameSurface.SinkAttached 转发过来之后补播。
+        preview.NotifyVideoFrameSinkAttached();
+        await WaitUntilAsync(() => backend.OpenCount == 1).ConfigureAwait(true);
+
+        Assert.True(preview.IsMediaPlaying);
+        Assert.EndsWith("clip.mp4", backend.OpenedPath!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FramePushAutoplayStartsRightAwayWhenTheSurfaceIsAlreadyAttached()
+    {
+        var settings = new AppSettings { PlayVideoInline = true, MediaAutoPlay = true };
+        var backend = new FakeMediaPlaybackService(canPlayAudio: true, canPlayVideo: true);
+        var preview = CreatePreviewWithSettings(backend, settings);
+        preview.FrameSinkAttachedProbe = static () => true;
+
+        await preview.LoadAsync(Item("clip.mp4", FileKind.Video));
+
+        Assert.Equal(1, backend.OpenCount);
+        Assert.True(preview.IsMediaPlaying);
+    }
+
+    [Fact]
+    public async Task ClosingThePreviewStopsPlaybackWithoutChangingFolders()
+    {
+        // v0.55：用户报「关掉预览还在放，非得切目录才停」。
+        // 关预览栏/收起浮窗都会走 ReleaseHeavyContent，这里必须把播放停掉。
+        var settings = new AppSettings { MediaAutoPlay = true };
+        var backend = new FakeMediaPlaybackService(canPlayAudio: true, canPlayVideo: false);
+        var preview = CreatePreviewWithSettings(backend, settings);
+
+        await preview.LoadAsync(Item("song.mp3", FileKind.Audio));
+        Assert.True(preview.IsMediaPlaying);
+
+        preview.ReleaseHeavyContent();
+        await WaitUntilAsync(() => backend.StopCount == 1).ConfigureAwait(true);
+
+        Assert.Equal(1, backend.StopCount);
+        Assert.False(preview.IsMediaPlaying);
+        Assert.Equal(MediaPlaybackState.Stopped, backend.State);
+    }
+
+    /// <summary>等一个条件成立（最多 2 秒）。自动播放的补播是异步发出的，测试不能假设它已经跑完。</summary>
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 200 && !condition(); attempt++)
+            await Task.Delay(10).ConfigureAwait(true);
+        Assert.True(condition(), "等待的条件在 2 秒内没有成立。");
+    }
+
+    [Fact]
     public async Task FramePushClaimWithoutAFrameSinkIsNotPlayable()
     {
         // 后端自称推帧却交不出帧呈现面：和“有声无画”一样，不许给播放按钮。

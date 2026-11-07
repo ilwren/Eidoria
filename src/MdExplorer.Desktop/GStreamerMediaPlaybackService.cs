@@ -47,6 +47,8 @@ internal sealed class GStreamerMediaPlaybackService
     private IMediaFrameSink? _frameSink;
     private CancellationTokenSource? _framePumpCts;
     private Thread? _framePump;
+    // 取帧线程专属的复用缓冲（PublishSample 只在这条线程上跑）。
+    private byte[]? _frameBytes;
 
     public GStreamerMediaPlaybackService()
     {
@@ -110,7 +112,7 @@ internal sealed class GStreamerMediaPlaybackService
                 // 只要 appsink 可用就给 playbin 一个视频 sink：音频文件根本不会走到它，
                 // 视频文件则把每帧交给我们推给宿主。sync=true 让画面跟着音频时钟走。
                 var videoSink = _videoAvailable
-                    ? $" video-sink=\"appsink name={VideoSinkName} caps=video/x-raw,format=BGRA sync=true max-buffers=2 drop=true\""
+                    ? $" video-sink=\"appsink name={VideoSinkName} caps=video/x-raw,format=BGRA sync=true max-buffers=1 drop=true\""
                     : string.Empty;
                 var launch = $"playbin uri=\"{uri}\"{videoSink}";
                 _pipeline = gst_parse_launch(launch, out var error);
@@ -326,15 +328,19 @@ internal sealed class GStreamerMediaPlaybackService
     {
         var cts = _framePumpCts;
         var thread = _framePump;
-        _framePumpCts = null;
-        _framePump = null;
         if (cts is null)
             return;
         try { cts.Cancel(); }
         catch (ObjectDisposedException) { }
+        // v0.55：先把线程收干净再清字段。此前是先清字段再 Join，紧接着的启动会新起一个线程，
+        // 两个线程抢同一个 appsink，帧被劈成两半各自推给不同的面——观感就是卡顿。
         // 取帧线程只做非阻塞推送，不会卡在这里；给足 500ms 兜底，绝不把 UI 线程锁死。
         try { thread?.Join(500); }
         catch (ThreadStateException) { }
+        if (ReferenceEquals(_framePump, thread))
+            _framePump = null;
+        if (ReferenceEquals(_framePumpCts, cts))
+            _framePumpCts = null;
         cts.Dispose();
     }
 
@@ -362,6 +368,10 @@ internal sealed class GStreamerMediaPlaybackService
 
             while (!token.IsCancellationRequested)
             {
+                // 宿主换了帧呈现面（控件重建）后旧线程可能还没退出：已经不是我该服务的那个面，
+                // 立刻收工，别去抢 appsink 里的样本。
+                if (!ReferenceEquals(Volatile.Read(ref _frameSink), sink))
+                    return;
                 var sample = gst_app_sink_try_pull_sample(appsink, 200_000_000UL); // 200ms
                 if (sample == IntPtr.Zero)
                     continue;
@@ -389,7 +399,7 @@ internal sealed class GStreamerMediaPlaybackService
         }
     }
 
-    private static void PublishSample(IntPtr sample, IMediaFrameSink sink)
+    private void PublishSample(IntPtr sample, IMediaFrameSink sink)
     {
         var caps = gst_sample_get_caps(sample);
         if (caps == IntPtr.Zero)
@@ -425,10 +435,25 @@ internal sealed class GStreamerMediaPlaybackService
                 if (stride < rowBytes)
                     stride = rowBytes;
 
-                var frame = new byte[rowBytes * height];
-                for (var y = 0; y < height; y++)
-                    Marshal.Copy(IntPtr.Add(data, y * stride), frame, y * rowBytes, rowBytes);
-                sink.PresentFrame(frame, width, height, rowBytes);
+                // v0.55：复用一块缓冲，行对齐时一次拷完。此前每帧都新分配、还逐行拷——
+                // 1080p 一帧 8 MB，30 fps 就是每秒 240 MB 的分配与拷贝，CPU 全耗在这上面。
+                var needed = rowBytes * height;
+                var frame = _frameBytes;
+                if (frame is null || frame.Length < needed)
+                {
+                    frame = new byte[needed];
+                    _frameBytes = frame;
+                }
+                if (stride == rowBytes)
+                {
+                    Marshal.Copy(data, frame, 0, needed);
+                }
+                else
+                {
+                    for (var y = 0; y < height; y++)
+                        Marshal.Copy(IntPtr.Add(data, y * stride), frame, y * rowBytes, rowBytes);
+                }
+                sink.PresentFrame(frame.AsSpan(0, needed), width, height, rowBytes);
             }
             finally
             {

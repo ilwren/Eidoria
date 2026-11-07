@@ -286,6 +286,62 @@ public sealed partial class PreviewViewModel(
     /// <summary>对当前文件显式改用内嵌画面（风险提示就在卡片上，用户自己选的）。</summary>
     [ObservableProperty] private bool _forceInlineVideo;
 
+    // v0.55：推帧后端的自动播放要等宿主把帧呈现面挂上去。
+    // 早一步开始播，首帧落在「还没人接」的空档里，用户看到的就是一块黑框；
+    // 等到 SinkAttached 再播，第一帧就有人接。
+    private bool _pendingAutoplay;
+
+    /// <summary>
+    /// 视图注入的探针：帧呈现面此刻挂上了没。没有视图（无头测试/截图）时按「已挂上」处理，
+    /// 行为与 v0.54 一致——不该因为看不见视图就不播。
+    /// </summary>
+    public Func<bool>? FrameSinkAttachedProbe { get; set; }
+
+    /// <summary>
+    /// 宿主的帧呈现面刚挂上（由 <c>PreviewView</c> 的 <c>MediaFrameSurface.SinkAttached</c> 转发）。
+    /// 若此时还欠着一次自动播放，就在这里补上。
+    /// </summary>
+    public void NotifyVideoFrameSinkAttached()
+    {
+        if (!_pendingAutoplay)
+            return;
+        _pendingAutoplay = false;
+        var generation = _generation;
+        _ = StartPendingAutoplayAsync(generation);
+    }
+
+    /// <summary>等画面面最多 1.2 秒；超时仍没挂上也照常开播，别让用户以为「没反应」。</summary>
+    private async Task StartAutoplayAfterGraceAsync(int generation)
+    {
+        try
+        {
+            await Task.Delay(1200).ConfigureAwait(true);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (!_pendingAutoplay || generation != _generation)
+            return;
+        _pendingAutoplay = false;
+        await StartPendingAutoplayAsync(generation).ConfigureAwait(true);
+    }
+
+    private async Task StartPendingAutoplayAsync(int generation)
+    {
+        if (generation != _generation || !CanPlayMediaInApp)
+            return;
+        try
+        {
+            await ToggleMediaPlaybackAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // 自动播放失败不该抛给界面：卡片上本来就会显示失败原因。
+        }
+    }
+
     /// <summary>对当前文件打开内嵌画面；换文件时随 <see cref="LoadAsync"/> 复位。</summary>
     [RelayCommand]
     private void EnableInlineVideo() => ForceInlineVideo = true;
@@ -590,6 +646,7 @@ public sealed partial class PreviewViewModel(
     private async Task StopMediaIfAnyAsync()
     {
         StopMediaTimer();
+        _pendingAutoplay = false;
         _mediaPath = null;
         if (_media is { } media && media.State is MediaPlaybackState.Playing or MediaPlaybackState.Paused
             or MediaPlaybackState.Opening or MediaPlaybackState.Stopped)
@@ -767,6 +824,10 @@ public sealed partial class PreviewViewModel(
         HasKeePass = false;
         NeedsKeePassPassword = false;
         IsPayloadReleased = hadHeavyPayload;
+        // v0.55：关掉预览（预览栏开关、浮窗/预览页收起）就把媒体停掉。
+        // 此前只有换文件/换目录才 Stop，用户关掉预览后声音还在放，非得切个目录才安静。
+        _pendingAutoplay = false;
+        _ = StopMediaIfAnyAsync();
     }
 
     /// <summary>旧位图可能还在这一帧的绘制队列里：等这一轮渲染落地后再释放。</summary>
@@ -865,9 +926,23 @@ public sealed partial class PreviewViewModel(
             // 否则用户听到声音却看不到画面，比不播更糟。
             if ((_settings?.Invoke().MediaAutoPlay ?? false) && CanPlayMediaInApp)
             {
-                await ToggleMediaPlaybackAsync().ConfigureAwait(true);
-                if (generation != _generation)
-                    return;
+                // v0.55：推帧后端要等宿主的帧呈现面挂上再开播。此前先播后接，
+                // 首帧落在「还没人接」的空档里，用户看到的就是一块黑框（动一下界面才出画面）。
+                // 探针说了「还没挂上」才等；无视图（无头测试/截图）一律按已挂上处理。
+                var waitForSink = VideoFrameSource is not null && FrameSinkAttachedProbe?.Invoke() != true;
+                if (waitForSink)
+                {
+                    _pendingAutoplay = true;
+                    // 兜底：画面面若因窗口未显示等原因一直没挂上（例如预览栏被收起来），
+                    // 1.2 秒后照样开播——音频该响就响，画面来了再看。
+                    _ = StartAutoplayAfterGraceAsync(generation);
+                }
+                else
+                {
+                    await ToggleMediaPlaybackAsync().ConfigureAwait(true);
+                    if (generation != _generation)
+                        return;
+                }
             }
         }
         SelectedTabIndex = item.IsFolder ? 1 : 0;

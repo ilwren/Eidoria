@@ -33,8 +33,18 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
 
     public bool HasFrame => FrameSize.Width > 0 && FrameSize.Height > 0 && _bitmap is not null;
 
+    /// <summary>后端接受了宿主的帧呈现面（v0.55）：自动播放靠它确认「画面管道已接通」。</summary>
+    public event EventHandler? SinkAttached;
+
+    public bool IsSinkAttached => _attached is not null;
+
     private WriteableBitmap? _bitmap;
     private IMediaVideoFrameSource? _attached;
+    // v0.55：后端有时还没准备好（解码器仍在初始化）就返回 false。此前只在 Source 变化或控件
+    // 重新进树时才重试，于是「第一次预览不出画面、动一下才出来」——这里按固定间隔自己重试几次。
+    private Avalonia.Threading.DispatcherTimer? _attachRetry;
+    private int _attachAttempts;
+    private const int MaxAttachAttempts = 20;
     private readonly object _pendingFrameGate = new();
     private PendingFrame? _pendingFrame;
     private bool _frameDispatchPending;
@@ -146,11 +156,16 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
     /// <summary>从池里取一块够大的缓冲；尺寸变了就换新（旧的自然被丢弃）。只能由解码线程调用。</summary>
     private byte[] RentFrame(int length)
     {
-        var spare = _spareFrame;
-        if (spare is not null && spare.Length == length)
+        // v0.55：空闲缓冲是解码线程和 UI 线程共用的，取还都要在同一把锁里。
+        // 此前两边各写各的，偶尔会把同一块缓冲同时交给两帧，画面上就是撕裂/抖一下。
+        lock (_pendingFrameGate)
         {
-            _spareFrame = null;
-            return spare;
+            var spare = _spareFrame;
+            if (spare is not null && spare.Length == length)
+            {
+                _spareFrame = null;
+                return spare;
+            }
         }
         return new byte[length];
     }
@@ -196,14 +211,17 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
             return;
         PresentCore(frame.Pixels, frame.Width, frame.Height);
         // 画完把缓冲还给解码线程；只留一块，多余的自然回收。
-        _spareFrame = frame.Pixels;
+        lock (_pendingFrameGate)
+            _spareFrame = frame.Pixels;
     }
 
     private void ClearCore()
     {
         lock (_pendingFrameGate)
+        {
             _pendingFrame = null;
-        _spareFrame = null;
+            _spareFrame = null;
+        }
         FrameSize = default;
         InvalidateVisual();
     }
@@ -238,13 +256,48 @@ public sealed class MediaFrameSurface : Control, IMediaFrameSink
         if (!source.AttachFrameSink(this))
         {
             _attached = null;
+            ScheduleAttachRetry();
             return;
         }
+
+        StopAttachRetry();
+        _attachAttempts = 0;
         InvalidateVisual();
+        SinkAttached?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 后端暂时拒收就隔 200 ms 再试。上限 20 次（约 4 秒）后放弃——那说明这个后端确实交不出画面，
+    /// 界面照实说「画面未接入」，而不是无限重试。
+    /// </summary>
+    private void ScheduleAttachRetry()
+    {
+        if (_attachRetry is not null || _attachAttempts >= MaxAttachAttempts)
+            return;
+        _attachAttempts++;
+        _attachRetry = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200),
+        };
+        _attachRetry.Tick += (_, _) =>
+        {
+            StopAttachRetry();
+            if (_attached is null)
+                Attach();
+        };
+        _attachRetry.Start();
+    }
+
+    private void StopAttachRetry()
+    {
+        _attachRetry?.Stop();
+        _attachRetry = null;
     }
 
     private void Detach()
     {
+        StopAttachRetry();
+        _attachAttempts = 0;
         if (_attached is not { } source)
             return;
         _attached = null;

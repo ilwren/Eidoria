@@ -38,6 +38,13 @@ internal sealed class WindowsMediaPlaybackService
     private static readonly TimeSpan FramePeriod = TimeSpan.FromSeconds(1d / TargetFrameRate);
     private static readonly TimeSpan MinimumFrameAdvance = TimeSpan.FromMilliseconds(16);
 
+    /// <summary>
+    /// 取帧要「往前提一点」：一次解码 + 一次界面绘制的耗时都要几十毫秒，
+    /// 若按「此刻的播放位置」取帧，画出来时声音已经走过去了，观感就是口型慢半拍。
+    /// 往前 60 ms 取，正好抵掉这段流水线延迟。
+    /// </summary>
+    private static readonly TimeSpan FrameLead = TimeSpan.FromMilliseconds(60);
+
     private readonly WinRtMediaPlayer? _player;
     private readonly object _gate = new();
     private readonly object _framePumpGate = new();
@@ -52,6 +59,13 @@ internal sealed class WindowsMediaPlaybackService
     private IMediaFrameSink? _frameSink;
     private CancellationTokenSource? _frameCts;
     private Thread? _frameThread;
+    // v0.55：上一轮取帧线程还在收尾时又有人要启动（挂帧呈现面 / 暂停恢复），
+    // 记下来由它在 finally 里接力。此前这种启动直接被忽略，而收尾那一轮又判定「sink 已换」
+    // 不重启——于是取帧线程从此消失，画面一直黑到用户去动一下界面。
+    private bool _pumpRestartPending;
+    // WinRT 的 Buffer 是原生分配，按帧新建同样是把内存分配打成碎片；这里复用一块。
+    // 只在取帧线程上读写（GrabFrameAsync 由该线程同步等待）。
+    private WinRtBuffer? _frameBuffer;
 
     public WindowsMediaPlaybackService()
     {
@@ -259,8 +273,17 @@ internal sealed class WindowsMediaPlaybackService
     {
         lock (_framePumpGate)
         {
-            if (_frameSink is not { } sink || _composition is null || _frameThread is not null || _disposed)
+            if (_disposed || _frameSink is null || _composition is null)
                 return;
+            if (_frameThread is not null)
+            {
+                // 线程还活着说明泵在工作，不用别人接力；只有它已经被取消、正在收尾时才记一笔。
+                if (_frameCts is { IsCancellationRequested: true })
+                    _pumpRestartPending = true;
+                return;
+            }
+            var sink = _frameSink;
+            _pumpRestartPending = false;
 
             var cts = new CancellationTokenSource();
             var thread = new Thread(() => PumpFrames(sink, cts))
@@ -290,7 +313,10 @@ internal sealed class WindowsMediaPlaybackService
 
         // WinRT 解码调用可能暂时不响应取消。保留线程句柄直到 PumpFrames finally 收尾，
         // 防止快速暂停/继续时启动第二个取帧线程并争抢 CPU / 乱序绘帧。
-        try { thread?.Join(500); }
+        // v0.55：这里常被 UI 线程调用（暂停/停止/切文件），等待上限从 500 ms 收到 200 ms——
+        // 一帧还没解完就得等半秒，用户按一下暂停界面就僵一下。等不到也没关系：
+        // 旧线程收尾时看到 _pumpRestartPending 会自己接力。
+        try { thread?.Join(200); }
         catch (ThreadStateException) { }
     }
 
@@ -315,7 +341,7 @@ internal sealed class WindowsMediaPlaybackService
                         if (lastPosition == TimeSpan.MinValue ||
                             Math.Abs((position - lastPosition).Ticks) >= MinimumFrameAdvance.Ticks)
                         {
-                            var frame = GrabFrameAsync(position, token).GetAwaiter().GetResult();
+                            var frame = GrabFrameAsync(position + FrameLead, token).GetAwaiter().GetResult();
                             if (frame is { } raw && !token.IsCancellationRequested)
                             {
                                 sink.PresentFrame(raw.Pixels, raw.Width, raw.Height, raw.Stride);
@@ -355,8 +381,11 @@ internal sealed class WindowsMediaPlaybackService
             {
                 if (ReferenceEquals(_frameCts, cts))
                 {
-                    restart = cts.IsCancellationRequested && State == MediaPlaybackState.Playing &&
-                              ReferenceEquals(_frameSink, sink) && !_disposed;
+                    restart = !_disposed && _frameSink is not null &&
+                        (_pumpRestartPending ||
+                         (cts.IsCancellationRequested && State == MediaPlaybackState.Playing &&
+                          ReferenceEquals(_frameSink, sink)));
+                    _pumpRestartPending = false;
                     _frameCts = null;
                     _frameThread = null;
                 }
@@ -399,7 +428,13 @@ internal sealed class WindowsMediaPlaybackService
             return null;
 
         var tight = width * 4 * height;
-        var buffer = new WinRtBuffer((uint)tight);
+        var buffer = _frameBuffer;
+        if (buffer is null || buffer.Capacity < (uint)tight)
+        {
+            buffer = new WinRtBuffer((uint)tight);
+            _frameBuffer = buffer;
+        }
+        buffer.Length = (uint)tight;
         bitmap.CopyToBuffer(buffer);
         Windows.Security.Cryptography.CryptographicBuffer.CopyToByteArray(buffer, out var copy);
         if (copy is null || copy.Length < tight)
