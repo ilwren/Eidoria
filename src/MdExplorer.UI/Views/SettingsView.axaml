@@ -325,7 +325,7 @@
             <StackPanel>
               <TextBlock Classes="body" Text="全文内容索引" />
               <TextBlock Classes="caption" TextWrapping="Wrap"
-                         Text="在本机建立文件正文索引，搜索中心可跨文件夹找内容；只收白名单文本扩展名、单文件 ≤ 512 KB，索引与查询都不联网。" />
+                         Text="在本机建立文件正文索引，搜索中心可跨文件夹找内容；收白名单文本扩展名（单文件 ≤ 512 KB），以及 Office / OpenDocument / 文本型 PDF 的正文。扫描件 PDF 需先 OCR，本版不做；索引与查询都不联网。" />
             </StackPanel>
             <md:MdSwitch Grid.Column="1" IsChecked="{Binding EnableContentIndex}" VerticalAlignment="Center"
                          ToolTip.Tip="关闭后全文搜索不可用；已建索引保留在应用数据目录，可手动清除" />

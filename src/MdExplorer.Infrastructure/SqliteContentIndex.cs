@@ -1157,7 +1157,7 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
     private static bool IsCandidate(FileInfo file)
     {
         var extension = Path.GetExtension(file.Name);
-        var isDocument = OfficeDocumentText.IsSupportedExtension(extension);
+        var isDocument = IsDocumentExtension(extension);
         if (!isDocument && !IndexedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
             return false;
         try
@@ -1176,7 +1176,11 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
     {
         try
         {
-            return OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
+            var extension = Path.GetExtension(file.Name);
+            // v0.57：PDF 只在这里取文字层（预览链路的两个引擎都不提供文本）。
+            if (PdfDocumentText.IsSupportedExtension(extension))
+                return PdfDocumentText.TryExtract(file.FullName);
+            return OfficeDocumentText.IsSupportedExtension(extension)
                 ? OfficeDocumentText.TryExtract(file.FullName)
                 : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
                     .ConfigureAwait(false)).Text;
@@ -1188,6 +1192,10 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
             return null;
         }
     }
+
+    /// <summary>会被按「文档」口径（32 MB 上限 + 正文抽取）处理的扩展名：OOXML / OpenDocument / PDF。</summary>
+    private static bool IsDocumentExtension(string? extension) =>
+        OfficeDocumentText.IsSupportedExtension(extension) || PdfDocumentText.IsSupportedExtension(extension);
 
     private static bool ShouldSkipDirectory(DirectoryInfo directory) =>
         directory.Name.StartsWith('.') ||

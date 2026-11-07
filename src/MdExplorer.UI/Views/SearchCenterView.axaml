@@ -343,7 +343,7 @@
             <md:MdButton Variant="Outlined" Margin="0,0,8,0" Content="建立 / 更新"
                          Command="{Binding RebuildContentIndexCommand}"
                          IsEnabled="{Binding CanRebuildContentIndex}"
-                         ToolTip.Tip="只收白名单扩展名且单文件 ≤ 512 KB 的本地文本，数据不出本机" />
+                         ToolTip.Tip="收白名单文本（≤ 512 KB）与 Office / 文本型 PDF 正文；扫描件需 OCR，本版不做。数据不出本机" />
             <md:MdButton Variant="Outlined" Content="清除"
                          Command="{Binding ClearContentIndexCommand}"
                          IsEnabled="{Binding HasContentIndex}"

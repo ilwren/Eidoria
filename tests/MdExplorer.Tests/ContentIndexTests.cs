@@ -46,6 +46,42 @@ public sealed class ContentIndexTests : IDisposable
         }
     }
 
+    // ── PDF 正文（v0.57） ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TextPdfDocumentsAreIndexedThroughTheTextLayer()
+    {
+        var root = Path.Combine(_root, "pdf-root");
+        Directory.CreateDirectory(root);
+        var pdf = Path.Combine(root, "quarterly.pdf");
+        TestPdf.Write(pdf, "Quarterly bonds and interest rates");
+
+        var index = new SqliteContentIndex(Path.Combine(_root, "pdf.db"), new LocalTextFileService());
+        var stats = await index.RebuildAsync([root], null, TestContext.Current.CancellationToken);
+        Assert.Equal(1, stats.DocumentCount);
+
+        var hits = await index.SearchAsync("bonds", 10, TestContext.Current.CancellationToken);
+        var hit = Assert.Single(hits);
+        Assert.Equal("quarterly.pdf", hit.Name);
+        Assert.Contains("bonds", hit.Snippet, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BrokenPdfDoesNotBreakTheRebuild()
+    {
+        var root = Path.Combine(_root, "pdf-broken");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "broken.pdf"), "%PDF-1.4\nnot really a pdf");
+        File.WriteAllText(Path.Combine(root, "notes.txt"), "recoverable notes");
+
+        var index = new SqliteContentIndex(Path.Combine(_root, "broken.db"), new LocalTextFileService());
+        var stats = await index.RebuildAsync([root], null, TestContext.Current.CancellationToken);
+
+        // 坏 PDF 只是「这篇没有正文」，整次重建照常完成，别的文件不受影响。
+        Assert.Equal(1, stats.DocumentCount);
+        Assert.Single(await index.SearchAsync("recoverable", 10, TestContext.Current.CancellationToken));
+    }
+
     // ── 增量维护（v0.56） ─────────────────────────────────────────────────
 
     [Fact]

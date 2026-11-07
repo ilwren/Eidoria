@@ -32,7 +32,8 @@ public sealed record ContentSearchHit(
 
 /// <summary>
 /// 内容（全文）索引端口。默认关闭的增强能力：只索引用户显式加入的本地根，
-/// 只收白名单扩展名的文本（单文件 ≤ 512 KB）与 Office/OpenDocument 文档正文（v0.47，≤ 32 MB），
+/// 只收白名单扩展名的文本（单文件 ≤ 512 KB）与 Office/OpenDocument 文档正文（v0.47，≤ 32 MB）、
+/// 文本型 PDF 的文字层（v0.57，≤ 32 MB，扫描件需 OCR 不进索引），
 /// 索引数据只存本机应用数据目录，原文不落库——只存被分词的正文副本用于摘要。
 /// <para>
 /// 契约：<see cref="RebuildAsync"/> 是可取消的全量校准（未变的文件跳过、消失的文件删除），

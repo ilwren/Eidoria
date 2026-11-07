@@ -2831,7 +2831,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     private string ContentSearchHintText() =>
         !EnableContentIndex ? "请先在设置页启用全文内容索引。" :
         !HasSearchIndexRoots ? "请先在设置页加入索引根。" :
-        !HasContentIndex ? "内容索引尚未建立，建立后可跨文件搜正文。" :
+        // v0.57：正文来源补上「文本型 PDF」；扫描件要 OCR，本版不做，文案不吹。
+        !HasContentIndex ? "内容索引尚未建立，建立后可跨文件搜正文（含文本型 PDF 与 Office 文档；扫描件需 OCR，本版不做）。" :
         ContentIndexStatusText;
 
     partial void OnSearchSizeFilterChanged(string value) => NotifySearchFilterChanged();
@@ -3504,7 +3505,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
             var filterNote = HasActiveSearchFilter ? $" · 筛选：{ActiveSearchFilterText}" : string.Empty;
             SearchCenterStatusText = SearchCenterResults.Count == 0
-                ? $"正文里没有匹配；索引只收白名单扩展名且单文件 ≤ 512 KB{filterNote}"
+                ? $"正文里没有匹配；索引收白名单文本（≤ 512 KB）与 Office/PDF 正文{filterNote}"
                 : $"{SearchCenterResults.Count} 项 · 全文命中 · {ContentIndexCountText} 篇已索引{filterNote}";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)

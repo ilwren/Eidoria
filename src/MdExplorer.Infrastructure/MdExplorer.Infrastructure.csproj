@@ -17,6 +17,8 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="Microsoft.ML.Tokenizers" />
+    <!-- v0.57：PDF 正文抽取（只给全文索引，不接预览）。 -->
+    <PackageReference Include="PdfPig" />
     <InternalsVisibleTo Include="MdExplorer.Tests" />
   </ItemGroup>
   <ItemGroup>
