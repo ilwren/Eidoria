@@ -926,10 +926,12 @@ public sealed partial class PreviewViewModel(
             // 否则用户听到声音却看不到画面，比不播更糟。
             if ((_settings?.Invoke().MediaAutoPlay ?? false) && CanPlayMediaInApp)
             {
-                // v0.55：推帧后端要等宿主的帧呈现面挂上再开播。此前先播后接，
+                // v0.55：推帧后端要等宿主的帧呈现面挂上再开播——此前先播后接，
                 // 首帧落在「还没人接」的空档里，用户看到的就是一块黑框（动一下界面才出画面）。
-                // 探针说了「还没挂上」才等；无视图（无头测试/截图）一律按已挂上处理。
-                var waitForSink = VideoFrameSource is not null && FrameSinkAttachedProbe?.Invoke() != true;
+                // 只在「确实要出画面」且视图明确报告未挂上时才等；音频项、
+                // 无画面的后端以及无视图（无头测试/截图）都照旧立刻开播。
+                var waitForSink = ShowFrameVideoSurface &&
+                    FrameSinkAttachedProbe is not null && !FrameSinkAttachedProbe();
                 if (waitForSink)
                 {
                     _pendingAutoplay = true;
