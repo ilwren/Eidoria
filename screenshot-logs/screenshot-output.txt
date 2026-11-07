@@ -1,10 +1,10 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 934 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 934 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 959 ms).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 3.84 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 4.99 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 5.96 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/MdExplorer.Domain.csproj (in 1.03 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/MdExplorer.Application.csproj (in 1.03 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/MdExplorer.Platform.Abstractions.csproj (in 1 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj (in 7.93 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj (in 7.93 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj (in 7.66 sec).
   MdExplorer.Domain -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Domain/bin/Release/net10.0/MdExplorer.Domain.dll
   MdExplorer.Platform.Abstractions -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Platform.Abstractions/bin/Release/net10.0/MdExplorer.Platform.Abstractions.dll
   MdExplorer.Application -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/bin/Release/net10.0/MdExplorer.Application.dll
@@ -24,7 +24,7 @@
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1176,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1234,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1433,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(2190,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
+/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(2192,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
   MdExplorer.Screenshots -> /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll
 
 Build succeeded.
@@ -43,38 +43,33 @@ Build succeeded.
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1176,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1234,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(1433,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
-/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(2190,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
+/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs(2192,13): warning CS0618: 'Bitmap.Save(string, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/MdExplorer.Screenshots.csproj]
     15 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:42.52
+Time Elapsed 00:00:34.51
 Discovered 87 screenshot tests; running in 4 isolated processes.
 === Screenshot partition 1/4: 22 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3195).
+Blame: Attaching crash dump utility to process dotnet (3004).
 
-Passed!  - Failed:     0, Passed:    22, Skipped:     0, Total:    22, Duration: 33 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    22, Skipped:     0, Total:    22, Duration: 28 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 2/4: 22 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3406).
+Blame: Attaching crash dump utility to process dotnet (3216).
 
-Passed!  - Failed:     0, Passed:    22, Skipped:     0, Total:    22, Duration: 29 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    22, Skipped:     0, Total:    22, Duration: 24 s - MdExplorer.Screenshots.dll (net10.0)
 === Screenshot partition 3/4: 22 tests ===
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-Blame: Attaching crash dump utility to process dotnet (3615).
-[xUnit.net 00:00:28.62]     MdExplorer.Screenshots.ScreenshotTests.Foldable_HalfFoldedBookReservesTheHingeBand [FAIL]
-  Failed MdExplorer.Screenshots.ScreenshotTests.Foldable_HalfFoldedBookReservesTheHingeBand [122 ms]
-  Error Message:
-   Assert.True() Failure
-Expected: True
-Actual:   False
-  Stack Trace:
-     at MdExplorer.Screenshots.ScreenshotTests.<>c.<Foldable_HalfFoldedBookReservesTheHingeBand>b__82_0(ShellViewModel shell) in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs:line 1730
-   at MdExplorer.Screenshots.ScreenshotTests.CaptureAsync(String fileName, Double width, Double height, Func`2 arrange, String themeMode, Boolean androidAccess, Func`2 afterShow, IFoldablePostureSource foldablePosture) in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs:line 112
-   at MdExplorer.Screenshots.ScreenshotTests.Foldable_HalfFoldedBookReservesTheHingeBand() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/ScreenshotTests.cs:line 1719
---- End of stack trace from previous location ---
+Blame: Attaching crash dump utility to process dotnet (3428).
 
-Failed!  - Failed:     1, Passed:    21, Skipped:     0, Total:    22, Duration: 31 s - MdExplorer.Screenshots.dll (net10.0)
+Passed!  - Failed:     0, Passed:    22, Skipped:     0, Total:    22, Duration: 26 s - MdExplorer.Screenshots.dll (net10.0)
+=== Screenshot partition 4/4: 21 tests ===
+Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Screenshots/bin/Release/net10.0/MdExplorer.Screenshots.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Blame: Attaching crash dump utility to process dotnet (3633).
+
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 19 s - MdExplorer.Screenshots.dll (net10.0)
