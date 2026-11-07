@@ -14,30 +14,30 @@ Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/
 A total of 1 test files matched the specified pattern.
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
 [xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
-[xUnit.net 00:00:00.12]   Discovering: MdExplorer.Performance
-[xUnit.net 00:00:00.26]   Discovered:  MdExplorer.Performance
-[xUnit.net 00:00:00.39]   Starting:    MdExplorer.Performance
-  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [227 ms]
+[xUnit.net 00:00:00.24]   Discovering: MdExplorer.Performance
+[xUnit.net 00:00:00.49]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.67]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [292 ms]
   Standard Output Messages:
- [perf] 1 万条目录首批上屏：137.5 ms（首屏 120 行，总数 10000）
- [perf] 补齐剩余 9880 行：40.4 ms
+ [perf] 1 万条目录首批上屏：181.7 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：45.3 ms
 
 
-  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [1 s]
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [2 s]
   Standard Output Messages:
- [perf] 内容索引重建 10000 篇：1313 ms，库体积 4.88 MB
- [perf] 内容索引重建（10000 篇全未变）：68 ms，库体积 4.88 MB
- [perf] 内容索引查询命中 50 条：13.2 ms
+ [perf] 内容索引重建 10000 篇：2441 ms，库体积 4.88 MB
+ [perf] 内容索引重建（10000 篇全未变）：54 ms，库体积 4.88 MB
+ [perf] 内容索引查询命中 50 条：12.5 ms
 
 
+[xUnit.net 00:00:12.43]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
   Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [1 ms]
   Standard Output Messages:
- [perf] 组合根 + Shell 构造：1.2 ms
+ [perf] 组合根 + Shell 构造：1.3 ms
 
 
-[xUnit.net 00:00:04.65]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
 
 Test Run Successful.
 Total tests: 3
      Passed: 3
- Total time: 5.0854 Seconds
+ Total time: 12.8414 Seconds
