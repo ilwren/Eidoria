@@ -1,20 +1,20 @@
   Determining projects to restore...
-  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj (in 1.14 sec).
-  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/LuaPluginRuntime.csproj (in 7.07 sec).
+  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj (in 749 ms).
+  Restored /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/LuaPluginRuntime.csproj (in 7.3 sec).
   LuaPluginRuntime -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/bin/Release/net10.0/MdExplorer.LuaPluginRuntime.dll
   LuaPluginRuntime.Android -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/bin/Release/net10.0-android/android-x64/MdExplorer.LuaPluginRuntime.AndroidSpike.dll
   LuaPluginRuntime -> /home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime/bin/Release/net10.0/MdExplorer.LuaPluginRuntime.dll
   Optimizing assemblies for size. This process might take a while.
 /home/runner/.nuget/packages/moonsharp/2.0.0/lib/netstandard1.6/MoonSharp.Interpreter.dll : warning IL2104: Assembly 'MoonSharp.Interpreter' produced trim warnings. For more information see https://aka.ms/il2104 [/home/runner/work/Eidoria/Eidoria/spikes/LuaPluginRuntime.Android/LuaPluginRuntime.Android.csproj]
+  [1/14] MdExplorer.LuaPluginRuntime.AndroidSpike.dll -> MdExplorer.LuaPluginRuntime.AndroidSpike.dll.so
   [2/14] MdExplorer.LuaPluginRuntime.dll -> MdExplorer.LuaPluginRuntime.dll.so
-  [3/14] MdExplorer.LuaPluginRuntime.AndroidSpike.dll -> MdExplorer.LuaPluginRuntime.AndroidSpike.dll.so
-  [1/14] _Microsoft.Android.Resource.Designer.dll -> _Microsoft.Android.Resource.Designer.dll.so
+  [3/14] _Microsoft.Android.Resource.Designer.dll -> _Microsoft.Android.Resource.Designer.dll.so
   [4/14] MoonSharp.Interpreter.dll -> MoonSharp.Interpreter.dll.so
-  [5/14] System.Collections.dll -> System.Collections.dll.so
-  [6/14] System.Console.dll -> System.Console.dll.so
+  [5/14] System.Console.dll -> System.Console.dll.so
+  [6/14] System.Collections.dll -> System.Collections.dll.so
   [7/14] System.Runtime.InteropServices.dll -> System.Runtime.InteropServices.dll.so
-  [8/14] System.Linq.Expressions.dll -> System.Linq.Expressions.dll.so
-  [9/14] System.Runtime.dll -> System.Runtime.dll.so
+  [8/14] System.Runtime.dll -> System.Runtime.dll.so
+  [9/14] System.Linq.Expressions.dll -> System.Linq.Expressions.dll.so
   [10/14] System.Linq.dll -> System.Linq.dll.so
   [11/14] Mono.Android.Runtime.dll -> Mono.Android.Runtime.dll.so
   [12/14] Mono.Android.dll -> Mono.Android.dll.so
