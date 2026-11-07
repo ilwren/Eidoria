@@ -11,7 +11,7 @@ namespace MdExplorer.Infrastructure;
 /// 索引只保存定位与展示所需的轻量元数据；命中返回前以真实文件复核，删除/改名后的旧条目不会出现。
 /// 构建不穿目录符号链接；无权限子树跳过并把快照标为部分结果。
 /// </summary>
-public sealed class FileNameIndexService : IFileNameIndexService
+public sealed class FileNameIndexService : IFileNameIndexService, IDisposable
 {
     private const string IndexFileName = "filename-index-v1.json";
     private const int MaxEntries = 500_000;
@@ -21,8 +21,15 @@ public sealed class FileNameIndexService : IFileNameIndexService
     private readonly ISettingsStore _settingsStore;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _watcherGate = new();
-    private readonly List<FileSystemWatcher> _watchers = [];
+    private IndexRootWatcher? _watcher;
     private IReadOnlyList<string> _watchedRoots = [];
+    // v0.56：增量落盘的闸门。持续写入的文件（下载中、日志）每 700 ms 就会攒出一批变更，
+    // 每批都重写整份 JSON 是纯写盘——内存里的快照一直是新的，磁盘最多落后几秒。
+    private readonly object _snapshotWriteGate = new();
+    private DateTimeOffset _lastSnapshotWrite = DateTimeOffset.MinValue;
+    private bool _snapshotWritePending;
+    private Timer? _snapshotFlushTimer;
+    private static readonly TimeSpan MinSnapshotWriteInterval = TimeSpan.FromSeconds(3);
     private FileNameIndexSnapshot? _snapshot;
     private bool _loaded;
     private volatile bool _invalidated;
@@ -75,6 +82,9 @@ public sealed class FileNameIndexService : IFileNameIndexService
             var previous = _snapshot ?? await ReadSnapshotFromDiskAsync(cancellationToken).ConfigureAwait(false);
             if (!SnapshotsEquivalent(previous, built))
                 await WriteSnapshotAsync(built, cancellationToken).ConfigureAwait(false);
+            _lastSnapshotWrite = DateTimeOffset.UtcNow;
+            lock (_snapshotWriteGate)
+                _snapshotWritePending = false;
             _snapshot = built;
             _loaded = true;
             UpdateWatchers(built);
@@ -92,6 +102,14 @@ public sealed class FileNameIndexService : IFileNameIndexService
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // 待写的快照不能再落地：否则刚删掉的索引文件会被几秒后的补写又造出来。
+            lock (_snapshotWriteGate)
+            {
+                _snapshotFlushTimer?.Dispose();
+                _snapshotFlushTimer = null;
+                _snapshotWritePending = false;
+            }
+
             DeleteIndexFile();
             _snapshot = null;
             _loaded = true;
@@ -477,6 +495,303 @@ public sealed class FileNameIndexService : IFileNameIndexService
         return true;
     }
 
+    /// <summary>
+    /// 把监视器攒下的一批路径增量应用到快照上（v0.56）：先删掉这些路径（及其子树）的旧条目，
+    /// 再按当前磁盘状态补回。成功时快照**仍然有效**（<c>IsCurrent</c> 保持为真），浏览器不必回落实时扫描。
+    /// <para>
+    /// 增量只处理「变化的那一撮」：一次保存、一次改名、删掉一个文件，代价与索引规模无关。
+    /// 批量操作（解压、git checkout）由 <see cref="IndexRootWatcher"/> 判定溢出后交回全量校准。
+    /// </para>
+    /// </summary>
+    internal async Task<IncrementalApplyResult> ApplyIncrementalAsync(
+        IReadOnlyList<string> changedPaths, CancellationToken cancellationToken)
+    {
+        if (changedPaths.Count == 0)
+            return IncrementalApplyResult.NothingToDo;
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var snapshot = _snapshot;
+            if (snapshot is null || _invalidated)
+                return IncrementalApplyResult.Unavailable;
+            var roots = ConfiguredRoots();
+            if (!RootsEqual(snapshot.Roots, roots))
+                return IncrementalApplyResult.Unavailable;
+
+            // 先把「与我们无关」的路径挑掉再动快照：这批全在根外的话，一次复制都不用做。
+            var applicable = new List<string>(changedPaths.Count);
+            foreach (var raw in changedPaths)
+            {
+                if (TryNormalizeLocalPath(raw) is not { } path)
+                    continue;
+                // 索引文件自己落在某个根里时不参与（应用数据目录可以被用户加进索引根）。
+                if (IsSameOrUnder(path, _dataDirectory))
+                    continue;
+                if (!roots.Any(root => IsSameOrUnder(path, root)))
+                    continue;
+                applicable.Add(path);
+            }
+
+            if (applicable.Count == 0)
+                return IncrementalApplyResult.NothingToDo;
+
+            var entries = new Dictionary<string, FileNameIndexEntry>(
+                snapshot.Entries.Count + applicable.Count, PathComparer);
+            foreach (var entry in snapshot.Entries)
+                entries[entry.Path] = entry;
+
+            var changed = false;
+            foreach (var path in applicable)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                changed |= RemoveSubtree(entries, path);
+                changed |= AddCurrentState(entries, path, roots);
+            }
+
+            if (!changed)
+                return IncrementalApplyResult.NothingToDo;
+
+            // 只写真正变了的内容；写盘本身按 MinSnapshotWriteInterval 节流。
+            snapshot.Entries = [.. entries.Values];
+            snapshot.Entries.Sort((a, b) => string.Compare(a.Path, b.Path, PathComparison));
+            snapshot.BuiltAtUtc = DateTimeOffset.UtcNow;
+            if (snapshot.Entries.Count >= MaxEntries)
+                snapshot.IsPartial = true;
+            await PersistSnapshotIfDueAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            return IncrementalApplyResult.Updated;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return IncrementalApplyResult.Unavailable;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 增量落盘：距上次写盘不足 <see cref="MinSnapshotWriteInterval"/> 就记一笔待写、稍后补上。
+    /// 内存里的快照始终是最新的，节流只影响「重启后看到的是哪一版」。
+    /// </summary>
+    private async Task PersistSnapshotIfDueAsync(FileNameIndexSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        lock (_snapshotWriteGate)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now - _lastSnapshotWrite < MinSnapshotWriteInterval)
+            {
+                ScheduleSnapshotFlushLocked();
+                return;
+            }
+
+            // 先占住时间戳再写：并发的第二批不会跟着再写一遍。
+            _lastSnapshotWrite = now;
+            _snapshotWritePending = true;
+        }
+
+        try
+        {
+            await WriteSnapshotAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            lock (_snapshotWriteGate)
+                _snapshotWritePending = false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // 写不进去就留一笔待写：内存里的索引照常可用，稍后再试。
+            lock (_snapshotWriteGate)
+                ScheduleSnapshotFlushLocked();
+        }
+    }
+
+    private void ScheduleSnapshotFlushLocked()
+    {
+        _snapshotWritePending = true;
+        if (_snapshotFlushTimer is not null)
+            return;
+        _snapshotFlushTimer = new Timer(
+            _ => _ = FlushPendingSnapshotAsync(), null, MinSnapshotWriteInterval, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task FlushPendingSnapshotAsync()
+    {
+        lock (_snapshotWriteGate)
+        {
+            _snapshotFlushTimer?.Dispose();
+            _snapshotFlushTimer = null;
+            if (!_snapshotWritePending)
+                return;
+        }
+
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_snapshot is not { } snapshot || _invalidated)
+            {
+                // 没东西可写（被清空/已标脏）：别留一个永远不再触发的「待写」标记。
+                lock (_snapshotWriteGate)
+                    _snapshotWritePending = false;
+                return;
+            }
+
+            await WriteSnapshotAsync(snapshot, CancellationToken.None).ConfigureAwait(false);
+            lock (_snapshotWriteGate)
+            {
+                _lastSnapshotWrite = DateTimeOffset.UtcNow;
+                _snapshotWritePending = false;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // 写不进去就留到下一次：索引在内存里仍然可用。
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static bool RemoveSubtree(Dictionary<string, FileNameIndexEntry> entries, string path)
+    {
+        var removed = entries.Remove(path);
+        var prefix = WithTrailingSeparator(path);
+        List<string>? doomed = null;
+        foreach (var key in entries.Keys)
+        {
+            if (key.StartsWith(prefix, PathComparison))
+                (doomed ??= []).Add(key);
+        }
+
+        if (doomed is null)
+            return removed;
+        foreach (var key in doomed)
+            entries.Remove(key);
+        return true;
+    }
+
+    /// <summary>按当前磁盘状态把这条路径（是目录就连子树）补回快照；路径已不存在就什么都不做。</summary>
+    private static bool AddCurrentState(
+        Dictionary<string, FileNameIndexEntry> entries, string path, IReadOnlyList<string> roots)
+    {
+        FileItem? item;
+        try
+        {
+            item = LocalFileSystemService.StatPath(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+
+        if (item is null)
+            return false;
+
+        var hiddenAncestor = HasHiddenAncestor(path, roots);
+        var changed = AddEntry(entries, item, hiddenAncestor);
+        if (!item.IsFolder || item.IsSymlink)
+            return changed;
+
+        // 整体挪进来的目录只会来一条事件：子树得自己补，否则要等用户手动重建。
+        var pending = new Stack<(string Path, bool HiddenAncestor)>();
+        pending.Push((path, hiddenAncestor));
+        while (pending.Count > 0)
+        {
+            var (current, hidden) = pending.Pop();
+            IEnumerable<string> children;
+            try
+            {
+                children = Directory.EnumerateFileSystemEntries(current);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                if (entries.Count >= MaxEntries)
+                    return true; // 撞到条数上界：剩下的等下次重建，先如实返回
+                FileItem? childItem;
+                try
+                {
+                    childItem = LocalFileSystemService.StatPath(child);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (childItem is null)
+                    continue;
+                changed |= AddEntry(entries, childItem, hidden);
+                if (childItem.IsFolder && !childItem.IsSymlink)
+                    pending.Push((child, hidden || childItem.IsHidden));
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>写入一条索引条目；返回「与旧值不同」（相等就不算变更，避免白写一次快照）。</summary>
+    private static bool AddEntry(
+        Dictionary<string, FileNameIndexEntry> entries, FileItem item, bool hiddenAncestor)
+    {
+        var fullPath = item.Locator.Path;
+        var exists = entries.TryGetValue(fullPath, out var existing);
+        if (!exists && entries.Count >= MaxEntries)
+            return false;
+        if (exists && existing!.Name == item.Name && existing.Kind == (int)item.Kind &&
+            existing.Length == item.Length && existing.LastWriteUtcTicks == item.LastWriteTime.UtcTicks &&
+            existing.IsHidden == item.IsHidden && existing.HasHiddenAncestor == hiddenAncestor &&
+            existing.IsSymlink == item.IsSymlink && existing.Extension == item.Extension)
+        {
+            return false;
+        }
+
+        entries[fullPath] = new FileNameIndexEntry
+        {
+            Path = fullPath,
+            Name = item.Name,
+            Kind = (int)item.Kind,
+            Length = item.Length,
+            LastWriteUtcTicks = item.LastWriteTime.UtcTicks,
+            IsHidden = item.IsHidden,
+            HasHiddenAncestor = hiddenAncestor,
+            IsSymlink = item.IsSymlink,
+            Extension = item.Extension,
+        };
+        return true;
+    }
+
+    /// <summary>从索引根往下走到这条路径，路上有没有隐藏目录（与全量构建时的判定口径一致）。</summary>
+    private static bool HasHiddenAncestor(string path, IReadOnlyList<string> roots)
+    {
+        var parent = Path.GetDirectoryName(path);
+        while (!string.IsNullOrEmpty(parent))
+        {
+            if (roots.Any(root => string.Equals(root, parent, PathComparison)))
+                return false;
+            try
+            {
+                var info = new DirectoryInfo(parent);
+                if (!info.Exists)
+                    return false;
+                if ((info.Attributes & FileAttributes.Hidden) != 0 ||
+                    (info.Name.StartsWith('.') && info.Name.Length > 1))
+                    return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
+
+            parent = Path.GetDirectoryName(parent);
+        }
+
+        return false;
+    }
+
     private async Task WriteSnapshotAsync(FileNameIndexSnapshot snapshot, CancellationToken cancellationToken)
     {
         var temp = _indexPath + ".tmp";
@@ -520,51 +835,35 @@ public sealed class FileNameIndexService : IFileNameIndexService
 
         lock (_watcherGate)
         {
-            if (_watchedRoots.SequenceEqual(roots, PathComparer) && _watchers.Count == roots.Count)
+            if (_watchedRoots.SequenceEqual(roots, PathComparer) && _watcher is not null)
                 return;
 
             DisposeWatchersLocked();
-            try
+            var watcher = new IndexRootWatcher(roots, ApplyWatchedChangesAsync, InvalidateFromWatcher);
+            watcher.Start();
+            if (_invalidated)
             {
-                foreach (var root in roots)
-                {
-                    var watcher = new FileSystemWatcher(root)
-                    {
-                        IncludeSubdirectories = true,
-                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName,
-                        InternalBufferSize = 64 * 1024,
-                    };
-                    watcher.Created += OnIndexRootChanged;
-                    watcher.Deleted += OnIndexRootChanged;
-                    watcher.Renamed += OnIndexRootRenamed;
-                    watcher.Error += OnIndexWatcherError;
-                    watcher.EnableRaisingEvents = true;
-                    _watchers.Add(watcher);
-                }
+                // 建监视器时就发现看不住（平台不支持 / 权限不足）：聚合器已经回调过溢出。
+                watcher.Dispose();
+                return;
+            }
 
-                _watchedRoots = roots;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or PlatformNotSupportedException)
-            {
-                _invalidated = true;
-                DisposeWatchersLocked();
-            }
+            _watcher = watcher;
+            _watchedRoots = roots;
         }
     }
 
-    private void OnIndexRootChanged(object sender, FileSystemEventArgs e)
+    /// <summary>
+    /// 监视器攒好的一批变更（v0.56）。增量成功就继续用这份快照；
+    /// 失败（没有快照、根变了、写盘出错）就退回「标脏 + 实时扫描」的老路，不假装索引还是新的。
+    /// </summary>
+    private async Task ApplyWatchedChangesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
     {
-        if (!IsSameOrUnder(e.FullPath, _dataDirectory))
+        var result = await ApplyIncrementalAsync(paths, cancellationToken).ConfigureAwait(false);
+        // 「这批没带来变化」不是失败（重复事件很常见）；只有「根本应用不了」才退回标脏。
+        if (result == IncrementalApplyResult.Unavailable && _snapshot is not null)
             InvalidateFromWatcher();
     }
-
-    private void OnIndexRootRenamed(object sender, RenamedEventArgs e)
-    {
-        if (!IsSameOrUnder(e.FullPath, _dataDirectory) && !IsSameOrUnder(e.OldFullPath, _dataDirectory))
-            InvalidateFromWatcher();
-    }
-
-    private void OnIndexWatcherError(object sender, ErrorEventArgs e) => InvalidateFromWatcher();
 
     private void InvalidateFromWatcher()
     {
@@ -578,11 +877,22 @@ public sealed class FileNameIndexService : IFileNameIndexService
             DisposeWatchersLocked();
     }
 
+    /// <summary>停掉目录监听（应用退出 / 测试收尾用）。不释放信号量：还在跑的查询要能收尾。</summary>
+    public void Dispose()
+    {
+        lock (_watcherGate)
+            DisposeWatchersLocked();
+        lock (_snapshotWriteGate)
+        {
+            _snapshotFlushTimer?.Dispose();
+            _snapshotFlushTimer = null;
+        }
+    }
+
     private void DisposeWatchersLocked()
     {
-        foreach (var watcher in _watchers)
-            watcher.Dispose();
-        _watchers.Clear();
+        _watcher?.Dispose();
+        _watcher = null;
         _watchedRoots = [];
     }
 
@@ -675,6 +985,19 @@ public sealed class IndexedSearchService : ISearchService
         await foreach (var item in _fallback.SearchByNameAsync(spec, cancellationToken).ConfigureAwait(false))
             yield return item;
     }
+}
+
+/// <summary>增量应用的结果（v0.56）：调用方要能分清「没有变化」与「应用不了」。</summary>
+internal enum IncrementalApplyResult
+{
+    /// <summary>已经按当前磁盘状态更新了快照。</summary>
+    Updated,
+
+    /// <summary>这批路径没有带来任何变化（重复事件、索引本就一致）。</summary>
+    NothingToDo,
+
+    /// <summary>没有可用快照 / 根配置变了 / 写盘失败：只能靠全量重建。</summary>
+    Unavailable,
 }
 
 internal sealed class FileNameIndexSnapshot

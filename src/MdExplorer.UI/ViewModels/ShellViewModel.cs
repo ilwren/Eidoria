@@ -177,6 +177,14 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             }
         };
 
+        // v0.56：内容索引的后台增量（目录监听驱动）改完库要刷新计数与时间；
+        // 监听看不住时（批量解压、平台不支持）如实提示需要重建。
+        if (services.ContentIndex is IContentIndexMaintenance contentIndexMaintenance)
+        {
+            contentIndexMaintenance.Changed += OnContentIndexIncrementallyUpdated;
+            contentIndexMaintenance.WatchFailed += OnContentIndexWatchFailed;
+        }
+
         var s = services.SettingsStore.Settings;
         _themeMode = s.ThemeMode;
         _seedColor = s.SeedColor;
@@ -2708,7 +2716,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public string SearchIndexStateText =>
         !UseSearchIndex ? "已暂停" :
         SearchIndexRoots.Count == 0 ? "未配置" :
-        SearchIndexIsCurrent ? (SearchIndexIsPartial ? "已更新 · 部分" : "已更新") :
+        // v0.56：快照跟着目录变化自己补，用户不必每加一个文件就重建一次。
+        SearchIndexIsCurrent ? (SearchIndexIsPartial ? "已跟随 · 部分" : "已跟随改动") :
         SearchIndexEntryCount > 0 ? "需重建" : "未建立";
 
     public bool IsSearchKindAll => SearchCenterKindFilter == "All";
@@ -2789,6 +2798,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     partial void OnEnableContentIndexChanged(bool value)
     {
         _services.SettingsStore.Settings.EnableContentIndex = value;
+        if (!value && _services.ContentIndex is IContentIndexMaintenance maintenance)
+            maintenance.StopWatching();
         OnPropertyChanged(nameof(CanRebuildContentIndex));
         OnPropertyChanged(nameof(SearchCenterModeHintText));
         ContentIndexStatusText = value ? "内容索引已启用；建立后才会占用磁盘" : "内容索引已关闭";
@@ -3511,6 +3522,56 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         }
     }
 
+    private void OnContentIndexIncrementallyUpdated(object? sender, int writes)
+    {
+        if (writes <= 0)
+            return;
+        // 回调来自监听线程：有 Avalonia 应用时切回 UI 线程再动观察属性。
+        if (Avalonia.Application.Current is not null &&
+            !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = RefreshContentIndexAsync());
+            return;
+        }
+
+        _ = RefreshContentIndexAsync();
+    }
+
+    private void OnContentIndexWatchFailed(object? sender, EventArgs e)
+    {
+        // 同样来自监听线程：切回 UI 线程再改观察属性。
+        if (Avalonia.Application.Current is not null &&
+            !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                ContentIndexStatusText = "文件变动太频繁，内容索引已停止自动跟随；请重建一次";
+                OnPropertyChanged(nameof(SearchCenterModeHintText));
+            });
+            return;
+        }
+
+        ContentIndexStatusText = "文件变动太频繁，内容索引已停止自动跟随；请重建一次";
+        OnPropertyChanged(nameof(SearchCenterModeHintText));
+    }
+
+    /// <summary>
+    /// 内容索引的目录监听只在「开着 + 已建立 + 有索引根」时才值得跑；
+    /// 其余情况继续监听只会白读盘，直接停掉。
+    /// </summary>
+    private void SyncContentIndexWatcher(ContentIndexStats stats)
+    {
+        if (_services.ContentIndex is not IContentIndexMaintenance maintenance)
+            return;
+        if (EnableContentIndex && stats.IsBuilt && SearchIndexRoots.Count > 0)
+        {
+            maintenance.StartWatching(SearchIndexRoots.Select(root => root.Path).ToArray());
+            return;
+        }
+
+        maintenance.StopWatching();
+    }
+
     [RelayCommand]
     private async Task RefreshContentIndexAsync()
     {
@@ -3527,6 +3588,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 : stats.IsBuilt
                     ? $"内容索引已就绪 · {stats.DocumentCount:N0} 篇"
                     : "尚未建立内容索引";
+            // v0.56：建立过索引就跟着目录变化走，不再等用户手动重建。
+            SyncContentIndexWatcher(stats);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {

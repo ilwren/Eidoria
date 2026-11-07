@@ -23,7 +23,7 @@ namespace MdExplorer.Infrastructure;
 /// 这里保留一份原文列，命中后在原文里找第一个出现位置并截窗口。
 /// </para>
 /// </summary>
-public sealed class SqliteContentIndex : IContentIndexService
+public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMaintenance, IDisposable
 {
     /// <summary>单文件正文上限（与文档口径一致）；超过的文件不进索引。</summary>
     public const long MaxFileBytes = 512 * 1024;
@@ -54,6 +54,11 @@ public sealed class SqliteContentIndex : IContentIndexService
     private readonly object _initGate = new();
     private bool _initialized;
     private string? _initError;
+    // v0.56：目录监听驱动的增量维护。两个索引各看一套根，互不干扰。
+    private readonly object _watcherGate = new();
+    private IndexRootWatcher? _watcher;
+    private IReadOnlyList<string> _watchedRoots = [];
+    private bool _disposed;
 
     public SqliteContentIndex(string databasePath, ITextFileService textFiles)
     {
@@ -163,11 +168,7 @@ public sealed class SqliteContentIndex : IContentIndexService
                     string? text;
                     try
                     {
-                        // Office / ODF 走正文抽取（ZIP + XML 流式扫文本）。
-                        text = OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
-                            ? OfficeDocumentText.TryExtract(file.FullName)
-                            : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
-                                .ConfigureAwait(false)).Text;
+                        text = await ReadDocumentTextAsync(file, cancellationToken).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
                     {
@@ -237,6 +238,259 @@ public sealed class SqliteContentIndex : IContentIndexService
         }
 
         return await GetStatsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // ── 增量维护（目录监听驱动，v0.56） ─────────────────────────────────────────
+
+    /// <inheritdoc />
+    public void StartWatching(IReadOnlyList<string> roots)
+    {
+        var normalized = NormalizeRoots(roots);
+        lock (_watcherGate)
+        {
+            if (_disposed)
+                return;
+            if (normalized.Count == 0)
+            {
+                StopWatchingLocked();
+                return;
+            }
+
+            if (_watcher is not null && normalized.SequenceEqual(_watchedRoots, StringComparer.Ordinal))
+                return;
+
+            StopWatchingLocked();
+            var watcher = new IndexRootWatcher(normalized, OnWatchedChangesAsync, OnWatcherFailed);
+            watcher.Start();
+            if (!watcher.IsRunning)
+            {
+                // 看不住这些根（平台不支持 / 权限不足）：已经上报过 WatchFailed，这里别记成「在跟随」。
+                watcher.Dispose();
+                _watcher = null;
+                _watchedRoots = [];
+                return;
+            }
+
+            _watcher = watcher;
+            _watchedRoots = normalized;
+        }
+    }
+
+    /// <inheritdoc />
+    public void StopWatching()
+    {
+        lock (_watcherGate)
+            StopWatchingLocked();
+    }
+
+    private void StopWatchingLocked()
+    {
+        _watcher?.Dispose();
+        _watcher = null;
+        _watchedRoots = [];
+    }
+
+    /// <summary>监视器攒好的一批变更：交给增量写库，并通知上层刷新统计。</summary>
+    private async Task OnWatchedChangesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        var writes = await ApplyChangesAsync(paths, cancellationToken).ConfigureAwait(false);
+        if (writes > 0)
+            Changed?.Invoke(this, writes);
+    }
+
+    private void OnWatcherFailed()
+    {
+        StopWatching();
+        WatchFailed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <inheritdoc />
+    public event EventHandler<int>? Changed;
+
+    /// <inheritdoc />
+    public event EventHandler? WatchFailed;
+
+    /// <inheritdoc />
+    public async Task<int> ApplyChangesAsync(IReadOnlyList<string> changedPaths, CancellationToken cancellationToken)
+    {
+        if (changedPaths is null || changedPaths.Count == 0)
+            return 0;
+        // 没建过索引就没有可增量的对象：这里不顺手建库，免得「内容索引还关着」却冒出个 db。
+        if (!File.Exists(_databasePath) || !await TryEnsureSchemaAsync(cancellationToken).ConfigureAwait(false))
+            return 0;
+
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+            var roots = await ReadRootsAsync(connection, cancellationToken).ConfigureAwait(false);
+            if (roots.Count == 0)
+                return 0;
+
+            var writes = 0;
+            await using var transaction = connection.BeginTransaction();
+            foreach (var raw in changedPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryNormalizeWatchedPath(raw) is not { } path)
+                    continue;
+                if (!roots.Any(root => IsSameOrUnder(path, root)))
+                    continue;
+
+                var rows = await LoadRowsUnderAsync(connection, transaction, path, cancellationToken).ConfigureAwait(false);
+                var targets = EnumerateTargets(path);
+                foreach (var (rowPath, row) in rows)
+                {
+                    if (targets.ContainsKey(rowPath))
+                        continue;
+                    await DeleteDocumentAsync(connection, transaction, row.Id, cancellationToken).ConfigureAwait(false);
+                    writes++;
+                }
+
+                foreach (var (filePath, file) in targets)
+                {
+                    long mtime;
+                    long length;
+                    try
+                    {
+                        mtime = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeMilliseconds();
+                        length = file.Length;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        continue; // 枚举后被删/改名：下一批变更或下次重建再校准
+                    }
+
+                    if (rows.TryGetValue(filePath, out var known) && known.Mtime == mtime && known.Size == length)
+                        continue; // 没变：不读正文、不写库
+
+                    string? text;
+                    try
+                    {
+                        text = await ReadDocumentTextAsync(file, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                        or InvalidDataException or NotSupportedException or ArgumentException)
+                    {
+                        text = null;
+                    }
+
+                    if (text is null)
+                    {
+                        if (rows.TryGetValue(filePath, out var stale))
+                        {
+                            await DeleteDocumentAsync(connection, transaction, stale.Id, cancellationToken)
+                                .ConfigureAwait(false);
+                            writes++;
+                        }
+                        continue;
+                    }
+
+                    await UpsertDocumentAsync(
+                        connection, transaction, file, text, mtime, length,
+                        rows.TryGetValue(filePath, out var current) ? current.Id : null,
+                        cancellationToken).ConfigureAwait(false);
+                    writes++;
+                }
+            }
+
+            transaction.Commit();
+            return writes;
+        }
+        catch (Exception ex) when (ex is SqliteException or IOException)
+        {
+            // 增量失败不该炸界面：下一批/下次重建会补齐。
+            return 0;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>这批路径当前应该被收录的文件（目录则整棵子树）；路径已不存在时返回空。</summary>
+    private static Dictionary<string, FileInfo> EnumerateTargets(string path)
+    {
+        var targets = new Dictionary<string, FileInfo>(StringComparer.Ordinal);
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                if (ShouldSkipDirectory(new DirectoryInfo(path)))
+                    return targets;
+                foreach (var file in EnumerateCandidates([path], CancellationToken.None))
+                    targets[file.FullName] = file;
+                return targets;
+            }
+
+            if (!File.Exists(path))
+                return targets;
+            var single = new FileInfo(path);
+            if (IsCandidate(single))
+                targets[single.FullName] = single;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // 路径读不了：当作「没有目标」，上方会把旧行删掉——下次重建会把它补回来。
+        }
+
+        return targets;
+    }
+
+    private static async Task<Dictionary<string, (long Id, long Mtime, long Size)>> LoadRowsUnderAsync(
+        SqliteConnection connection, SqliteTransaction transaction, string path, CancellationToken cancellationToken)
+    {
+        var rows = new Dictionary<string, (long Id, long Mtime, long Size)>(StringComparer.Ordinal);
+        await using var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        // 用 substr 比对前缀而不是 LIKE：路径里出现 % 或 _ 时 LIKE 会误配。
+        read.CommandText = """
+            SELECT id, path, mtime, size FROM docs
+            WHERE path = $path OR substr(path, 1, $length) = $prefix;
+            """;
+        read.Parameters.AddWithValue("$path", path);
+        read.Parameters.AddWithValue("$length", path.Length + 1);
+        read.Parameters.AddWithValue("$prefix", path + Path.DirectorySeparatorChar);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            rows[reader.GetString(1)] = (reader.GetInt64(0), reader.GetInt64(2), reader.GetInt64(3));
+        return rows;
+    }
+
+    private static string? TryNormalizeWatchedPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Contains("://", StringComparison.Ordinal))
+            return null;
+        try
+        {
+            if (!Path.IsPathFullyQualified(path))
+                return null;
+            var full = Path.GetFullPath(path);
+            var root = Path.GetPathRoot(full) ?? string.Empty;
+            while (full.Length > root.Length &&
+                   (full[^1] == Path.DirectorySeparatorChar || full[^1] == Path.AltDirectorySeparatorChar))
+                full = full[..^1];
+            return full;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsSameOrUnder(string path, string root)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (string.Equals(path, root, comparison))
+            return true;
+        var prefix = root.EndsWith(Path.DirectorySeparatorChar) || root.EndsWith(Path.AltDirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        return path.StartsWith(prefix, comparison);
     }
 
     // ── 查询 ─────────────────────────────────────────────────────────────────
@@ -314,6 +568,8 @@ public sealed class SqliteContentIndex : IContentIndexService
 
     public async Task ClearAsync(CancellationToken cancellationToken)
     {
+        // 清空之后没有可增量的内容：监听继续跑只会白读文件。
+        StopWatching();
         if (!await TryEnsureSchemaAsync(cancellationToken).ConfigureAwait(false))
             return;
 
@@ -643,6 +899,17 @@ public sealed class SqliteContentIndex : IContentIndexService
         }
     }
 
+    public void Dispose()
+    {
+        lock (_watcherGate)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            StopWatchingLocked();
+        }
+    }
+
     private static Task PaceAsync(CancellationToken cancellationToken) =>
         PaceMilliseconds <= 0 ? Task.CompletedTask : Task.Delay(PaceMilliseconds, cancellationToken);
 
@@ -877,26 +1144,49 @@ public sealed class SqliteContentIndex : IContentIndexService
 
                     if (entry is not FileInfo file)
                         continue;
-                    var extension = Path.GetExtension(file.Name);
-                    var isDocument = OfficeDocumentText.IsSupportedExtension(extension);
-                    if (!isDocument &&
-                        !IndexedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                    if (!IsCandidate(file))
                         continue;
-                    try
-                    {
-                        var limit = isDocument ? MaxDocumentBytes : MaxFileBytes;
-                        if (file.Length <= 0 || file.Length > limit)
-                            continue;
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        continue;
-                    }
                     results.Add(file);
                 }
             }
         }
         return results;
+    }
+
+    /// <summary>这个文件是否会被内容索引收录（扩展名 + 体积上限）。重建与增量共用同一条口径。</summary>
+    private static bool IsCandidate(FileInfo file)
+    {
+        var extension = Path.GetExtension(file.Name);
+        var isDocument = OfficeDocumentText.IsSupportedExtension(extension);
+        if (!isDocument && !IndexedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            return false;
+        try
+        {
+            var limit = isDocument ? MaxDocumentBytes : MaxFileBytes;
+            return file.Length > 0 && file.Length <= limit;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>读一篇正文：Office/OpenDocument 走正文抽取，其余按文本服务（超限/无权限返回 null）。</summary>
+    private async Task<string?> ReadDocumentTextAsync(FileInfo file, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return OfficeDocumentText.IsSupportedExtension(Path.GetExtension(file.Name))
+                ? OfficeDocumentText.TryExtract(file.FullName)
+                : (await _textFiles.ReadAsync(file.FullName, MaxFileBytes, cancellationToken)
+                    .ConfigureAwait(false)).Text;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or InvalidDataException or NotSupportedException or ArgumentException)
+        {
+            // 读不了（超过上限、无权限、编码不认识）就不进索引；调用方按「没有正文」处理。
+            return null;
+        }
     }
 
     private static bool ShouldSkipDirectory(DirectoryInfo directory) =>

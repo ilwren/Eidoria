@@ -60,3 +60,31 @@ public interface IContentIndexService
     /// <summary>删除全部索引数据（不动用户文件，不动文件名索引）。</summary>
     Task ClearAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// 内容索引的增量维护（v0.56）。由目录监听驱动：把变化的路径交进来，只重解这几条，
+/// 不再为了一个新文件把整棵树重新枚举一遍。
+/// <para>
+/// 契约：<see cref="ApplyChangesAsync"/> 只处理**已经在索引根内、且本来会被收录**的路径；
+/// 文件消失/变得不合格就把对应的行删掉。索引没建过时它是空操作（不会凭空建库）。
+/// 目录监听看不住（缓冲区溢出、平台不支持）时抛 <see cref="WatchFailed"/>，由上层提示重建——
+/// 增量一旦不可信，就必须让用户知道，而不是继续给一份悄悄变旧的索引。
+/// </para>
+/// </summary>
+public interface IContentIndexMaintenance
+{
+    /// <summary>按给定根启动目录监听（重复调用同根是空操作）。</summary>
+    void StartWatching(IReadOnlyList<string> roots);
+
+    /// <summary>停止监听（关闭内容索引、清除索引、退出前调用）。</summary>
+    void StopWatching();
+
+    /// <summary>应用一批变化路径，返回实际写入（新增/更新/删除）的文档数。</summary>
+    Task<int> ApplyChangesAsync(IReadOnlyList<string> changedPaths, CancellationToken cancellationToken);
+
+    /// <summary>后台增量改动完成；参数是本次写入的文档数。</summary>
+    event EventHandler<int>? Changed;
+
+    /// <summary>监听失效，增量不再可信（需要全量重建）。</summary>
+    event EventHandler? WatchFailed;
+}

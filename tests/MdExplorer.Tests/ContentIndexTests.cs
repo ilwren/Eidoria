@@ -46,6 +46,74 @@ public sealed class ContentIndexTests : IDisposable
         }
     }
 
+    // ── 增量维护（v0.56） ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task IncrementalUpdate_ReindexesTouchedFilesAndDropsDeletedOnes()
+    {
+        var rewritten = Write("alpha.md", "alpha original");
+        var doomed = Write("beta.md", "beta content");
+        var untouched = Write("gamma.md", "gamma content");
+        var index = Index();
+        await index.RebuildAsync([_root], null, TestContext.Current.CancellationToken);
+        Assert.Equal(3, (await index.GetStatsAsync(TestContext.Current.CancellationToken)).DocumentCount);
+
+        // 改一篇、删一篇、加一篇——只把这三条路径交给增量，不重扫整棵树。
+        File.WriteAllText(rewritten, "alpha rewritten delta");
+        File.Delete(doomed);
+        var added = Write("delta.md", "delta added");
+
+        var writes = await index.ApplyChangesAsync(
+            [rewritten, doomed, added], TestContext.Current.CancellationToken);
+        Assert.Equal(3, writes);
+
+        // 正文跟着变：旧词查不到，新词两篇都命中，没动过的还在。
+        Assert.Empty(await index.SearchAsync("original", 10, TestContext.Current.CancellationToken));
+        Assert.Equal(2, (await index.SearchAsync("delta", 10, TestContext.Current.CancellationToken)).Count);
+        Assert.Empty(await index.SearchAsync("beta", 10, TestContext.Current.CancellationToken));
+        Assert.Single(await index.SearchAsync("gamma", 10, TestContext.Current.CancellationToken));
+        Assert.Equal(3, (await index.GetStatsAsync(TestContext.Current.CancellationToken)).DocumentCount);
+    }
+
+    [Fact]
+    public async Task IncrementalUpdate_SkipsUnchangedAndOutOfScopePaths()
+    {
+        var kept = Write("kept.md", "kept content");
+        var outside = Path.Combine(Path.GetTempPath(), "eidoria-outside-" + Guid.NewGuid().ToString("N") + ".md");
+        File.WriteAllText(outside, "outside content");
+        var index = Index();
+        try
+        {
+            await index.RebuildAsync([_root], null, TestContext.Current.CancellationToken);
+
+            // 没变的文件不该重写，根外的文件不该被拉进来，非白名单扩展名也不该被收。
+            var image = Write("picture.png", "not really a png");
+            var writes = await index.ApplyChangesAsync(
+                [kept, outside, image], TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, writes);
+            Assert.Single(await index.SearchAsync("kept", 10, TestContext.Current.CancellationToken));
+            Assert.Empty(await index.SearchAsync("outside", 10, TestContext.Current.CancellationToken));
+            Assert.Equal(1, (await index.GetStatsAsync(TestContext.Current.CancellationToken)).DocumentCount);
+        }
+        finally
+        {
+            try { File.Delete(outside); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task IncrementalUpdate_IsANoOpBeforeTheIndexIsBuilt()
+    {
+        var index = new SqliteContentIndex(
+            Path.Combine(_root, "never-built.db"), new LocalTextFileService());
+        var file = Write("lonely.md", "lonely content");
+
+        // 没建过索引时不许凭空建库：那会让「内容索引还关着」的用户多出一个 db 文件。
+        Assert.Equal(0, await index.ApplyChangesAsync([file], TestContext.Current.CancellationToken));
+        Assert.False(File.Exists(Path.Combine(_root, "never-built.db")));
+    }
+
     // ── 分词 ──────────────────────────────────────────────────────────────
 
     [Fact]

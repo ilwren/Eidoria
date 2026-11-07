@@ -97,6 +97,8 @@ public sealed class SearchIndexTests : IDisposable
 
     public void Dispose()
     {
+        // 先停目录监听，再删临时树：Windows 上边看边删会留下共享冲突的空目录。
+        _index.Dispose();
         try { Directory.Delete(_baseDir, recursive: true); } catch (IOException) { }
     }
 
@@ -300,25 +302,124 @@ public sealed class SearchIndexTests : IDisposable
     }
 
     [Fact]
-    public async Task FileCreatedAfterBuild_InvalidatesSnapshotForScanFallback()
+    public async Task FileCreatedAfterBuild_IsPatchedIntoTheSnapshotWithoutRebuild()
     {
         FileIn("before.txt");
         await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
-        Assert.True((await _index.GetStatsAsync(TestContext.Current.CancellationToken)).IsCurrent);
+        var before = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+        Assert.True(before.IsCurrent);
 
         FileIn("after.txt");
-        var invalidated = false;
-        for (var i = 0; i < 50 && !invalidated; i++)
+        var patched = false;
+        for (var i = 0; i < 60 && !patched; i++)
         {
-            invalidated = !(await _index.GetStatsAsync(TestContext.Current.CancellationToken)).IsCurrent;
-            if (!invalidated)
+            patched = (await _index.GetStatsAsync(TestContext.Current.CancellationToken)).EntryCount ==
+                before.EntryCount + 1;
+            if (!patched)
                 await Task.Delay(100, TestContext.Current.CancellationToken);
         }
 
-        Assert.True(invalidated, "索引根内的新建文件应触发变更失效");
-        var combined = new IndexedSearchService(_index, new SearchService(), _settings);
-        var hits = await CollectAsync(combined.SearchByNameAsync(
+        // v0.56：新建文件由目录监听补进快照，不再把整份索引标脏、逼浏览器回落实时扫描。
+        Assert.True(patched, "索引根内新建的文件应被增量补进快照");
+        var after = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+        Assert.True(after.IsCurrent);
+        Assert.True(await _index.CoversAsync(_root, TestContext.Current.CancellationToken));
+        var hits = await CollectAsync(_index.SearchAsync(
             new SearchSpec("after", _root), TestContext.Current.CancellationToken));
         Assert.Single(hits);
+    }
+
+    [Fact]
+    public async Task FileDeletedAfterBuild_IsDroppedFromTheSnapshotWithoutRebuild()
+    {
+        var doomed = FileIn("doomed.txt");
+        FileIn("survivor.txt");
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+        var before = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+
+        File.Delete(doomed);
+        var patched = false;
+        for (var i = 0; i < 60 && !patched; i++)
+        {
+            patched = (await _index.GetStatsAsync(TestContext.Current.CancellationToken)).EntryCount ==
+                before.EntryCount - 1;
+            if (!patched)
+                await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(patched, "删掉的文件应从快照里移除");
+        Assert.True((await _index.GetStatsAsync(TestContext.Current.CancellationToken)).IsCurrent);
+        Assert.Empty(await CollectAsync(_index.SearchAsync(
+            new SearchSpec("doomed", _root), TestContext.Current.CancellationToken)));
+        Assert.Single(await CollectAsync(_index.SearchAsync(
+            new SearchSpec("survivor", _root), TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task IncrementalApply_RenamesMoveEntriesAndKeepsTheSnapshotCurrent()
+    {
+        FileIn(Path.Combine("docs", "old-name.md"));
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+        var before = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+
+        // 直接喂一批路径（不依赖监视器时序）：老路径已不在磁盘上，新路径存在。
+        var oldPath = Path.Combine(_root, "docs", "old-name.md");
+        var newPath = Path.Combine(_root, "docs", "new-name.md");
+        File.Move(oldPath, newPath);
+
+        Assert.Equal(IncrementalApplyResult.Updated, await _index.ApplyIncrementalAsync(
+            [oldPath, newPath], TestContext.Current.CancellationToken));
+
+        var after = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+        Assert.True(after.IsCurrent);
+        Assert.Equal(before.EntryCount, after.EntryCount); // 一条改名：不减不增
+        Assert.Empty(await CollectAsync(_index.SearchAsync(
+            new SearchSpec("old-name", _root), TestContext.Current.CancellationToken)));
+        Assert.Single(await CollectAsync(_index.SearchAsync(
+            new SearchSpec("new-name", _root), TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task IncrementalApply_AddsAWholeMovedInSubtree()
+    {
+        FileIn("seed.txt");
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+        var before = (await _index.GetStatsAsync(TestContext.Current.CancellationToken)).EntryCount;
+
+        // 整体挪进来的目录只会有「一条」事件：增量必须自己把子树走一遍。
+        var incoming = Path.Combine(_baseDir, "incoming");
+        Directory.CreateDirectory(Path.Combine(incoming, "nested"));
+        File.WriteAllText(Path.Combine(incoming, "one.txt"), "1");
+        File.WriteAllText(Path.Combine(incoming, "nested", "two.txt"), "2");
+        var moved = Path.Combine(_root, "moved");
+        Directory.Move(incoming, moved);
+
+        Assert.Equal(IncrementalApplyResult.Updated, await _index.ApplyIncrementalAsync(
+            [moved], TestContext.Current.CancellationToken));
+
+        var after = await _index.GetStatsAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(before + 4, after.EntryCount); // moved/ + one.txt + nested/ + nested/two.txt
+        Assert.Single(await CollectAsync(_index.SearchAsync(
+            new SearchSpec("two", _root), TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task IncrementalApply_RefusesWhenRootsChangedOrSnapshotMissing()
+    {
+        FileIn("a.txt");
+        await _index.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        // 根变了：增量不再是「补几条」的事，交回全量重建。
+        var other = Path.Combine(_baseDir, "other");
+        Directory.CreateDirectory(other);
+        _settings.Settings.SearchIndexRootPaths.Add(other);
+        Assert.Equal(IncrementalApplyResult.Unavailable, await _index.ApplyIncrementalAsync(
+            [FileIn("b.txt")], TestContext.Current.CancellationToken));
+
+        // 没有快照（清空后）同样拒绝，而不是凭空造一份。
+        _settings.Settings.SearchIndexRootPaths.Remove(other);
+        await _index.ClearAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(IncrementalApplyResult.Unavailable, await _index.ApplyIncrementalAsync(
+            [FileIn("c.txt")], TestContext.Current.CancellationToken));
     }
 }
