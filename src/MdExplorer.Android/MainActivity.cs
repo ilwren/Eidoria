@@ -4,6 +4,8 @@ using Android.OS;
 using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
+using MdExplorer.Infrastructure;
+using MdExplorer.Platform.Abstractions;
 using MdExplorer.UI.Media;
 using MdExplorer.UI.Services;
 using AvaloniaApp = MdExplorer.UI.App;
@@ -22,6 +24,7 @@ public sealed class MainActivity : AvaloniaMainActivity
 {
     private const int NotificationPermissionRequestCode = 4102;
     private static MainActivity? _current;
+    private AndroidFoldablePostureSource? _foldablePosture;
     private TaskCompletionSource<bool>? _notificationPermissionCompletion;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -32,6 +35,10 @@ public sealed class MainActivity : AvaloniaMainActivity
         AppHost.MediaPlaybackFactory = static () => new AndroidMediaPlaybackService();
         // 视频画面走宿主托管的原生窗口：TextureView 由 Avalonia 的 NativeControlHost 挂进视觉树并按控件定位。
         MediaSurfaceBridge.Factory = static parent => new AndroidVideoSurfaceAttachment(parent);
+        // 折叠屏姿态（v0.58）：铰链角度传感器 → 半折叠时主副两半分开摆；没有传感器就是平铺。
+        AppHost.FoldablePostureFactory = static () =>
+            _current?._foldablePosture ?? (IFoldablePostureSource)FlatFoldablePostureSource.Instance;
+        _foldablePosture = new AndroidFoldablePostureSource(this);
         MdSystemNotificationServiceAdapter.PlatformPreparation = static cancellationToken =>
             _current?.RequestNotificationPermissionAsync(cancellationToken)
             ?? Task.FromException(new InvalidOperationException("Android 前台 Activity 尚未就绪，无法请求通知权限。"));
@@ -44,7 +51,17 @@ public sealed class MainActivity : AvaloniaMainActivity
             _current = null;
             _notificationPermissionCompletion?.TrySetCanceled();
         }
+        // 传感器监听要显式摘掉：Activity 销毁后回调里再碰 Resources 就会炸。
+        _foldablePosture?.Dispose();
+        _foldablePosture = null;
         base.OnDestroy();
+    }
+
+    public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig)
+    {
+        base.OnConfigurationChanged(newConfig);
+        // 旋转/分屏后窗口横竖可能变了：铰链走向要跟着重算（Attribute 里已声明不重建 Activity）。
+        _foldablePosture?.Refresh();
     }
 
     public override void OnRequestPermissionsResult(

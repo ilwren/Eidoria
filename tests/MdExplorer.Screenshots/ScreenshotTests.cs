@@ -59,10 +59,11 @@ public sealed class ScreenshotTests
         }
     }
 
-    private async Task<ShellViewModel> CreateShellAsync(string themeMode = "Light", bool androidAccess = false)
+    private async Task<ShellViewModel> CreateShellAsync(
+        string themeMode = "Light", bool androidAccess = false, IFoldablePostureSource? foldablePosture = null)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), "mdexplorer-shots", Guid.NewGuid().ToString("N"));
-        var built = AppHost.Build(dataDirectory: dataDir, startFolder: PicturesDir);
+        var built = AppHost.Build(dataDirectory: dataDir, startFolder: PicturesDir, foldablePosture: foldablePosture);
         var services = androidAccess
             ? built with
             {
@@ -102,9 +103,10 @@ public sealed class ScreenshotTests
         Func<ShellViewModel, Task>? arrange = null,
         string themeMode = "Light",
         bool androidAccess = false,
-        Func<Window, Task>? afterShow = null)
+        Func<Window, Task>? afterShow = null,
+        IFoldablePostureSource? foldablePosture = null)
     {
-        var shell = await CreateShellAsync(themeMode, androidAccess);
+        var shell = await CreateShellAsync(themeMode, androidAccess, foldablePosture);
         shell.SetViewportSize(width, height);
         if (arrange is not null)
             await arrange(shell);
@@ -1708,6 +1710,79 @@ public sealed class ScreenshotTests
                 .Count(nav => nav.IsEffectivelyVisible);
             Assert.InRange(visibleNavs, 0, 1);
         });
+
+    /// <summary>
+    /// 折叠屏半折叠·书本式（竖铰链，1200×841）：主区只占左半，右半留给预览，
+    /// 中间那条铰链带谁也不许跨过去。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Foldable_HalfFoldedBookReservesTheHingeBand() => await CaptureAsync(
+        "86-foldable-half-folded-book.png", 1200, 841, shell =>
+        {
+            Assert.True(shell.IsHalfFolded);
+            Assert.True(shell.IsFoldSecondaryBook);
+            Assert.False(shell.IsFoldSecondaryTabletop);
+            Assert.Equal(616, shell.FoldPrimaryMargin.Right, 3);
+            Assert.Equal(0, shell.FoldPrimaryMargin.Bottom);
+            Assert.Equal(584, shell.FoldSecondaryWidth, 3);
+            // 书本式竖向本来就够高，不该被误判成矮视口；主区 584 宽按 Medium 排（导轨），不出抽屉。
+            Assert.False(shell.IsShortViewport);
+            Assert.True(shell.IsMedium);
+            Assert.True(shell.ShowRail);
+            Assert.False(shell.ShowDrawerPane);
+            return Task.CompletedTask;
+        },
+        foldablePosture: new StubFoldablePostureSource(new FoldablePosture(FoldHingeAxis.Vertical, 32)),
+        afterShow: async window =>
+        {
+            await Task.Delay(120);
+            // 副半屏在右、主区让开：两者不许重叠，否则就是内容压在铰链上。
+            var main = window.GetVisualDescendants().OfType<Grid>().First(g => g.Name == "PaneGrid");
+            var secondary = window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "FoldSecondaryBookPane");
+            Assert.True(secondary.Bounds.Width > 0, "副半屏应当可见");
+            Assert.True(main.Bounds.Right <= secondary.Bounds.Left + 0.5,
+                $"主区右边缘 {main.Bounds.Right} 压进了副半屏 {secondary.Bounds.Left}");
+        });
+
+    /// <summary>
+    /// 折叠屏半折叠·桌面式（横铰链，1200×841）：上下两半，下半留给预览；
+    /// 每半只有 404.5 高，必须按矮视口处理（抽屉收起、底栏不出现）。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Foldable_HalfFoldedTabletopShortensTheViewport() => await CaptureAsync(
+        "87-foldable-half-folded-tabletop.png", 1200, 841, shell =>
+        {
+            Assert.True(shell.IsHalfFolded);
+            Assert.True(shell.IsFoldSecondaryTabletop);
+            Assert.True(shell.IsShortViewport);
+            Assert.False(shell.ShowDrawerPane);
+            Assert.False(shell.ShowBottomNav);
+            Assert.True(shell.ShowRail);
+            Assert.Equal(436.5, shell.FoldPrimaryMargin.Bottom, 3);
+            return Task.CompletedTask;
+        },
+        foldablePosture: new StubFoldablePostureSource(new FoldablePosture(FoldHingeAxis.Horizontal, 32)),
+        afterShow: async window =>
+        {
+            await Task.Delay(120);
+            var main = window.GetVisualDescendants().OfType<Grid>().First(g => g.Name == "PaneGrid");
+            var secondary = window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "FoldSecondaryTabletopPane");
+            Assert.True(secondary.Bounds.Height > 0, "副半屏应当可见");
+            Assert.True(main.Bounds.Bottom <= secondary.Bounds.Top + 0.5,
+                $"主区底边 {main.Bounds.Bottom} 压进了副半屏 {secondary.Bounds.Top}");
+        });
+
+    /// <summary>截图用的姿态来源：固定报一个姿态（真机上是 Android 铰链角度传感器）。</summary>
+    private sealed class StubFoldablePostureSource(FoldablePosture posture) : IFoldablePostureSource
+    {
+        public FoldablePosture Current { get; } = posture;
+
+        public event EventHandler? Changed
+        {
+            add { }
+            remove { }
+        }
+    }
 
     private static Task WithStubMediaAsync(Func<Task> body) =>
         WithStubMediaAsync(body, static () => new StubMediaPlayback());

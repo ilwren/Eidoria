@@ -80,6 +80,9 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     {
         _services = services;
         _launcher = () => services.Launcher;
+        // 折叠姿态由宿主注入（v0.58）：平铺实现不会触发任何回调，布局照旧。
+        _foldablePosture = services.FoldablePosture;
+        _foldablePosture.Changed += OnFoldablePostureChanged;
         Preview = new PreviewViewModel(
             MdExplorer.UI.Preview.BuiltInPreviewProviders.Create(services.Archive, services.FileSystem),
             () => Launcher,
@@ -174,6 +177,9 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             {
                 OnPropertyChanged(nameof(ShowPreviewPaneNow));
                 OnPropertyChanged(nameof(ShowPreviewPaneEffective));
+                OnPropertyChanged(nameof(ShowFoldSecondaryHint));
+                OnPropertyChanged(nameof(ShowFoldSecondaryPreview));
+                OnPropertyChanged(nameof(FoldSecondaryPreviewSource));
             }
         };
 
@@ -556,6 +562,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public bool IsExtensionCenterPage => Page == ShellPage.ExtensionCenter;
 
     private double _viewportHeight;
+    private double _viewportWidth;
+    /// <summary>折叠屏姿态（v0.58）：宿主没登记折叠检测时永远是平铺。</summary>
+    private readonly IFoldablePostureSource _foldablePosture;
+    private FoldableLayoutResult _foldableLayout = FoldableLayoutResult.Flat;
 
     public bool IsCompact => SizeClass == SizeClass.Compact;
     public bool IsMedium => SizeClass == SizeClass.Medium;
@@ -568,8 +578,55 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// </summary>
     public const double ShortViewportThreshold = 560;
 
-    /// <summary>当前视口是不是「矮」的（手机横屏、分屏小窗、矮桌面窗口）。</summary>
-    public bool IsShortViewport => _viewportHeight > 0 && _viewportHeight < ShortViewportThreshold;
+    /// <summary>
+    /// 参与「矮视口」判定的高度：桌面式半折叠（横铰链）时内容只有半边可用，
+    /// 要按半边高度算，否则整窗 841 会骗过判定、把抽屉塞进 400 高的半屏里（v0.58）。
+    /// </summary>
+    private double EffectiveViewportHeight => _foldableLayout.ShortViewportReferenceHeight(_viewportHeight);
+
+    /// <summary>当前视口是不是「矮」的（手机横屏、分屏小窗、矮桌面窗口、桌面式半折叠）。</summary>
+    public bool IsShortViewport => EffectiveViewportHeight > 0 && EffectiveViewportHeight < ShortViewportThreshold;
+
+    /// <summary>是否处于半折叠（铰链把可视区分成两半，其中一半是看不见的铰链带）。</summary>
+    public bool IsHalfFolded => _foldableLayout.IsHalfFolded;
+
+    /// <summary>
+    /// 主区要让出的边距：竖铰链让右、横铰链让下。
+    /// 半折叠时另一半是折进去的，内容跨过去就等于把一半行藏进铰链里。
+    /// </summary>
+    public Avalonia.Thickness FoldPrimaryMargin =>
+        new(0, 0, _foldableLayout.PrimaryMarginRight, _foldableLayout.PrimaryMarginBottom);
+
+    /// <summary>副半屏是否够大、值得单独摆一块面板。</summary>
+    public bool ShowFoldSecondarySurface => _foldableLayout.ShowSecondarySurface;
+
+    /// <summary>书本式半折叠：副半屏在右边。</summary>
+    public bool IsFoldSecondaryBook =>
+        _foldableLayout.ShowSecondarySurface && _foldableLayout.Axis == FoldHingeAxis.Vertical;
+
+    /// <summary>桌面式半折叠：副半屏在下边。</summary>
+    public bool IsFoldSecondaryTabletop =>
+        _foldableLayout.ShowSecondarySurface && _foldableLayout.Axis == FoldHingeAxis.Horizontal;
+
+    public double FoldSecondaryWidth => _foldableLayout.SecondaryWidth;
+    public double FoldSecondaryHeight => _foldableLayout.SecondaryHeight;
+
+    /// <summary>副半屏现在没有可显示的内容：放一段说明，别留白得让人以为卡住了。</summary>
+    public bool ShowFoldSecondaryHint => ShowFoldSecondarySurface && !Preview.HasItem;
+
+    /// <summary>副半屏有内容可显示（选中了文件）。</summary>
+    public bool ShowFoldSecondaryPreview => ShowFoldSecondarySurface && Preview.HasItem;
+
+    /// <summary>
+    /// 副半屏的预览视图模型：**不显示时给 null**。副半屏用 ContentControl 绑它，
+    /// null 就不会造出第二份预览视图——媒体画面只许挂一处，多一份就是两份原生画面。
+    /// </summary>
+    public PreviewViewModel? FoldSecondaryPreviewSource => ShowFoldSecondaryPreview ? Preview : null;
+
+    /// <summary>副半屏的说明文字：说清楚它为什么空着，以及怎么把内容放进去。</summary>
+    public string FoldSecondaryHint => IsFoldSecondaryTabletop
+        ? "下半屏留给预览：选中一个文件即在这里显示。"
+        : "右半屏留给预览：选中一个文件即在这里显示。";
 
     /// <summary>底部导航：只在「窄且不矮」时出现（小屏竖屏手机、折叠屏合起态）。</summary>
     public bool ShowBottomNav => IsCompact && !IsShortViewport;
@@ -583,7 +640,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// </summary>
     public bool ShowRail => !ShowDrawerPane && !ShowBottomNav;
 
-    public bool ShowPreviewPaneNow => IsExpandedOrAbove && !IsShortViewport &&
+    /// <summary>
+    /// 常驻预览栏：半折叠时一律让位给副半屏（v0.58）——两半各摆一套预览只会互相挤。
+    /// </summary>
+    public bool ShowPreviewPaneNow => !IsHalfFolded && IsExpandedOrAbove && !IsShortViewport &&
         SettingsStore.Settings.ShowPreviewPane && Preview.HasItem;
     public bool ShowPreviewPaneEffective => IsBrowser && ShowPreviewPaneNow;
     /// <summary>预览页：没有常驻预览栏时（含矮视口）改为覆盖式预览页，而不是挤一列。</summary>
@@ -688,20 +748,31 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public void SetViewportSize(double widthDip, double heightDip)
     {
         var wasShort = IsShortViewport;
+        _viewportWidth = widthDip;
         _viewportHeight = heightDip;
-        if (wasShort != IsShortViewport)
-        {
-            foreach (var name in new[]
-                     {
-                         nameof(IsShortViewport), nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane),
-                         nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
-                     })
-                OnPropertyChanged(name);
-            if (ShowDrawerPane)
-                IsDrawerOpen = false;
-        }
+        ApplyViewport(wasShort);
+    }
 
-        var next = widthDip switch
+    /// <summary>
+    /// 断点与折叠几何一起算（v0.58 起两者互相牵制，拆开算就会前后矛盾）：
+    /// 折叠几何先出「有效高度 / 有效宽度」，矮视口与五档断点再按有效尺寸判定。
+    /// </summary>
+    private void ApplyViewport(bool wasShort)
+    {
+        var previousFold = _foldableLayout;
+        _foldableLayout = FoldableLayout.Compute(_foldablePosture.Current, _viewportWidth, _viewportHeight);
+        if (wasShort != IsShortViewport)
+            NotifyShortViewportChanged();
+        if (!previousFold.Equals(_foldableLayout))
+            NotifyFoldableLayoutChanged();
+
+        // 书本式半折叠时主区只有一半宽：断点要按**主区**算，
+        // 否则 1200 的书本式会被当成 Large，抽屉+预览栏一起塞进 584 宽里。
+        var effectiveWidth = _foldableLayout.Axis == FoldHingeAxis.Vertical && _foldableLayout.ShowSecondarySurface
+            ? _foldableLayout.SecondaryWidth
+            : _viewportWidth;
+
+        var next = effectiveWidth switch
         {
             < 600 => SizeClass.Compact,
             < 840 => SizeClass.Medium,
@@ -715,6 +786,66 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         if (next != SizeClass)
             SizeClass = next;
         DocumentWorkbench.IsCompactLayout = isCompact;
+    }
+
+    /// <summary>矮视口状态翻转后要一起刷新的那些可见性（导航面、预览栏）。</summary>
+    private void NotifyShortViewportChanged()
+    {
+        foreach (var name in new[]
+                 {
+                     nameof(IsShortViewport), nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane),
+                     nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
+                 })
+            OnPropertyChanged(name);
+        if (ShowDrawerPane)
+            IsDrawerOpen = false;
+    }
+
+    /// <summary>折叠几何变了：主区留白与副半屏跟着动，其余状态一概不碰。</summary>
+    private void NotifyFoldableLayoutChanged()
+    {
+        foreach (var name in new[]
+                 {
+                     nameof(IsHalfFolded), nameof(FoldPrimaryMargin), nameof(ShowFoldSecondarySurface),
+                     nameof(IsFoldSecondaryBook), nameof(IsFoldSecondaryTabletop),
+                     nameof(FoldSecondaryWidth), nameof(FoldSecondaryHeight), nameof(FoldSecondaryHint),
+                     nameof(ShowFoldSecondaryHint), nameof(ShowFoldSecondaryPreview),
+                     nameof(FoldSecondaryPreviewSource),
+                     nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
+                 })
+            OnPropertyChanged(name);
+    }
+
+    /// <summary>
+    /// 折叠姿态变化（v0.58）。传感器回调可能在别的线程，统一回 UI 线程；
+    /// 姿态没真的变化时直接返回——铰链角度在区间内连续上报，不该每来一次就重排一次布局。
+    /// </summary>
+    private void OnFoldablePostureChanged(object? sender, EventArgs e)
+    {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(ApplyFoldablePosture);
+            return;
+        }
+
+        ApplyFoldablePosture();
+    }
+
+    private void ApplyFoldablePosture()
+    {
+        if (_viewportWidth <= 0 && _viewportHeight <= 0)
+            return;
+        var previous = _foldableLayout;
+        ApplyViewport(IsShortViewport);
+        if (previous.Equals(_foldableLayout))
+            return;
+        // 姿态真的变了：断点可能跟着换档（书本式半折叠按主区半宽算），补一次重算。
+        OnPropertyChanged(nameof(IsCompact));
+        OnPropertyChanged(nameof(IsMedium));
+        OnPropertyChanged(nameof(IsExpandedOrAbove));
+        OnPropertyChanged(nameof(IsLargeOrAbove));
+        OnPropertyChanged(nameof(IsCompactOrMedium));
+        RefreshPreviewVisibility();
     }
 
     public void RefreshPreviewVisibility()

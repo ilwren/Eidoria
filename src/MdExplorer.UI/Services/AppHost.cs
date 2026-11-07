@@ -37,13 +37,20 @@ public static class AppHost
         IContentIndexService ContentIndex,
         AiModelCatalog AiModels,
         IAiModelDownloader AiModelDownloads,
-        PluginPackageCatalog Plugins);
+        PluginPackageCatalog Plugins,
+        IFoldablePostureSource FoldablePosture);
 
     /// <summary>
     /// 平台内嵌播放后端的注入点（平台自带解码栈）。Android 宿主在 Activity 创建时注册
     /// MediaPlayer 实现；桌面在 Program.Main 里注册 Media Foundation / GStreamer。
     /// </summary>
     public static Func<IMediaPlaybackService>? MediaPlaybackFactory { get; set; }
+
+    /// <summary>
+    /// 折叠屏姿态的注入点（v0.58）。Android 宿主在 Activity 创建时注册铰链角度传感器实现；
+    /// 桌面、无头测试、未接线的宿主不注册，统一退回 <see cref="FlatFoldablePostureSource"/>（平铺）。
+    /// </summary>
+    public static Func<IFoldablePostureSource>? FoldablePostureFactory { get; set; }
 
     private const string DefaultMediaDiagnostic =
         "当前宿主没有注册内嵌解码后端（桌面端为 Media Foundation / GStreamer，Android 为 MediaPlayer）。可用系统应用打开。";
@@ -56,7 +63,8 @@ public static class AppHost
         string? startFolder = null,
         IFileLauncherService? launcher = null,
         ISystemClipboardService? systemClipboard = null,
-        ISystemNotificationService? systemNotifications = null)
+        ISystemNotificationService? systemNotifications = null,
+        IFoldablePostureSource? foldablePosture = null)
     {
         var dataDir = dataDirectory ?? DefaultDataDirectory();
         Directory.CreateDirectory(dataDir);
@@ -136,7 +144,9 @@ public static class AppHost
             aiModels,
             aiModelDownloads,
             // 插件包只接受本机显式导入的 MEPX 声明式数据，不执行其中的任何代码。
-            new PluginPackageCatalog(dataDir));
+            new PluginPackageCatalog(dataDir),
+            // 折叠屏姿态：宿主没注册就是「平铺」，布局照常，不会有任何额外留白。
+            foldablePosture ?? FoldablePostureFactory?.Invoke() ?? FlatFoldablePostureSource.Instance);
     }
 
     public static ShellViewModel CreateShell(AppServices services) => new(services);

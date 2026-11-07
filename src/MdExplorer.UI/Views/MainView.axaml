@@ -342,7 +342,8 @@
       </Grid>
 
       <!-- 主区：导轨 / 抽屉 / 分隔条 / 内容 / 分隔条 / 预览栏（Expanded+ 可拖） -->
-      <Grid x:Name="PaneGrid" Grid.Row="1">
+      <!-- 折叠屏半折叠（v0.58）：主区按 FoldPrimaryMargin 让开铰链那一半，平铺时边距为 0。 -->
+      <Grid x:Name="PaneGrid" Grid.Row="1" Margin="{Binding FoldPrimaryMargin}">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
@@ -1443,6 +1444,55 @@
           </Grid>
         </Border>
       </Grid>
+
+      <!--
+        折叠屏副半屏（v0.58）：书本式（竖铰链）摆在右、桌面式（横铰链）摆在下。
+        铰链那一半是折进去看不见的，主区已经让开；这一块只用来放预览，不抢主区地盘。
+        平铺时两块都不显示，布局与旧版一模一样。
+      -->
+      <Border x:Name="FoldSecondaryBookPane" Grid.Row="1"
+              IsVisible="{Binding IsFoldSecondaryBook}"
+              Width="{Binding FoldSecondaryWidth}"
+              HorizontalAlignment="Right" VerticalAlignment="Stretch"
+              Margin="0,10,10,10" Classes="workspace-surface" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Classes="caption" Text="副半屏 · 预览" Margin="17,12,17,0"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"
+                     VerticalAlignment="Center" HorizontalAlignment="Center"
+                     IsVisible="{Binding ShowFoldSecondaryHint}" Text="{Binding FoldSecondaryHint}" />
+          <!-- 只在真的要显示时造一份预览视图（Content 为 null 就不造），媒体画面只许挂一处 -->
+          <ContentControl Grid.Row="1" Content="{Binding FoldSecondaryPreviewSource}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="vm:PreviewViewModel">
+                <views:PreviewView />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </Grid>
+      </Border>
+
+      <Border x:Name="FoldSecondaryTabletopPane" Grid.Row="1"
+              IsVisible="{Binding IsFoldSecondaryTabletop}"
+              Height="{Binding FoldSecondaryHeight}"
+              HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+              Margin="10,0,10,10" Classes="workspace-surface" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Classes="caption" Text="副半屏 · 预览" Margin="17,12,17,0"
+                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"
+                     VerticalAlignment="Center" HorizontalAlignment="Center"
+                     IsVisible="{Binding ShowFoldSecondaryHint}" Text="{Binding FoldSecondaryHint}" />
+          <!-- 只在真的要显示时造一份预览视图（Content 为 null 就不造），媒体画面只许挂一处 -->
+          <ContentControl Grid.Row="1" Content="{Binding FoldSecondaryPreviewSource}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="vm:PreviewViewModel">
+                <views:PreviewView />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </Grid>
+      </Border>
 
       <!-- 底部导航（Compact） -->
       <md:MdNavigationBar x:Name="BottomNav" Grid.Row="2" IsVisible="{Binding ShowBottomNav}"

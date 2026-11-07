@@ -629,6 +629,10 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 > **v0.53 最近搜索词（已落地）**：搜索框下面多一排「最近」胶囊——点一下就重跑那次搜索，右边「清除」一次性清空。规则放在 `RecentSearches`（Domain 纯函数）：**只记真有结果的搜索**（一无所获的词留在列表里只会误导下一次点击）、忽略大小写去重并把重复词移到最前、上限 8 条、空白丢弃；读设置时再 `Normalize` 一遍，手改 JSON 塞进空白/重复/超长列表也不会带进界面。落盘在 `AppSettings.RecentSearchQueries`，与索引根、搜索上限同住一份设置文件——只动本机设置，不碰任何用户文件。每枚胶囊自带 `IAsyncRelayCommand`（`RecentSearchChipModel`），模板里不做父级 `DataContext` 查找。
 > **边界**：还没有「按类型/大小/日期筛最近结果」，也没有把最近搜索与筛选条件一起记下来。
 
+> **v0.58 折叠屏半折叠（已落地）**：此前只按「视口多宽多高」排布，半折叠时铰链那一半是折进去看不见的，内容跨过去就有一半被藏住。新增 `IFoldablePostureSource` 端口（`FoldHingeAxis` + 铰链留白）+ `FoldableLayout` 纯函数换算（`Compute` 给出主区让白与副半屏尺寸、`FromHingeAngle` 把 30°–150° 判成半折叠）+ `FlatFoldablePostureSource`（桌面/无头/无传感器一律平铺，行为与 v0.57 一致）。Android 宿主用系统自带**铰链角度传感器**（`TYPE_HINGE_ANGLE`，零新依赖）实现，横窗=上下两半、竖窗=左右两半；旋转/分屏时 `OnConfigurationChanged` 重算走向。
+> 布局侧：`PaneGrid` 按 `FoldPrimaryMargin` 让开铰链那一半（竖铰链让右、横铰链让下），副半屏常驻预览（没选文件就写一行说明，应用内常驻预览栏同时让位）；书本式半折叠的断点按**主区半宽**判定（1200 的书本式 → 584 → Medium/导轨，不会把抽屉+预览栏塞进半屏）；`IsShortViewport` 在桌面式半折叠时按**半边高度**判定（841 的半折叠 = 每半 404.5 → 算矮视口），抽屉收起、底栏不出现、导航退导轨。副半屏每边不足 260 DIP 时放弃副屏、只保留主区——绝不把主区压到比断点还窄。
+> **边界**：没走 `androidx.window`（要再拉 Java 绑定依赖，且没有折叠真机可验）；铰链多宽传感器不报，取保守 32 DIP；真机确认项写在 §7.5 末尾。平铺时两块副半屏都不显示，老布局一个像素不动。
+
 > **v0.57 PDF 正文进全文索引（`PdfPig`，已落地）**：维护者拍板后，PDF 的文字层第一次能被「全文」模式搜到——**只做索引，不碰预览**。新增 `PdfDocumentText`（Infrastructure）：`TryExtract(path)` 与 v0.47 的 `OfficeDocumentText` 同形态，输出 `string?`；`SqliteContentIndex` 的候选判定与正文读取改用共用 `IsDocumentExtension`（OOXML / OpenDocument / PDF 同档 32 MB 上限），因此 v0.56 的**重建与增量两条路径同时生效**，不用各写一份。
 > 四条硬顶全部公开成常量并由测试引用：单篇 ≤ 32 MB、最多 400 页、输出 ≤ 40 万字符（入库再封顶 4 万）、单篇解析 ≤ 15 s。加密件（`PdfDocumentEncryptedException`）、损坏件、无文本层的扫描件、超限与超时**一律返回 `null`**，按「这篇没有正文」跳过——一份坏 PDF 绝不能让整次重建失败。取词用逐页 `page.GetWords()` 拼空格：英文靠 `unicode61` 正常分词，中文照旧走写入侧重叠二元组；个别页取词抛异常时退回整页 `page.Text`，不丢页。
 > **边界**：不做 OCR（扫描件照实说「需先 OCR」）、不做版面/表格还原、不做命中高亮定位、不把 PdfPig 接到任何预览上（同一份 PDF 不许出现两个引擎给两块内容）。文案同步四处：设置页全文索引说明与搜索中心「全文」提示都写明「含文本型 PDF 与 Office 文档；扫描件需 OCR，本版不做」。体积与 AOT 按原门禁跑，不达标时如实量化上报、不静默降级。
@@ -874,6 +878,30 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 ### 7.4 验证口径
 
 每个导航目的地都有五份 Headless 截图基线（Compact 390×844、Medium 768×1024、Expanded 1100×760、Large 1440×900、XLarge 1920×1080，与线框画布一一对应），断言：无溢出截断、无小于 48 dp 触控目标（触控模式）、导航形态正确、选择模式工具栏可达。手动验收另做「窗口从 1920 连续拖到 360」的横扫用例（§14）。
+
+### 7.5 折叠屏半折叠（v0.58）
+
+> 断点管的是「多宽」，管不了「被折成两半」：半折叠时有一整条区域是**折进去看不见的**，
+> 内容跨过去就等于把一半行藏进铰链里。这一节是那件事的口径。
+
+- **姿态从哪来**：`IFoldablePostureSource`（`FoldHingeAxis.None/Vertical/Horizontal` + 铰链留白厚度）。
+  Android 宿主用系统自带的**铰链角度传感器**（`TYPE_HINGE_ANGLE`，API 30 起）实现，零新依赖；
+  桌面、无头测试与没有传感器的设备一律 `FlatFoldablePostureSource`（平铺）——行为与 v0.57 完全一致。
+  没走 `androidx.window`：它能同时给「走向 + 位置」，但要再拉一个 Java 绑定依赖，且本仓没有折叠真机可验。
+- **角度 → 姿态**：`30° < 角度 < 150°` 判为半折叠；走向按窗口横竖推断（横窗=上下两半，竖窗=左右两半）。
+  传感器不报走向，判错的代价只是主副两半换方向，**不会**出现内容被折进去。
+- **舍入成什么布局**：`FoldableLayout.Compute(posture, w, h)` 是纯函数，一次给出主区该让出的边距
+  （竖铰链让右 616 = 副半屏 584 + 铰链 32；横铰链让下同理）与副半屏尺寸。主区**永远只占第一半**；
+  副半屏够大（每边 ≥ 260 DIP）才单独摆面板，不够就只保留主区，绝不把主区压到比断点还窄。
+- **断点按主区算**：书本式半折叠时 `SizeClass` 用**主区半宽**判定（1200 的书本式 → 584 → Medium → 导轨，
+  而不是 Large 的抽屉）；桌面式半折叠宽度不变，仍按整窗宽度。这样抽屉/导轨/底栏的取舍永远与真正可用的那块地对得上。
+- **副半屏放什么**：常驻预览（此时应用内那条常驻预览栏一律让位，`ShowPreviewPaneNow` 为假）。
+- **矮视口判定跟着变**：桌面式半折叠时内容只有半边高，`IsShortViewport` 按**半边高度**判定
+  （841 的半折叠 = 每半 404.5，算矮视口），所以抽屉收起、底栏不出现、导航退成导轨——不这么改就等于把抽屉塞进 400 高的半屏里。
+- **留白的度**：铰链多宽传感器不报，取保守值 `FoldableLayout.DefaultGutterDip = 32 DIP`，上限 96 DIP。
+- **验收**：`FoldablePostureTests` 钉死角度区间、走向推断、让白几何、窄副屏放弃、极端留白钳制与界面层联动；
+  `86-foldable-half-folded-book.png` / `87-foldable-half-folded-tabletop.png` 两张 Headless 截图断言
+  「主区右/下边缘不压进副半屏」。**真机确认项**：铰链角度上报是否及时、32 DIP 留白在具体机型上是否够宽。
 
 ---
 
@@ -1311,6 +1339,7 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | 2026-11-06 | **v0.45 AI 搜索阈值与可解释性**：新增 `SemanticSearchConfidence`（纯函数 `Evaluate(scores)`）——每条命中显示余弦相似度（悬停说明「不是概率」），低于 `max(0.45, 第一名×0.85)` 的尾部命中标注「低置信」，整次查询最高分低于 0.45 时状态栏直接说「约等于没找到，按相似度排序供参考」。**设计取舍**：门槛只影响标注与文案，**不筛掉任何结果、不改排序**——模型/量化/运行时换代最多让标注变保守，不会让搜索突然查不到文件；不设固定 Top-1 硬门槛，避免 ONNX 版本漂移造成随机变红。9 例纯函数单测固定两把尺子（绝对下限、相对比例、边界包含、NaN 防护、计数上界）| run `42155746952` 十 Job 全绿；Linux 单测 380 例（376 通过 / 4 例无真实权重跳过），其中新增低置信 9 例 |
 | 2026-11-06 | **v0.47 全文索引覆盖 Office/OpenDocument**：此前「全文」只认白名单纯文本扩展名，用户的 docx/pptx/xlsx/odt 在搜索里等于不存在。新增 `OfficeDocumentText`：ZIP + XML 流式扫文本节点（docx 读 `word/document.xml`、pptx 按页号排序读 `ppt/slides/*`、xlsx 读 `sharedStrings.xml` 与各 sheet、ODF 读 `content.xml`，平面 `.fodt/.fods/.fodp` 直接扫），段落/行/单元格处补换行；`SqliteContentIndex` 对这些扩展名放宽到 32 MB 并走抽取器，纯文本仍限 512 KB。**安全与边界**：`DtdProcessing.Prohibit` + 禁外部解析、单部件 32 MB、整包展开 256 MB、单篇 40 万字符上限；坏包/加密/无正文一律返回 null 并跳过该篇，不让一份坏文档搞挂整次重建。**明确不做**：PDF 正文抽取需要新的文本层依赖（PDFium 只光栅化），留作待决策项；扫描件文字仍搜不到。10 例新单测（docx 段落、pptx 页序、xlsx 共享串、odt、fodt、坏包、DTD 拒绝、无正文、不支持扩展名、与内容索引端到端）。**同版跟随修正**：截图 84 目检发现矮视口下（400 宽减去 84 导轨）路径行把路径胶囊压到几乎不可读——矮视口收起「前进 / 刷新」两个次级按钮（`ShowPathRowExtras`），优先保住后退/上一级/路径/搜索，并在截图测试里断言路径胶囊仍有 ≥ 80 DIP | run `42172278184` 十 Job 全绿（Linux 单测 375 例：371 通过 / 4 例无真实权重跳过；新增 10 例文档抽取用例全过；截图 83/84/85 已目检：844×390 手机横屏为导轨 + 全高内容、400×520 分屏小窗路径胶囊可读） ||
 | 2026-11-07 | **v0.56 索引真增量（目录监听驱动）**：新增 `IndexRootWatcher`（事件攒批 + 700 ms 静默 + 溢出回调）；文件名索引 `ApplyIncrementalAsync` 就地增删改快照（目录连子树、值没变就不写、写盘 3 秒节流、`ClearAsync` 取消待写），`IsCurrent`/`CoversAsync` 保持为真、不再回落实时扫描；全文索引新增 `IContentIndexMaintenance`（`StartWatching`/`StopWatching`/`ApplyChangesAsync`/`Changed`/`WatchFailed`），只重解变化文件、删掉消失行、共同口径 `IsCandidate` + `ReadDocumentTextAsync`，`ClearAsync` 顺带停监听；宿主按「开关 + 已建立 + 有根」同步监听并在增量后刷新统计，监看不住时提示重建。7 例新单测（新建补入、删除剔除、改名搬移、整目录挪入、根变了/无快照拒绝增量，以及全文增量的改/删/增、未变与越界跳过、未建库时空操作）+ 改写 1 例旧测试（「新建文件让快照失效」→「新建文件就地补进快照」）。**边界**：没做增量向量索引；监听失效一律如实退化 | run `42328776156` 十 Job 全绿（Linux 单测 417 例：413 通过 / 4 例无真实权重跳过，较 v0.55 的 410 例正好多出本版 7 例；截图、Windows/Linux 自包含、linux-x64 Native AOT、Android APK、性能冒烟与真实模型缓存 Job 均通过）。本版首轮即绿，没有出现「等监视器事件」的时序抖动：轮询式用例按 6 秒上限等待，实测在 700 ms 静默窗口后 1–2 次轮询内就满足 |
+| 2026-11-07 | **v0.58 折叠屏半折叠布局**：新增 `IFoldablePostureSource` / `FoldablePosture` / `FoldableLayout`（`MdExplorer.Platform.Abstractions`，纯函数：角度区间 30°–150° 判半折叠、`Compute` 给出主区让白与副半屏尺寸、留白钳在 96 DIP）+ `FlatFoldablePostureSource`（桌面/无头/无传感器）；`AppHost.FoldablePostureFactory` 与 `Build(foldablePosture:)` 双入口，平铺时行为与 v0.57 完全一致。Android 宿主用系统铰链角度传感器（`Sensor.StringTypeHingeAngle`，零新依赖）实现 `AndroidFoldablePostureSource`，`OnCreate` 注册、`OnDestroy` 摘监听、`OnConfigurationChanged` 重算走向。界面：`PaneGrid` 绑 `FoldPrimaryMargin`（竖铰链让右 616、横铰链让下 436.5，均为「副半屏 + 32 铰链带」），新增 `FoldSecondaryBookPane` / `FoldSecondaryTabletopPane` 两块副半屏（常驻预览 + 空态说明）；`IsShortViewport` 半折叠时按半边高度判定，桌面式 841→404.5 触发矮视口（抽屉收起、底栏不出现、导轨兜底）；书本式断点改按主区半宽（1200→584→Medium）。副半屏每边 < 260 DIP 时放弃副屏。测试：`FoldablePostureTests` 10 例（角度/走向/几何/窄屏放弃/留白钳制/界面联动）+ 截图 `86-foldable-half-folded-book.png`、`87-foldable-half-folded-tabletop.png`（断言主区不压进副半屏） | push run `__CI__` 见下 |
 | 2026-11-07 | **v0.57 PDF 正文进全文索引（`PdfPig 0.1.16`）**：维护者拍板后新增 `PdfDocumentText`（`TryExtract(string) → string?`，与 v0.47 的 `OfficeDocumentText` 同形态）；`SqliteContentIndex` 的 `IsCandidate` 与 `ReadDocumentTextAsync` 改用共用 `IsDocumentExtension`，`.pdf` 与 Office/OpenDocument 同档（32 MB），**重建与 v0.56 增量两条路径同时生效**。硬顶公开为常量并被测试引用：32 MB / 400 页 / 40 万字符（入库再封顶 4 万）/ 单篇 15 s 超时；加密、损坏、无文本层扫描件、超限、超时一律 `null` 跳过，一份坏 PDF 拖不垮整次重建。取词用逐页 `page.GetWords()` 拼空格（英文正常分词、中文照旧二元组），取词失败退回整页文本。**预览链路零改动**（OfficeViewer 直接控件 + PDFtoImage 光栅照旧）；文案四处写明「含文本型 PDF 与 Office 文档；扫描件需 OCR，本版不做」。`Directory.Packages.props` 固定 `PdfPig 0.1.16`（Apache-2.0、纯托管、不走 `-alpha`）。新增 `PdfDocumentTextTests` 5 例 + `ContentIndexTests` 2 例（PDF 可搜、坏 PDF 不影响重建） | push run `42330712910` 十 Job 全绿（Build+Test ubuntu 424 例：420 过 / 4 跳过；Performance smoke 1 万篇重建 2919 ms、库 4.88 MB、查询 12.3 ms；linux-x64 Native AOT、Android APK、UI screenshots、Real model AI smoke 均 success）。体积同比 v0.56（CI 产物 zip）：AOT +3.97 MB、linux-x64 +1.86 MB、win-x64 +1.86 MB、Android 多 ABI +7.06 MB，未出现 PdfPig 相关 trim 警告 |
 | 2026-11-07 | **v0.55 修媒体预览三处实测缺陷**：①首次预览不出画面——推帧后端的自动播放改为等 `MediaFrameSurface.SinkAttached`（`PreviewView` 经 `FrameSinkAttachedProbe` 报告挂上没有）再开播、1.2 秒兜底；`MediaFrameSurface` 对被拒的后端每 200 ms 重试（≤20 次）；Windows 取帧新增 `_pumpRestartPending` 接力位，修掉「旧线程收尾 + 新启动被忽略 = 取帧线程永久消失」。②卡顿/延迟——Windows 取帧前移 60 ms 抵掉解码与绘制延迟、复用 WinRT `Buffer`、`StopFramePump` 的 `Join` 500→200 ms；Linux `appsink` `max-buffers` 2→1、`PublishSample` 复用缓冲并单次拷贝、`StopFramePumpLocked` 先 `Join` 再清字段（旧线程按「不是我的 sink」退出）；宿主帧缓冲的取还全部进锁。③关预览不停播——`ReleaseHeavyContent()` 现在同时 `StopMediaIfAnyAsync()`，不关目录也停。3 例新单测（画面面未挂上不开播、已挂上立即开播、关预览即停止） | run `42326187812` 十 Job 全绿（Linux 单测 410 例：406 通过 / 4 例无真实权重跳过；截图 Job 重渲染推帧视频画面、Windows/Linux 自包含、linux-x64 Native AOT、Android APK 与性能冒烟均通过）。**首轮 CI 抓到两例**：`SettingsPreferenceCanTurnVideoInlineOnAndAutoplayFollowsIt` 与 `ClosingThePreviewStopsPlaybackWithoutChangingFolders`——「`VideoFrameSource` 非空」对音频项也成立（后端本来就实现 `IMediaVideoFrameSource`），音频的自动播放因此被一并挂起；而探针为 null 时 `null != true` 又被当成「未挂上」。改成按 `ShowFrameVideoSurface` + 探针非空判断后转绿 |
 | 2026-11-06 | **v0.54 搜索大小 / 修改时间筛选**：新增 `SearchFilter` / `SearchFilterPresets`（Domain 纯函数，下界含、上界不含，文件夹在设了大小界限时不算通过）；`SearchSpec` 增 `Filter`、`IContentIndexService.SearchAsync` 增可选 `filter`（翻成 `d.size`/`d.mtime` 的 SQL 条件），**筛选先于 `MaxResults` 截断**；语义模式在界面层筛并按筛后结果重算置信度。搜索中心新增「大小 / 修改时间」胶囊排，状态栏补「筛选：…」。3 例新测试（档位边界与 null 大小、时间边界与组合、索引端与全文端筛选 + 上限优先）。**边界**：筛选不落盘，实时扫描回落路径不应用筛选 | run `42196539621` 十 Job 全绿（Linux 单测 407 例：403 通过 / 4 例无真实权重跳过；截图 25-large-search-center 已目检：「大小 / 修改时间」两排胶囊在关键词结果上方正常排布、当前档为「全部」） |
