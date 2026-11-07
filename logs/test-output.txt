@@ -1,12 +1,30 @@
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/bin/Release/net10.0/MdExplorer.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-[xUnit.net 00:00:01.08]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
-[xUnit.net 00:00:01.09]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
+[xUnit.net 00:00:02.93]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
+  Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
+[xUnit.net 00:00:03.79]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
-[xUnit.net 00:00:01.15]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:03.80]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
+[xUnit.net 00:00:03.80]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [1 ms]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
-[xUnit.net 00:00:03.27]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
-  Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
+[xUnit.net 00:00:03.93]     MdExplorer.Tests.MediaPlaybackTests.SettingsPreferenceCanTurnVideoInlineOnAndAutoplayFollowsIt [FAIL]
+  Failed MdExplorer.Tests.MediaPlaybackTests.SettingsPreferenceCanTurnVideoInlineOnAndAutoplayFollowsIt [11 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 1
+Actual:   0
+  Stack Trace:
+     at MdExplorer.Tests.MediaPlaybackTests.SettingsPreferenceCanTurnVideoInlineOnAndAutoplayFollowsIt() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/MediaPlaybackTests.cs:line 104
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:03.97]     MdExplorer.Tests.MediaPlaybackTests.ClosingThePreviewStopsPlaybackWithoutChangingFolders [FAIL]
+  Failed MdExplorer.Tests.MediaPlaybackTests.ClosingThePreviewStopsPlaybackWithoutChangingFolders [1 ms]
+  Error Message:
+   Assert.True() Failure
+Expected: True
+Actual:   False
+  Stack Trace:
+     at MdExplorer.Tests.MediaPlaybackTests.ClosingThePreviewStopsPlaybackWithoutChangingFolders() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/MediaPlaybackTests.cs:line 325
+--- End of stack trace from previous location ---
 
-Passed!  - Failed:     0, Passed:   403, Skipped:     4, Total:   407, Duration: 4 s - MdExplorer.Tests.dll (net10.0)
+Failed!  - Failed:     2, Passed:   404, Skipped:     4, Total:   410, Duration: 3 s - MdExplorer.Tests.dll (net10.0)
