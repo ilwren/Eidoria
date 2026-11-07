@@ -1456,8 +1456,7 @@
               HorizontalAlignment="Right" VerticalAlignment="Stretch"
               Margin="0,10,10,10" Classes="workspace-surface" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
-          <TextBlock Classes="caption" Text="副半屏 · 预览" Margin="17,12,17,0"
-                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <!-- 有内容就直接铺满（预览自己带标题），空着才放一行说明 -->
           <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"
                      VerticalAlignment="Center" HorizontalAlignment="Center"
                      IsVisible="{Binding ShowFoldSecondaryHint}" Text="{Binding FoldSecondaryHint}" />
@@ -1478,8 +1477,7 @@
               HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
               Margin="10,0,10,10" Classes="workspace-surface" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
-          <TextBlock Classes="caption" Text="副半屏 · 预览" Margin="17,12,17,0"
-                     Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+          <!-- 有内容就直接铺满（预览自己带标题），空着才放一行说明 -->
           <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"
                      VerticalAlignment="Center" HorizontalAlignment="Center"
                      IsVisible="{Binding ShowFoldSecondaryHint}" Text="{Binding FoldSecondaryHint}" />
