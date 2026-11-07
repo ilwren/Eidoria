@@ -425,6 +425,10 @@
         <TextBlock Classes="caption" TextWrapping="Wrap">
           <Run Text="数据目录：" /><Run Text="{Binding DataDirectoryText}" />
         </TextBlock>
+        <!-- 折叠屏真机自查：没有传感器与摊平了必须分开说，否则分不清布局为什么不折 -->
+        <TextBlock Classes="caption" TextWrapping="Wrap">
+          <Run Text="设备姿态：" /><Run Text="{Binding FoldableDiagnosticText}" />
+        </TextBlock>
         <md:MdButton Variant="Outlined" Content="开源许可证" HorizontalAlignment="Left" Click="OnLicensesClick" />
       </StackPanel>
       </Border>

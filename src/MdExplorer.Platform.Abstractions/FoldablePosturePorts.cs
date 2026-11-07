@@ -21,7 +21,16 @@ public enum FoldHingeAxis
 /// 铰链本身占掉的宽度（DIP）。半折叠时这一段是**看不见的**，内容跨过去就会有一半被折进去，
 /// 所以要按这个厚度留白。取不到真值时必须给保守估计，不许给 0。
 /// </param>
-public sealed record FoldablePosture(FoldHingeAxis HingeAxis, double GutterThicknessDip)
+/// <param name="HingeAngleDegrees">
+/// 最近一次读到的铰链角度（0–360）。null 表示这根来源不报角度（平铺实现、桌面）。
+/// 它只用于「设备姿态」这类诊断展示，不参与布局换算。
+/// </param>
+/// <param name="IsSensorSupported">这台设备到底有没有铰链传感器：没有就是「普通屏幕」，不是「摊平了」。</param>
+public sealed record FoldablePosture(
+    FoldHingeAxis HingeAxis,
+    double GutterThicknessDip,
+    double? HingeAngleDegrees = null,
+    bool IsSensorSupported = false)
 {
     /// <summary>平铺：没有分离式铰链（绝大多数设备、桌面窗口、展开 180°）。</summary>
     public static FoldablePosture Flat { get; } = new(FoldHingeAxis.None, 0);
@@ -98,11 +107,15 @@ public static class FoldableLayout
     /// </summary>
     public static FoldablePosture FromHingeAngle(double degrees, bool isLandscape, double gutterThicknessDip = DefaultGutterDip)
     {
-        if (!IsHalfFoldedAngle(degrees))
-            return FoldablePosture.Flat;
+        // 摊平时仍把角度与「传感器可用」带上：设置页要能显示「平铺（铰链角 178°）」，
+        // 而不是让人分不清「没有传感器」和「摊平了」。
         return new FoldablePosture(
-            isLandscape ? FoldHingeAxis.Horizontal : FoldHingeAxis.Vertical,
-            gutterThicknessDip);
+            IsHalfFoldedAngle(degrees)
+                ? (isLandscape ? FoldHingeAxis.Horizontal : FoldHingeAxis.Vertical)
+                : FoldHingeAxis.None,
+            gutterThicknessDip,
+            degrees,
+            IsSensorSupported: true);
     }
 
     /// <summary>把姿态换算成一次布局（视口尺寸单位为 DIP）。</summary>

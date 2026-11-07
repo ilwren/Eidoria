@@ -85,10 +85,12 @@ public sealed class AndroidFoldablePostureSource : Java.Lang.Object, ISensorEven
     private void Update()
     {
         var next = FoldableLayout.FromHingeAngle(_lastAngle, IsLandscape());
-        if (next.Equals(Current))
-            return;
+        var postureChanged = next.HingeAxis != Current.HingeAxis || next.IsSensorSupported != Current.IsSensorSupported;
+        // 角度按整度上报：折的过程中每变一度刷新一次「设备姿态」，单调变化不再重复派事件。
+        var angleChanged = Math.Abs((next.HingeAngleDegrees ?? 0) - (Current.HingeAngleDegrees ?? 0)) >= 1;
         Current = next;
-        Changed?.Invoke(this, EventArgs.Empty);
+        if (postureChanged || angleChanged)
+            Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private bool IsLandscape()

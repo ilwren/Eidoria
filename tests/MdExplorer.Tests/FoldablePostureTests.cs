@@ -38,7 +38,11 @@ public sealed class FoldablePostureTests : IDisposable
     public void FlatAnglesAreNotHalfFolded(double degrees)
     {
         Assert.False(FoldableLayout.IsHalfFoldedAngle(degrees));
-        Assert.Equal(FoldablePosture.Flat, FoldableLayout.FromHingeAngle(degrees, isLandscape: true));
+        // 摊平的读数仍要带上角度与「传感器可用」：设置页要能区分「没有传感器」和「摊平了」。
+        var posture = FoldableLayout.FromHingeAngle(degrees, isLandscape: true);
+        Assert.False(posture.IsHalfFolded);
+        Assert.True(posture.IsSensorSupported);
+        Assert.Equal(degrees, posture.HingeAngleDegrees ?? double.NaN);
     }
 
     [Theory]
@@ -179,6 +183,33 @@ public sealed class FoldablePostureTests : IDisposable
         Assert.False(shell.IsHalfFolded);
         Assert.False(shell.ShowFoldSecondarySurface);
         Assert.Equal(new Avalonia.Thickness(0), shell.FoldPrimaryMargin);
+    }
+
+    [Fact]
+    public void DiagnosticsSeparateNoSensorFromFlatPosture()
+    {
+        // 设置页「关于」里的那行设备姿态：真机上靠它判断铰链到底有没有被识别。
+        var noSensor = AppHost.CreateShell(AppHost.Build(
+            Directory.CreateDirectory(Path.Combine(_root, "d1")).FullName,
+            Directory.CreateDirectory(Path.Combine(_root, "s1")).FullName,
+            foldablePosture: new FakeFoldablePostureSource()));
+        Assert.Contains("未检测到铰链传感器", noSensor.FoldableDiagnosticText, StringComparison.Ordinal);
+
+        var flatWithSensor = AppHost.CreateShell(AppHost.Build(
+            Directory.CreateDirectory(Path.Combine(_root, "d2")).FullName,
+            Directory.CreateDirectory(Path.Combine(_root, "s2")).FullName,
+            foldablePosture: new FakeFoldablePostureSource(
+                FoldableLayout.FromHingeAngle(178, isLandscape: true))));
+        Assert.Contains("平铺", flatWithSensor.FoldableDiagnosticText, StringComparison.Ordinal);
+        Assert.Contains("178", flatWithSensor.FoldableDiagnosticText, StringComparison.Ordinal);
+
+        var book = AppHost.CreateShell(AppHost.Build(
+            Directory.CreateDirectory(Path.Combine(_root, "d3")).FullName,
+            Directory.CreateDirectory(Path.Combine(_root, "s3")).FullName,
+            foldablePosture: new FakeFoldablePostureSource(
+                FoldableLayout.FromHingeAngle(92, isLandscape: false))));
+        Assert.Contains("书本式半折叠", book.FoldableDiagnosticText, StringComparison.Ordinal);
+        Assert.Contains("92", book.FoldableDiagnosticText, StringComparison.Ordinal);
     }
 
     [Fact]

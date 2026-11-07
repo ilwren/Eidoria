@@ -623,6 +623,30 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// </summary>
     public PreviewViewModel? FoldSecondaryPreviewSource => ShowFoldSecondaryPreview ? Preview : null;
 
+    /// <summary>
+    /// 「设备姿态」诊断文案（设置 → 关于）。真机上没有这条就没法判断铰链到底有没有被识别——
+    /// 「没有传感器」与「摊平了」在布局上是同一件事，在诊断上必须分开说。
+    /// </summary>
+    public string FoldableDiagnosticText
+    {
+        get
+        {
+            var posture = _foldablePosture.Current;
+            if (!posture.IsSensorSupported)
+                return "本机未检测到铰链传感器，按平铺布局（折叠屏才会报角度）";
+
+            var angle = posture.HingeAngleDegrees is { } degrees
+                ? $"（铰链角 {Math.Round(degrees).ToString(System.Globalization.CultureInfo.InvariantCulture)}°）"
+                : string.Empty;
+            return posture.HingeAxis switch
+            {
+                FoldHingeAxis.Vertical => $"书本式半折叠{angle}",
+                FoldHingeAxis.Horizontal => $"桌面式半折叠{angle}",
+                _ => $"平铺{angle}",
+            };
+        }
+    }
+
     /// <summary>副半屏的说明文字：说清楚它为什么空着，以及怎么把内容放进去。</summary>
     public string FoldSecondaryHint => IsFoldSecondaryTabletop
         ? "下半屏留给预览：选中一个文件即在这里显示。"
@@ -814,7 +838,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                      nameof(IsFoldSecondaryBook), nameof(IsFoldSecondaryTabletop),
                      nameof(FoldSecondaryWidth), nameof(FoldSecondaryHeight), nameof(FoldSecondaryHint),
                      nameof(ShowFoldSecondaryHint), nameof(ShowFoldSecondaryPreview),
-                     nameof(FoldSecondaryPreviewSource),
+                     nameof(FoldSecondaryPreviewSource), nameof(FoldableDiagnosticText),
                      // 导航面也随半折叠变：底栏收起、导轨兜底。
                      nameof(IsShortViewport), nameof(ShowBottomNav), nameof(ShowRail), nameof(ShowDrawerPane),
                      nameof(ShowPreviewPaneNow), nameof(ShowPreviewPaneEffective), nameof(ShowPreviewPageNow),
@@ -843,6 +867,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             return;
         var previous = _foldableLayout;
         ApplyViewport(IsShortViewport);
+        // 角度可能变了而姿态没变（铰链在 30°–150° 内连续动），诊断文案仍要刷新。
+        OnPropertyChanged(nameof(FoldableDiagnosticText));
         if (previous.Equals(_foldableLayout))
             return;
         // 姿态真的变了：断点可能跟着换档（书本式半折叠按主区半宽算），补一次重算。
