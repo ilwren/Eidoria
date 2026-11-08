@@ -306,8 +306,43 @@ public sealed record SemanticSearchStats(
     bool IsEnabled,
     IReadOnlyList<string> ModelNames);
 
-/// <summary>语义检索命中；Score 为归一化向量的 cosine similarity。</summary>
-public sealed record SemanticSearchHit(FileItem Item, float Score, string ModelName);
+/// <summary>一条命中在哪个通道上成立（v0.60）。混合检索必须能解释「为什么它在这里」。</summary>
+public enum SemanticHitMatch
+{
+    /// <summary>只有向量相似度。</summary>
+    Semantic,
+
+    /// <summary>文件名里有查询词。</summary>
+    Name,
+
+    /// <summary>所在文件夹名里有查询词。</summary>
+    Folder,
+
+    /// <summary>查询点名了类型（「视频」「图片」），文件正是该类型。</summary>
+    FileType,
+
+    /// <summary>全文索引里的正文命中。</summary>
+    Content,
+}
+
+/// <summary>
+/// 语义检索命中（v0.60 起是<b>混合</b>结果）。
+/// <para>
+/// <see cref="Score"/> 是最终排序分（0–1）；<see cref="SemanticScore"/> 单独保留余弦相似度，
+/// 便于用户与测试区分「模型觉得像」和「字面/类型对上」。<see cref="Rationale"/> 是一句
+/// 人能读的理由，直接显示在结果行上——没有理由的命中比没有命中更让人不信任。
+/// </para>
+/// </summary>
+public sealed record SemanticSearchHit(
+    FileItem Item,
+    float Score,
+    string ModelName,
+    SemanticHitMatch Match = SemanticHitMatch.Semantic,
+    float SemanticScore = 0f,
+    string? Rationale = null,
+    string? Snippet = null,
+    int SnippetHighlightStart = -1,
+    int SnippetHighlightLength = 0);
 
 /// <summary>完全离线的文本语义索引。仅在用户启用本地 AI、装有文本模型并显式建索引后运行。</summary>
 public interface ISemanticSearchService
@@ -317,8 +352,20 @@ public interface ISemanticSearchService
     /// <summary>从现有文件名索引覆盖的本地根重建；取消/失败时保留上一份完整向量快照。</summary>
     Task<SemanticSearchStats> RebuildAsync(IProgress<OperationProgress>? progress, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// 混合检索：向量相似度 + 文件名 / 文件夹名 / 文件类型 / 正文（全文索引可用时）四路字面通道。
+    /// 只服务于显式启用了本地 AI 与文件名的场景；任何字面通道失败都不会让整次查询失败。
+    /// </summary>
+    /// <param name="query">用户输入。</param>
+    /// <param name="kinds">调用方在界面上限定的类型；在这里再筛一次，避免字面通道越权。</param>
+    /// <param name="maxResults">返回条数上限。</param>
+    /// <param name="cancellationToken">取消。</param>
+    /// <param name="contentIndex">全文索引（可选）：有它才能按正文内容命中。</param>
+    /// <param name="contentSearch">在全文索引里查正文的回调（可选）；与 <paramref name="contentIndex"/> 一起用。</param>
     Task<IReadOnlyList<SemanticSearchHit>> SearchAsync(
-        string query, IReadOnlySet<FileKind>? kinds, int maxResults, CancellationToken cancellationToken);
+        string query, IReadOnlySet<FileKind>? kinds, int maxResults, CancellationToken cancellationToken,
+        IContentIndexService? contentIndex = null,
+        Func<string, int, CancellationToken, Task<IReadOnlyList<ContentSearchHit>>>? contentSearch = null);
 
     /// <summary>删除本地语义向量；不会触碰用户文件或文本文件名索引。</summary>
     Task ClearAsync(CancellationToken cancellationToken);

@@ -16,7 +16,7 @@ namespace MdExplorer.Desktop;
 /// </para>
 /// </summary>
 internal sealed class GStreamerMediaPlaybackService
-    : IMediaPlaybackService, IMediaPlaybackPoller, IMediaProbe, IMediaVideoFrameSource
+    : IMediaPlaybackService, IMediaPlaybackPoller, IMediaProbe, IMediaVideoFrameSource, IMediaFrameTelemetry
 {
     private const string Library = "libgstreamer-1.0.so.0";
     private const string AppLibrary = "libgstapp-1.0.so.0";
@@ -30,6 +30,12 @@ internal sealed class GStreamerMediaPlaybackService
     private const int FormatTime = 3;
     private const int SeekFlagFlush = 1;
     private const int SeekFlagAccurate = 2;
+
+    // v0.60：帧节奏账本。appsink 推帧节奏由解码器决定，目标值按 30 fps 折算掉帧判据。
+    private MdExplorer.Domain.FramePacingStats _pacing = new(30d);
+
+    /// <inheritdoc />
+    public MdExplorer.Domain.FramePacingStats FramePacing => Volatile.Read(ref _pacing);
 
     private static readonly object InitGate = new();
     private static bool _initialized;
@@ -289,6 +295,10 @@ internal sealed class GStreamerMediaPlaybackService
     {
         if (!_videoAvailable || sink is null)
             return false;
+        // 重新挂接 = 新的一段观看：首帧时延从此刻算起（与 Windows 后端同一口径）。
+        var pacing = new MdExplorer.Domain.FramePacingStats(30d);
+        pacing.MarkFirstFramePending(System.Diagnostics.Stopwatch.GetTimestamp());
+        Interlocked.Exchange(ref _pacing, pacing);
         lock (_gate)
         {
             _frameSink = sink;
@@ -454,6 +464,8 @@ internal sealed class GStreamerMediaPlaybackService
                         Marshal.Copy(IntPtr.Add(data, y * stride), frame, y * rowBytes, rowBytes);
                 }
                 sink.PresentFrame(frame.AsSpan(0, needed), width, height, rowBytes);
+                // v0.60：与 Windows 后端同一口径的帧节奏账本（供预览卡与诊断报告读取）。
+                FramePacing.Record(System.Diagnostics.Stopwatch.GetTimestamp());
             }
             finally
             {

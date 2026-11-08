@@ -23,7 +23,7 @@ namespace MdExplorer.Desktop;
 /// </para>
 /// </summary>
 internal sealed class WindowsMediaPlaybackService
-    : IMediaPlaybackService, IMediaProbe, IMediaPlaybackPoller, IMediaVideoFrameSource
+    : IMediaPlaybackService, IMediaProbe, IMediaPlaybackPoller, IMediaVideoFrameSource, IMediaFrameTelemetry
 {
     /// <summary>取帧目标尺寸：预览窗格够用，同时让每次取帧的解码开销可控。</summary>
     private const int FrameWidth = 480;
@@ -58,6 +58,9 @@ internal sealed class WindowsMediaPlaybackService
 
     private IMediaFrameSink? _frameSink;
     private CancellationTokenSource? _frameCts;
+    // v0.60：帧节奏账本。用户说「卡」时，这里给出帧率 / 间隔分位数 / 掉帧 / 首帧时延，
+    // 不再靠主观描述。只在取帧线程与 Attach 时读写，用 Interlocked 交换引用即可。
+    private MdExplorer.Domain.FramePacingStats _pacing = new(TargetFrameRate);
     private Thread? _frameThread;
     // v0.55：上一轮取帧线程还在收尾时又有人要启动（挂帧呈现面 / 暂停恢复），
     // 记下来由它在 finally 里接力。此前这种启动直接被忽略，而收尾那一轮又判定「sink 已换」
@@ -259,9 +262,16 @@ internal sealed class WindowsMediaPlaybackService
         if (_disposed || Unavailable is not null || sink is null)
             return false;
         _frameSink = sink;
+        // 重新挂接 = 新的一段观看：首帧时延从此刻算起，旧样本不再代表这段表现。
+        var pacing = new MdExplorer.Domain.FramePacingStats(TargetFrameRate);
+        pacing.MarkFirstFramePending(Stopwatch.GetTimestamp());
+        Interlocked.Exchange(ref _pacing, pacing);
         StartFramePump();
         return true;
     }
+
+    /// <summary>取帧账本（v0.60）。UI 只读，不参与排序或播放控制。</summary>
+    public MdExplorer.Domain.FramePacingStats FramePacing => Volatile.Read(ref _pacing);
 
     public void DetachFrameSink()
     {
@@ -345,6 +355,8 @@ internal sealed class WindowsMediaPlaybackService
                             if (frame is { } raw && !token.IsCancellationRequested)
                             {
                                 sink.PresentFrame(raw.Pixels, raw.Width, raw.Height, raw.Stride);
+                                // 记在「真正交给宿主」之后：用户看到的节奏是呈现节奏，不是解码节奏。
+                                FramePacing.Record(Stopwatch.GetTimestamp());
                                 lastPosition = position;
                             }
                         }
@@ -360,6 +372,9 @@ internal sealed class WindowsMediaPlaybackService
                 }
 
                 var elapsed = Stopwatch.GetElapsedTime(started);
+                // 一次解码 + 一次呈现超过目标周期，说明「跟不上」的原因在解码侧，而不是主循环空转。
+                if (elapsed > FramePeriod)
+                    FramePacing.RecordOverrun(elapsed.TotalMilliseconds);
                 var wait = FramePeriod - elapsed;
                 if (wait <= TimeSpan.Zero)
                     continue;

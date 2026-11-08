@@ -638,6 +638,8 @@
                                                             <md:MdButton Classes="menu-action" Variant="Text" Content="编辑路径" Command="{Binding Browser.BeginEditAddressCommand}" />
                               <md:MdButton Classes="menu-action" Variant="Text" Content="复制当前路径" Command="{Binding Browser.CopyCurrentPathCommand}" />
                               <md:MdButton Classes="menu-action" Variant="Text" Content="任务中心" Command="{Binding ToggleTaskCenterCommand}" />
+                              <!-- v0.60：预览的显式入口。宽屏开预览栏、窄屏开浮窗；关过开关也能重新打开。 -->
+                              <md:MdButton Classes="menu-action" Variant="Text" Content="打开预览（Ctrl+P）" Command="{Binding OpenPreviewPaneCommand}" />
                               <Border Height="1" Margin="6,5" Background="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
                               <md:MdButton Classes="menu-action" Variant="Text" Content="新建标签页" Command="{Binding Browser.NewTabCommand}" />
                               <md:MdButton Classes="menu-action" Variant="Text" Content="恢复已关闭标签" Command="{Binding Browser.ReopenClosedTabCommand}"

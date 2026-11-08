@@ -17,6 +17,9 @@ public sealed class SemanticSearchService : ISemanticSearchService
     private const int MaxTextChars = 4_000;
     private const long MaxIndexBytes = 96L * 1024 * 1024;
     private const float MinimumScore = 0.16f;
+
+    /// <summary>进度派发的最小间隔（毫秒）；与全文索引保持同一口径。</summary>
+    private const double ProgressMinimumIntervalMs = 200d;
     private const string IndexFileName = "semantic-search-v1.bin";
 
     private static readonly IReadOnlySet<FileKind> AllKinds = Enum.GetValues<FileKind>().ToHashSet();
@@ -121,7 +124,9 @@ public sealed class SemanticSearchService : ISemanticSearchService
         string query,
         IReadOnlySet<FileKind>? kinds,
         int maxResults,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IContentIndexService? contentIndex = null,
+        Func<string, int, CancellationToken, Task<IReadOnlyList<ContentSearchHit>>>? contentSearch = null)
     {
         query = query?.Trim() ?? string.Empty;
         if (query.Length == 0)
@@ -134,50 +139,97 @@ public sealed class SemanticSearchService : ISemanticSearchService
         if (snapshot is null || !BuildStats(snapshot, sourceStats).IsCurrent)
             throw new InvalidOperationException("AI 语义索引尚未建立或已经过期，请先重建索引。");
 
+        var plan = SemanticQuery.Parse(query);
+        var limit = Math.Clamp(maxResults, 1, 5000);
+
+        // 正文通道（v0.60）：全文索引已建好时才有。它负责「文件内容提到视频」这一类，
+        // 与向量通道互为补充；读失败就当没有，绝不让正文索引把整次查询拖垮。
+        var contentHits = await TrySearchContentAsync(
+                plan, contentIndex, contentSearch, Math.Min(limit, 200), cancellationToken)
+            .ConfigureAwait(false);
+
+        var candidates = new Dictionary<string, RankedCandidate>(PathComparer);
+
+        // ① 向量通道：模型给语义相似度。查询词一个都不认识时，这一路仍然能让「意思相近」的命中露面。
         var currentModels = _embeddings.GetAvailableModels();
         var model = SelectModel(query, snapshot.Models, currentModels);
-        if (model is null)
-            throw new InvalidOperationException("AI 索引所用模型当前不可用；请检查模型目录并重建 AI 索引。");
+        if (model is not null && plan.HasTerms)
+        {
+            try
+            {
+                await ScoreWithVectorsAsync(query, model, snapshot, kinds, limit, candidates, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException)
+            {
+                // 模型目录被改动（下载中途、被删）时退回纯字面检索，而不是整次搜索失败。
+                // 一个字面通道都没有时才把异常抛出去——那时确实什么也搜索不了。
+                if (!plan.HasKindHints && contentHits.Count == 0)
+                    throw;
+            }
+        }
 
-        var queryVector = await Task.Run(
-                () => _embeddings.Embed(model.Id, query, isQuery: true, cancellationToken), cancellationToken)
-            .ConfigureAwait(false);
-        ValidateEmbedding(queryVector, model.Dimensions, model.Name, "查询");
-
-        var limit = Math.Clamp(maxResults, 1, 5000);
-        var modelIndex = snapshot.Models.FindIndex(candidate => candidate.Id == model.Id);
-        if (modelIndex < 0)
-            throw new InvalidDataException($"AI 索引中缺少模型 {model.Id} 的向量。");
-        var best = new PriorityQueue<SemanticCandidate, float>();
+        // ② 字面通道：文件名 / 文件夹名。这一路的排序完全可解释，所以优先级高于向量。
         foreach (var entry in snapshot.Entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (kinds is { Count: > 0 } && !kinds.Contains(entry.Kind))
                 continue;
-            if (modelIndex >= entry.Vectors.Length)
-                continue;
 
-            var score = Cosine(queryVector, entry.Vectors[modelIndex]);
-            if (score < MinimumScore)
+            var lexical = SemanticQuery.LexicalScore(
+                entry.Name, ParentFolderName(entry.Path), plan.Terms, out var source);
+            if (lexical <= 0f)
                 continue;
-            var candidate = new SemanticCandidate(entry, score);
-            if (best.Count < limit)
-                best.Enqueue(candidate, score);
-            else if (best.TryPeek(out _, out var lowest) && score > lowest)
+            AddOrMerge(candidates, entry.Path, entry.Name, entry.Kind, entry.IsFolder, lexical,
+                semantic: 0f, source, entry.Length, entry.LastWriteUtcTicks);
+        }
+
+        // ③ 类型通道：用户说「视频」，就把他要的类型整类摆到前面（受 kinds 过滤约束）。
+        if (plan.HasKindHints)
+        {
+            foreach (var entry in snapshot.Entries)
             {
-                best.Dequeue();
-                best.Enqueue(candidate, score);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!plan.KindHints.Contains(entry.Kind))
+                    continue;
+                if (kinds is { Count: > 0 } && !kinds.Contains(entry.Kind))
+                    continue;
+                AddOrMerge(candidates, entry.Path, entry.Name, entry.Kind, entry.IsFolder, TypeHintScore,
+                    semantic: 0f, SemanticHitMatch.FileType, entry.Length, entry.LastWriteUtcTicks);
             }
         }
 
-        var results = new List<SemanticSearchHit>(best.Count);
-        foreach (var result in best.UnorderedItems.OrderByDescending(item => item.Priority))
+        // ④ 正文通道：全文索引命中，带上下文摘要与高亮位置。
+        var snippets = new Dictionary<string, ContentSearchHit>(PathComparer);
+        foreach (var hit in contentHits)
+        {
+            snippets[hit.Path] = hit;
+            var kind = FileKindClassifier.Classify(hit.Name);
+            if (kinds is { Count: > 0 } && !kinds.Contains(kind))
+                continue;
+            AddOrMerge(candidates, hit.Path, hit.Name, kind, isFolder: false, ContentScore,
+                semantic: 0f, SemanticHitMatch.Content, hit.Length,
+                hit.LastWriteTime.UtcDateTime.Ticks);
+        }
+
+        if (candidates.Count == 0)
+            return [];
+
+        // 排序：分数降序 → 名称 → 路径。同分顺序稳定，测试与截图才能锁死。
+        var ordered = candidates.Values
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(candidate => candidate.Path, PathComparer)
+            .Take(limit);
+
+        var results = new List<SemanticSearchHit>(limit);
+        foreach (var candidate in ordered)
         {
             cancellationToken.ThrowIfCancellationRequested();
             FileItem? current;
             try
             {
-                current = LocalFileSystemService.StatPath(result.Element.Entry.Path);
+                current = LocalFileSystemService.StatPath(candidate.Path);
             }
             catch (IOException)
             {
@@ -196,13 +248,252 @@ public sealed class SemanticSearchService : ISemanticSearchService
                 continue;
             }
 
-            if (current is null || current.IsSymlink || current.IsFolder != result.Element.Entry.IsFolder ||
-                (current.Length ?? 0) != result.Element.Entry.Length ||
-                current.LastWriteTime.UtcDateTime.Ticks != result.Element.Entry.LastWriteUtcTicks)
+            // 索引建好后文件被改过：向量与文本指纹都对不上了，宁可少给一条，也不给错的。
+            if (current is null || current.IsSymlink ||
+                current.IsFolder != candidate.IsFolder ||
+                (current.Length ?? 0) != candidate.Length ||
+                current.LastWriteTime.UtcDateTime.Ticks != candidate.LastWriteUtcTicks)
                 continue;
-            results.Add(new SemanticSearchHit(current, result.Element.Score, model.Name));
+
+            snippets.TryGetValue(candidate.Path, out var snippet);
+            results.Add(new SemanticSearchHit(
+                current,
+                candidate.Score,
+                model?.Name ?? "字面匹配",
+                candidate.Source,
+                candidate.SemanticScore,
+                BuildRationale(candidate, model?.Name),
+                snippet?.Snippet,
+                snippet?.MatchOffset ?? -1,
+                snippet?.MatchLength ?? 0));
         }
+
         return results;
+    }
+
+    /// <summary>类型意图命中的基础分：低于「文件名完全同名」，高于纯向量的常见区间（0.2–0.5）。</summary>
+    private const float TypeHintScore = 0.66f;
+
+    /// <summary>正文命中的基础分：比文件名命中略低，比类型整类命中略高（内容更具体）。</summary>
+    private const float ContentScore = 0.70f;
+
+    /// <summary>融合权重：字面分权重高，向量做增量。避免「模型觉得像」压过「名字就叫这个」。</summary>
+    private const float SemanticWeight = 0.45f;
+
+    private static StringComparer PathComparer =>
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    private sealed class RankedCandidate
+    {
+        public required string Path { get; init; }
+        public required string Name { get; init; }
+        public required FileKind Kind { get; init; }
+        public required bool IsFolder { get; init; }
+        public required long Length { get; init; }
+        public required long LastWriteUtcTicks { get; init; }
+        public float Score { get; set; }
+        public float SemanticScore { get; set; }
+        public SemanticHitMatch Source { get; set; }
+        /// <summary>是类型整类命中（而不是名字/正文命中）。理由文案要区分。</summary>
+        public bool TypeHintMatch { get; set; }
+        /// <summary>这条命中来自「用户点名的类型」中的哪个具体类型词。</summary>
+        public FileKind? HintedKind { get; set; }
+    }
+
+    private async Task ScoreWithVectorsAsync(
+        string query,
+        TextEmbeddingModel model,
+        SemanticSnapshot snapshot,
+        IReadOnlySet<FileKind>? kinds,
+        int limit,
+        Dictionary<string, RankedCandidate> candidates,
+        CancellationToken cancellationToken)
+    {
+        var queryVector = await Task.Run(
+                () => _embeddings.Embed(model.Id, query, isQuery: true, cancellationToken), cancellationToken)
+            .ConfigureAwait(false);
+        ValidateEmbedding(queryVector, model.Dimensions, model.Name, "查询");
+
+        var modelIndex = snapshot.Models.FindIndex(candidate => candidate.Id == model.Id);
+        if (modelIndex < 0)
+            throw new InvalidDataException($"AI 索引中缺少模型 {model.Id} 的向量。");
+
+        var best = new PriorityQueue<(SemanticEntry Entry, float Score), float>();
+        foreach (var entry in snapshot.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (kinds is { Count: > 0 } && !kinds.Contains(entry.Kind))
+                continue;
+            if (modelIndex >= entry.Vectors.Length)
+                continue;
+
+            var score = Cosine(queryVector, entry.Vectors[modelIndex]);
+            if (score < MinimumScore)
+                continue;
+            if (best.Count < limit)
+                best.Enqueue((entry, score), score);
+            else if (best.TryPeek(out _, out var lowest) && score > lowest)
+            {
+                best.Dequeue();
+                best.Enqueue((entry, score), score);
+            }
+        }
+
+        foreach (var (entry, score) in best.UnorderedItems.Select(item => item.Element))
+        {
+            AddOrMerge(candidates, entry.Path, entry.Name, entry.Kind, entry.IsFolder,
+                score * SemanticWeight, score, SemanticHitMatch.Semantic, entry.Length, entry.LastWriteUtcTicks);
+        }
+    }
+
+    private static void AddOrMerge(
+        Dictionary<string, RankedCandidate> candidates,
+        string path, string name, FileKind kind, bool isFolder,
+        float score, float semantic, SemanticHitMatch source,
+        long length, long lastWriteUtcTicks)
+    {
+        if (!candidates.TryGetValue(path, out var existing))
+        {
+            candidates[path] = new RankedCandidate
+            {
+                Path = path,
+                Name = name,
+                Kind = kind,
+                IsFolder = isFolder,
+                Length = length,
+                LastWriteUtcTicks = lastWriteUtcTicks,
+                Score = score,
+                SemanticScore = semantic,
+                Source = source,
+                TypeHintMatch = source == SemanticHitMatch.FileType,
+                HintedKind = source == SemanticHitMatch.FileType ? kind : null,
+            };
+            return;
+        }
+
+        // 同一文件多路命中：取最高分那条的「来源」用于展示，分数做加权合并（上限 1）。
+        if (score > existing.Score)
+        {
+            existing.Score = Math.Min(1f, Math.Max(existing.Score, score + existing.Score * 0.25f));
+            existing.Source = PickBetterSource(existing.Source, source);
+        }
+        else
+        {
+            existing.Score = Math.Min(1f, existing.Score + score * 0.25f);
+        }
+
+        if (semantic > existing.SemanticScore)
+            existing.SemanticScore = semantic;
+        if (source == SemanticHitMatch.FileType)
+        {
+            existing.TypeHintMatch = true;
+            // 记下命中的具体类型（「视频」→ Video），理由文案才说得具体。
+            existing.HintedKind ??= kind;
+        }
+    }
+
+    /// <summary>展示优先级：名字 &gt; 正文 &gt; 文件夹 &gt; 类型 &gt; 纯向量。用户最先想看「名字就叫这个」。</summary>
+    private static SemanticHitMatch PickBetterSource(SemanticHitMatch current, SemanticHitMatch candidate) =>
+        Rank(current) >= Rank(candidate) ? current : candidate;
+
+    private static int Rank(SemanticHitMatch match) => match switch
+    {
+        SemanticHitMatch.Name => 5,
+        SemanticHitMatch.Content => 4,
+        SemanticHitMatch.Folder => 3,
+        SemanticHitMatch.FileType => 2,
+        _ => 1,
+    };
+
+    private static string? ParentFolderName(string path)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            return string.IsNullOrEmpty(directory) ? null : Path.GetFileName(directory);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 一句人能读的「为什么它在这里」。没有理由的命中比没有命中更让人不信任，
+    /// 所以每个来源都写清楚；纯向量命中也要标出相似度，用户能自己判断值不值得点。
+    /// </summary>
+    private static string? BuildRationale(RankedCandidate candidate, string? modelName)
+    {
+        var parts = new List<string>(3);
+        if (candidate.TypeHintMatch && candidate.Source != SemanticHitMatch.FileType)
+            parts.Add("类型也符合");
+        switch (candidate.Source)
+        {
+            case SemanticHitMatch.Name:
+                parts.Add("文件名命中");
+                break;
+            case SemanticHitMatch.Folder:
+                parts.Add("文件夹名命中");
+                break;
+            case SemanticHitMatch.FileType:
+                parts.Add($"类型命中（{SemanticQuery.KindWord(candidate.HintedKind ?? candidate.Kind).Split(' ')[0]}）");
+                break;
+            case SemanticHitMatch.Content:
+                parts.Add("正文命中");
+                break;
+        }
+
+        if (candidate.SemanticScore > 0f && modelName is not null)
+            parts.Add($"语义 {candidate.SemanticScore:P0}");
+        if (parts.Count == 0)
+            return modelName is null ? "字面匹配" : null;
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>最多向全文索引发起几次抽取查询：每次约十几毫秒，6 次已足够覆盖一条自然语言短句。</summary>
+    private const int MaxContentQueries = 6;
+
+    /// <summary>
+    /// 正文通道（v0.60）。全文索引的 MATCH 是 <b>AND</b> 语义：把整句「笔吧验机」丢进去，
+    /// 文档必须同时含「笔吧」「吧验」「验机」才算命中——真实文件几乎不可能满足。
+    /// 所以这里按词逐个查（CJK 二元组就是天然的检索单位），再按路径合并。
+    /// </summary>
+    private static async Task<IReadOnlyList<ContentSearchHit>> TrySearchContentAsync(
+        SemanticQueryPlan plan,
+        IContentIndexService? contentIndex,
+        Func<string, int, CancellationToken, Task<IReadOnlyList<ContentSearchHit>>>? contentSearch,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        if (contentIndex is null || contentSearch is null || !plan.HasTerms)
+            return [];
+
+        // 长词优先：整段「笔吧验机」有机会命中原句，短二元组负责兜底召回。
+        var queries = plan.Terms
+            .Where(term => term.Length >= SemanticQuery.MinimumTermLength)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(term => term.Length)
+            .Take(MaxContentQueries)
+            .ToArray();
+
+        var merged = new Dictionary<string, ContentSearchHit>(PathComparer);
+        foreach (var term in queries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var hits = await contentSearch(term, limit, cancellationToken).ConfigureAwait(false);
+                // 同一文件被多个词命中：保留第一次（词更长 = 更贴近原查询）的摘要与高亮位置。
+                foreach (var hit in hits)
+                    merged.TryAdd(hit.Path, hit);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+            {
+                // 单个词查不动（语法不支持、库被占用）不影响其它词。
+            }
+        }
+
+        return [.. merged.Values];
     }
 
     public async Task ClearAsync(CancellationToken cancellationToken)
@@ -234,6 +525,7 @@ public sealed class SemanticSearchService : ISemanticSearchService
         var entries = new List<SemanticEntry>(items.Count);
         var total = Math.Max(1, items.Count * models.Count);
         var done = 0;
+        var progressThrottle = new ProgressThrottle(ProgressMinimumIntervalMs);
         var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         var previousModelIndexes = MapReusableModels(previousSnapshot?.Models, models);
         var previousEntries = new Dictionary<string, SemanticEntry>(pathComparer);
@@ -276,8 +568,11 @@ public sealed class SemanticSearchService : ISemanticSearchService
                 }
             }
 
-            if (done == total || done % 16 == 0)
-                progress?.Report(new OperationProgress((double)done / total, item.Name, done, total));
+            // v0.60：进度按时间节流。此前每 16 篇一次，2 万篇 × 2 个模型就是 2500 次
+            // 跨线程回调——UI 线程排队处理进度的时间比用户点一下按钮还长。
+            if (progress is not null && progressThrottle.ShouldDispatch(
+                    System.Diagnostics.Stopwatch.GetTimestamp(), isFinal: done == total))
+                progress.Report(new OperationProgress((double)done / total, item.Name, done, total));
 
             // Ignore a file that changed while it was being embedded or reused. A fresh rebuild will pick up its new content.
             try
@@ -352,6 +647,11 @@ public sealed class SemanticSearchService : ISemanticSearchService
         text.Append("文件名：").Append(name);
         if (!string.IsNullOrWhiteSpace(parent))
             text.Append("。所在文件夹：").Append(parent);
+        // v0.60：把「类型」与扩展名也写进去。此前索引文本只有文件名 + 上级文件夹名，
+        // 搜「视频」时模型没有任何字面线索可抓，只能靠 4k 前缀里的正文碰运气。
+        text.Append("。类型：").Append(SemanticQuery.KindWord(item.Kind));
+        if (!string.IsNullOrWhiteSpace(item.Extension))
+            text.Append(' ').Append(item.Extension);
 
         if (!item.IsFolder && item.Length is <= 2 * 1024 * 1024 &&
             item.Extension is { } extension && TextExtensions.Contains(extension))
@@ -730,6 +1030,4 @@ public sealed class SemanticSearchService : ISemanticSearchService
         long LastWriteUtcTicks,
         byte[] ContentFingerprint,
         byte[][] Vectors);
-
-    private sealed record SemanticCandidate(SemanticEntry Entry, float Score);
 }

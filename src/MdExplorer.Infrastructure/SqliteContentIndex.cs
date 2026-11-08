@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using MdExplorer.Domain;
@@ -105,10 +106,21 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
 
     // ── 重建（全量校准） ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// 最近一次重建的耗时、写入篇数与真实派发的进度条数（v0.60）。
+    /// 性能验收与真机排查直接读它：进度条从 400 次降到 ≤5 次/秒，这个数字要对得上。
+    /// </summary>
+    public MdExplorer.Domain.IndexRebuildTelemetry LastRebuildTelemetry { get; private set; } =
+        MdExplorer.Domain.IndexRebuildTelemetry.None;
+
     public async Task<ContentIndexStats> RebuildAsync(
         IReadOnlyList<string> roots, IProgress<OperationProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(roots);
+        var telemetryTimer = Stopwatch.StartNew();
+        var telemetryCandidates = 0;
+        var telemetryWrites = 0;
+        var telemetryDispatches = 0;
         var normalizedRoots = NormalizeRoots(roots);
         if (!await TryEnsureSchemaAsync(cancellationToken).ConfigureAwait(false))
             return await GetStatsAsync(cancellationToken).ConfigureAwait(false);
@@ -123,10 +135,15 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
             var existing = await LoadExistingAsync(connection, cancellationToken).ConfigureAwait(false);
 
             var candidates = EnumerateCandidates(normalizedRoots, cancellationToken);
+            telemetryCandidates = candidates.Count;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var done = 0;
             var total = candidates.Count;
             var writesInChunk = 0;
+            // v0.60：进度按时间节流（≥200 ms 一次），不再「每 25 篇一次」。此前 1 万篇会向
+            // UI 线程投递 400 次进度回调，每次都要改任务中心的行文本 + 触发绑定；鼠标点击
+            // 排在它们后面，用户看到的就是「建立索引时界面卡一段」。现在最多 5 次/秒。
+            var progressThrottle = new ProgressThrottle(ProgressMinimumIntervalMs);
 
             // v0.49：分块提交。此前整次重建压在一个事务里——WAL 会把「读到的所有正文」攒到最后一次
             // 提交才落盘，几十万篇时表现为持续读写 + 结束瞬间的一大波写；现在每 CommitBatch 篇提交一次，
@@ -139,8 +156,9 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
                     cancellationToken.ThrowIfCancellationRequested();
                     seen.Add(file.FullName);
                     done++;
-                    if (done % 25 == 0 || done == total)
+                    if (progressThrottle.ShouldDispatch(Stopwatch.GetTimestamp(), isFinal: done == total))
                     {
+                        telemetryDispatches++;
                         progress?.Report(new OperationProgress(
                             total == 0 ? 0 : (double)done / total, file.Name, done, total));
                     }
@@ -188,6 +206,7 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
                             await DeleteDocumentAsync(connection, transaction, stale.Id, cancellationToken)
                                 .ConfigureAwait(false);
                             writesInChunk++;
+                            telemetryWrites++;
                         }
                     }
                     else
@@ -197,6 +216,7 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
                             existing.TryGetValue(file.FullName, out var current) ? current.Id : null,
                             cancellationToken).ConfigureAwait(false);
                         writesInChunk++;
+                        telemetryWrites++;
                     }
 
                     if (writesInChunk < CommitBatch)
@@ -235,6 +255,9 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
         finally
         {
             _writeGate.Release();
+            telemetryTimer.Stop();
+            LastRebuildTelemetry = new IndexRebuildTelemetry(
+                telemetryTimer.Elapsed.TotalMilliseconds, telemetryWrites, telemetryDispatches, telemetryCandidates);
         }
 
         return await GetStatsAsync(cancellationToken).ConfigureAwait(false);
@@ -874,6 +897,9 @@ public sealed class SqliteContentIndex : IContentIndexService, IContentIndexMain
 
     /// <summary>每多少条写库提交一次（v0.49）。500 条大约几十毫秒，既能摊平 I/O 又不至于提交过频。</summary>
     public const int CommitBatch = 500;
+
+    /// <summary>进度派发的最小间隔（毫秒）；见 <see cref="MdExplorer.Domain.ProgressThrottle"/>。</summary>
+    public const double ProgressMinimumIntervalMs = 200d;
 
     /// <summary>每个分块之间让出磁盘的毫秒数：给同机其它应用（含用户自己）留出 I/O 机会。</summary>
     private const int PaceMilliseconds = 12;

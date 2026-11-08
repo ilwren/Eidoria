@@ -146,6 +146,21 @@ public interface IMediaVideoFrameSource
 }
 
 /// <summary>
+/// 能把「画面到底流不流畅」量出来的后端实现它（v0.60，目前是 Windows 推帧后端）。
+/// <para>
+/// 用户说「卡」时，光靠描述无法判断是解码跟不上、UI 线程被占住，还是采样率本来就只有
+/// 20 fps。宿主把这里的数字直接显示在预览卡上，并写进诊断报告：
+/// 帧率、帧间隔 p50/p95/最大、掉帧数、首帧时延、解码超时次数。没有实现的后端如实显示
+/// 「该后端没有帧统计」，绝不用 0 假装流畅。
+/// </para>
+/// </summary>
+public interface IMediaFrameTelemetry
+{
+    /// <summary>最近一段观看的帧节奏账本（只读快照对象，随时可读）。</summary>
+    MdExplorer.Domain.FramePacingStats FramePacing { get; }
+}
+
+/// <summary>
 /// 没有位置回调的后端（如 Android MediaPlayer）实现它，宿主定时器调用即可把进度推给 UI。
 /// 支持回调的后端不必实现。
 /// </summary>

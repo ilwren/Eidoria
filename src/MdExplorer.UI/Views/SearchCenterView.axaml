@@ -178,10 +178,10 @@
                         <TextBlock Classes="caption" Text="{Binding ParentNameText}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="1" Classes="caption" Text="{Binding CompactMetaText}" />
                         <TextBlock Grid.Column="2" Classes="caption" Text="{Binding SearchSourceText}"
-                                   ToolTip.Tip="这是关键词搜索的命中来源：文件名命中排在正文命中之前。"
+                                   ToolTip.Tip="命中来源：文件名 / 文件夹 / 类型 / 正文 是字面命中，语义相近是模型判断；字面命中优先。"
                                    IsVisible="{Binding HasSearchSource}" />
                         <TextBlock Grid.Column="3" Classes="caption" Text="{Binding SearchScoreText}"
-                                   ToolTip.Tip="余弦相似度：越高越接近你的描述；这是排序依据，不是概率。"
+                                   ToolTip.Tip="排序依据，不是概率。字面命中显示「相关度」，多路命中显示「综合」并附带语义相似度。"
                                    IsVisible="{Binding HasSearchScore}" />
                         <TextBlock Grid.Column="4" Classes="caption" Text="{Binding SearchConfidenceText}"
                                    Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}"

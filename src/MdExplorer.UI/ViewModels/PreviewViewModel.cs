@@ -286,6 +286,51 @@ public sealed partial class PreviewViewModel(
     /// <summary>对当前文件显式改用内嵌画面（风险提示就在卡片上，用户自己选的）。</summary>
     [ObservableProperty] private bool _forceInlineVideo;
 
+    /// <summary>
+    /// 画面放大（v0.60）：用户在预览卡里点「放大画面」后，视频区域从 280 DIP 拉到视口高度。
+    /// 此前画面被写死 280 高，用户在预览栏里怎么拖都放不大——"不能随意展开预览"就是这个。
+    /// 这是纯界面状态，不重建解码器，也不改变播放位置。
+    /// </summary>
+    [ObservableProperty] private bool _isMediaExpanded;
+
+    /// <summary>展开后的画面高度：跟随宿主给的上限，默认 560 DIP。</summary>
+    public double ExpandedVideoHeight => Math.Clamp(_expandedVideoHeight, 280d, 1200d);
+    private double _expandedVideoHeight = 560d;
+
+    /// <summary>当前画面高度：展开与否决定 280 / <see cref="ExpandedVideoHeight"/>。</summary>
+    public double VideoSurfaceHeight => IsMediaExpanded ? ExpandedVideoHeight : 280d;
+
+    public bool CanExpandMedia => IsMedia && (ShowFrameVideoSurface || ShowNativeVideoSurface);
+    public string ExpandMediaLabel => IsMediaExpanded ? "还原画面" : "放大画面";
+
+    /// <summary>视图在尺寸变化时把可用高度告诉这里，展开高度不超过它，避免把控制条挤出屏幕。</summary>
+    public void SetExpandedVideoBudget(double availableHeightDip)
+    {
+        if (!double.IsFinite(availableHeightDip) || availableHeightDip <= 0)
+            return;
+        var budget = Math.Clamp(availableHeightDip - 120d, 280d, 1200d);
+        if (Math.Abs(budget - _expandedVideoHeight) < 0.5d)
+            return;
+        _expandedVideoHeight = budget;
+        OnPropertyChanged(nameof(ExpandedVideoHeight));
+        OnPropertyChanged(nameof(VideoSurfaceHeight));
+    }
+
+    /// <summary>放大 / 还原画面。切换媒体文件时自动还原，不让上一个文件的界面状态带过来。</summary>
+    [RelayCommand]
+    private void ToggleMediaExpanded()
+    {
+        if (!CanExpandMedia)
+            return;
+        IsMediaExpanded = !IsMediaExpanded;
+    }
+
+    partial void OnIsMediaExpandedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(VideoSurfaceHeight));
+        OnPropertyChanged(nameof(ExpandMediaLabel));
+    }
+
     // v0.55：推帧后端的自动播放要等宿主把帧呈现面挂上去。
     // 早一步开始播，首帧落在「还没人接」的空档里，用户看到的就是一块黑框；
     // 等到 SinkAttached 再播，第一帧就有人接。
@@ -387,6 +432,31 @@ public sealed partial class PreviewViewModel(
         _ => ShowInlineVideoGate ? "默认用系统播放器打开"
             : CanPlayMediaInApp ? "可以播放" : "此平台暂不支持内嵌播放",
     };
+    /// <summary>
+    /// 帧节奏诊断（v0.60）：后端实现 <see cref="IMediaFrameTelemetry"/> 时给出帧率、
+    /// 帧间隔分位数、掉帧与首帧时延；后端没有这项能力时如实说明，不写 0 冒充流畅。
+    /// 这是「播放卡不卡」的量化依据，用户可以照着抄给开发者。
+    /// </summary>
+    public string MediaFrameStatsText
+    {
+        get
+        {
+            if (!IsMedia)
+                return string.Empty;
+            if (_media is not IMediaFrameTelemetry telemetry)
+                return "帧统计：该播放后端不提供（换系统播放器或换平台才有）";
+            // 支持推帧的后端都会实现这个端口；但 Windows 只在「内嵌画面」真正开播后才开始取帧。
+            // 没开播时说清原因，比给一串 0 有用。
+            if (!PlayVideoInline)
+                return "帧统计：内嵌画面未开启（开启后才有帧率与掉帧数据）";
+            var pacing = telemetry.FramePacing;
+            return $"帧统计：{pacing.Describe()}";
+        }
+    }
+
+    /// <summary>只有真的能给出帧节奏（或明确说明为什么给不出）时才占一行；非媒体项不留空白。</summary>
+    public bool HasMediaFrameStats => IsVideoMedia;
+
     public string MediaPositionText => FormatTime(_media?.Position ?? TimeSpan.Zero);
     public string MediaDurationText => FormatTime(_media?.Duration ?? TimeSpan.Zero);
     public double MediaProgressPercent
@@ -582,12 +652,17 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(MediaBackendName));
         OnPropertyChanged(nameof(MediaBackendDiagnostic));
         OnPropertyChanged(nameof(MediaRendererText));
+        OnPropertyChanged(nameof(MediaFrameStatsText));
+        OnPropertyChanged(nameof(HasMediaFrameStats));
         OnPropertyChanged(nameof(MediaProbeText));
         OnPropertyChanged(nameof(HasMediaProbe));
         OnPropertyChanged(nameof(MediaProbeReasonText));
         OnPropertyChanged(nameof(HasMediaProbeReason));
         OnPropertyChanged(nameof(PlayVideoInline));
         OnPropertyChanged(nameof(ShowInlineVideoGate));
+        OnPropertyChanged(nameof(CanExpandMedia));
+        OnPropertyChanged(nameof(ExpandMediaLabel));
+        OnPropertyChanged(nameof(VideoSurfaceHeight));
         OnPropertyChanged(nameof(ShowMediaDiagnostics));
         OnPropertyChanged(nameof(MediaStateText));
     }
@@ -876,6 +951,7 @@ public sealed partial class PreviewViewModel(
         OnPropertyChanged(nameof(CanOpenDocumentWorkbench));
         RaiseQuickFacts();
         ForceInlineVideo = false;
+        IsMediaExpanded = false;
         Image = null;
         TextContent = null;
         MarkdownText = null;

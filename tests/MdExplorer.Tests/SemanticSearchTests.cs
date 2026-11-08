@@ -134,6 +134,124 @@ public sealed class SemanticSearchTests : IDisposable
             await _semantic.RebuildAsync(null, TestContext.Current.CancellationToken));
     }
 
+    // ── v0.60：混合检索（用户报的两个具体查询） ────────────────────────────
+
+    [Fact]
+    public async Task SearchingVideoKindFindsVideoFilesEvenWhenMeaningIsUnrelated()
+    {
+        // 「视频」两个字不在任何文件名里，向量也帮不上忙（FakeEmbeddings 只认 pet/feline）。
+        // 期望：类型通道把 .mp4/.mkv 全部摆到前面，理由写清「类型命中」。
+        await File.WriteAllTextAsync(Path.Combine(_root, "trip.mp4"), "binary-ish placeholder");
+        await File.WriteAllTextAsync(Path.Combine(_root, "lecture.mkv"), "binary-ish placeholder");
+        await File.WriteAllTextAsync(Path.Combine(_root, "shopping.txt"), "milk, eggs, bread");
+        await _fileIndex.RebuildAsync(null, TestContext.Current.CancellationToken);
+        await _semantic.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        var hits = await _semantic.SearchAsync("视频", null, 10, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, hits.Count);
+        Assert.All(hits, hit => Assert.Equal(FileKind.Video, hit.Item.Kind));
+        Assert.All(hits, hit => Assert.Equal(SemanticHitMatch.FileType, hit.Match));
+        Assert.All(hits, hit => Assert.Contains("类型命中", hit.Rationale, StringComparison.Ordinal));
+        Assert.DoesNotContain(hits, hit => hit.Item.Name == "shopping.txt");
+    }
+
+    [Fact]
+    public async Task ChineseTopicQueryMatchesFilesContainingATwoCharacterFragment()
+    {
+        // 用户原话：「笔吧验机」是视频主题，结果里连「验机」都没有。
+        // 文件名里没有整段，只有「验机」；文件夹名里也没有。这一条必须命中。
+        var downloads = Path.Combine(_root, "downloads");
+        Directory.CreateDirectory(downloads);
+        await File.WriteAllTextAsync(Path.Combine(downloads, "2024-验机实录.mp4"), "placeholder");
+        await File.WriteAllTextAsync(Path.Combine(downloads, "cooking.webm"), "placeholder");
+        await _fileIndex.RebuildAsync(null, TestContext.Current.CancellationToken);
+        await _semantic.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        // 用「查询与文档完全正交」的嵌入：向量通道一条都给不出来，能不能命中完全看字面通道。
+        // 这正是用户遇到的处境——小模型对「笔吧验机」没有判断力，字面通道必须兜住。
+        var literalOnly = new SemanticSearchService(_dataDir, _fileIndex, _settings, new OrthogonalEmbeddings());
+        var hits = await literalOnly.SearchAsync("笔吧验机", null, 10, TestContext.Current.CancellationToken);
+
+        var top = Assert.Single(hits);
+        Assert.Equal("2024-验机实录.mp4", top.Item.Name);
+        Assert.Equal(SemanticHitMatch.Name, top.Match);
+        Assert.Contains("文件名命中", top.Rationale, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ContentChannelUsesTheFullTextIndexPerTermInsteadOfTheWholeSentence()
+    {
+        // 全文索引的 MATCH 是 AND：整句「笔吧验机」要求文档同时含「笔吧」「吧验」「验机」。
+        // 服务必须按词逐个查，否则真实文件连一条都进不来。这里用假的正文通道把调用模式钉死。
+        var queried = new List<string>();
+        var contentFile = Path.Combine(_root, "访谈记录.txt");
+        await File.WriteAllTextAsync(contentFile, "这期视频聊了验机流程");
+        await _fileIndex.RebuildAsync(null, TestContext.Current.CancellationToken);
+        await _semantic.RebuildAsync(null, TestContext.Current.CancellationToken);
+        var info = new FileInfo(contentFile);
+
+        Task<IReadOnlyList<ContentSearchHit>> Search(string term, int limit, CancellationToken ct)
+        {
+            queried.Add(term);
+            return Task.FromResult<IReadOnlyList<ContentSearchHit>>(
+                term == "验机"
+                    ? [new ContentSearchHit(contentFile, "访谈记录.txt", "这期视频聊了验机流程", info.LastWriteTime, info.Length, 7, 2)]
+                    : []);
+        }
+
+        var hits = await _semantic.SearchAsync(
+            "笔吧验机", null, 10, TestContext.Current.CancellationToken,
+            contentIndex: new AlwaysAvailableContentIndex(), contentSearch: Search);
+
+        Assert.Contains(hits, hit => hit.Item.Name == "访谈记录.txt" && hit.Match == SemanticHitMatch.Content);
+        Assert.All(new[] { "笔吧验机", "验机" }, term => Assert.Contains(term, queried));
+        var contentHit = hits.Single(hit => hit.Match == SemanticHitMatch.Content);
+        Assert.Contains("验机", contentHit.Snippet, StringComparison.Ordinal);
+        Assert.Equal(7, contentHit.SnippetHighlightStart);
+    }
+
+    [Fact]
+    public async Task KindFilterStillAppliesToEveryChannel()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_root, "验机笔记.md"), "验机");
+        await File.WriteAllTextAsync(Path.Combine(_root, "验机录像.mp4"), "placeholder");
+        await _fileIndex.RebuildAsync(null, TestContext.Current.CancellationToken);
+        await _semantic.RebuildAsync(null, TestContext.Current.CancellationToken);
+
+        var onlyVideos = await _semantic.SearchAsync(
+            "验机", new HashSet<FileKind> { FileKind.Video }, 10, TestContext.Current.CancellationToken);
+        Assert.All(onlyVideos, hit => Assert.Equal(FileKind.Video, hit.Item.Kind));
+        Assert.Contains(onlyVideos, hit => hit.Item.Name == "验机录像.mp4");
+    }
+
+    /// <summary>只用于本组测试：正文通道永远「可用」（真正的可用性由 Shell 判定）。</summary>
+    private sealed class AlwaysAvailableContentIndex : IContentIndexService
+    {
+        public Task<ContentIndexStats> GetStatsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new ContentIndexStats(1, 0, DateTimeOffset.UtcNow, []));
+
+        public Task<ContentIndexStats> RebuildAsync(
+            IReadOnlyList<string> roots, IProgress<OperationProgress>? progress, CancellationToken cancellationToken) =>
+            GetStatsAsync(cancellationToken);
+
+        public Task<IReadOnlyList<ContentSearchHit>> SearchAsync(
+            string query, int maxResults, CancellationToken cancellationToken, SearchFilter? filter = null) =>
+            Task.FromResult<IReadOnlyList<ContentSearchHit>>([]);
+
+        public Task ClearAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    /// <summary>查询与文档正交（余弦 0）：只用来验证「模型帮不上忙时字面通道仍然有效」。</summary>
+    private sealed class OrthogonalEmbeddings : ITextEmbeddingService
+    {
+        public IReadOnlyList<TextEmbeddingModel> GetAvailableModels() =>
+            [new TextEmbeddingModel("test-embed", "Test embedding", "revision-a", 2)];
+
+        public float[] Embed(string modelId, string text, bool isQuery, CancellationToken cancellationToken) =>
+            isQuery ? [0f, 1f] : [1f, 0f];
+    }
+
     private sealed class FakeEmbeddings(string revision = "revision-a", bool emitInvalidVector = false) : ITextEmbeddingService
     {
         private int _embeddingCount;

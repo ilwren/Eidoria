@@ -525,6 +525,76 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         }
     }
 
+    /// <summary>
+    /// 可复制的性能诊断报告（v0.60）：设置 → 关于 → 「复制诊断」。
+    /// <para>
+    /// 「卡」「不流畅」这类反馈没法靠描述定位。这份报告把三件事一次说清：
+    /// ① 媒体画面到底跑多少帧、掉了几帧、首帧等多久；② 上一次建索引花了多久、
+    /// 派发了多少次进度回调；③ 界面停顿的采样结论（有采样才写数字）。
+    /// </para>
+    /// </summary>
+    public string PerformanceDiagnosticsText
+    {
+        get
+        {
+            var builder = new System.Text.StringBuilder();
+            builder.AppendLine("Eidoria 性能诊断");
+            builder.Append("版本：").AppendLine(AppVersionText);
+            builder.Append("平台：").AppendLine(System.Runtime.InteropServices.RuntimeInformation.OSDescription);
+            builder.Append("断点：").Append(SizeClass).Append(" · ").AppendLine(IsShortViewport ? "矮视口" : "常规视口");
+            builder.Append("视口：").Append(_viewportWidth.ToString("F0", System.Globalization.CultureInfo.InvariantCulture))
+                .Append("×").Append(_viewportHeight.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)).AppendLine(" DIP");
+
+            builder.Append("媒体画面：").AppendLine(Preview.HasMediaFrameStats ? Preview.MediaFrameStatsText : "当前没有选中媒体");
+            builder.Append("媒体后端：").AppendLine(Preview.MediaBackendName);
+            builder.Append("画面通道：").AppendLine(Preview.MediaRendererText);
+
+            var contentTelemetry = _services.ContentIndex is MdExplorer.Infrastructure.SqliteContentIndex sqliteContent
+                ? sqliteContent.LastRebuildTelemetry
+                : IndexRebuildTelemetry.None;
+            builder.Append("全文索引上次重建：").AppendLine(contentTelemetry.Describe());
+            builder.Append("AI 语义索引：").Append(SemanticSearchIndexStatusText)
+                .Append("（").Append(SemanticSearchIndexedItemCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture))
+                .AppendLine(" 项）");
+            builder.Append("界面停顿：").AppendLine(_uiStallRecorder.Describe());
+            return builder.ToString();
+        }
+    }
+
+    /// <summary>UI 线程停顿记录器：窗口活着时按 100 ms 喂点；报告里给 p95 / 最大 / 长停顿次数。</summary>
+    private readonly UiStallRecorder _uiStallRecorder = new(intervalMs: 100d, stallThresholdMs: 50d);
+
+    /// <summary>宿主（MainView）启动 UI 停顿采样；重复调用无副作用。</summary>
+    public void StartUiStallSampling()
+    {
+        // 没有 Avalonia 消息泵（无头单测、截图工具）时不建定时器：采样本身不能成为负担。
+        if (_uiStallTimer is not null)
+            return;
+        if (Avalonia.Application.Current is null)
+            return;
+        _uiStallRecorder.Reset();
+        _uiStallTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _uiStallTimer.Tick += (_, _) => _uiStallRecorder.Record(System.Diagnostics.Stopwatch.GetTimestamp());
+        _uiStallTimer.Start();
+    }
+
+    private Avalonia.Threading.DispatcherTimer? _uiStallTimer;
+
+    [RelayCommand]
+    private async Task CopyPerformanceDiagnosticsAsync()
+    {
+        try
+        {
+            await _services.SystemClipboard.SetTextAsync(PerformanceDiagnosticsText, CancellationToken.None)
+                .ConfigureAwait(true);
+            Notify("诊断报告已复制到剪贴板");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Notify($"复制失败：{ex.Message}");
+        }
+    }
+
     public string PageTitle => Page switch
     {
         ShellPage.Home => "文件",
@@ -589,6 +659,13 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
     /// <summary>是否处于半折叠（铰链把可视区分成两半，其中一半是看不见的铰链带）。</summary>
     public bool IsHalfFolded => _foldableLayout.IsHalfFolded;
+
+    /// <summary>
+    /// 「手动打开预览」的请求（v0.60）：宽屏下预览栏默认跟着设置走，用户按 Ctrl+P 或点
+    /// 「预览」时不该再被设置挡回来——"打不开预览"有一半原因是开关被关过就再也点不开。
+    /// 这是会话内状态，不写设置文件；设置页里改开关仍以设置为准。
+    /// </summary>
+    private bool _previewPaneRequested = true;
 
     /// <summary>
     /// 主区要让出的边距：竖铰链让右、横铰链让下。
@@ -672,7 +749,47 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// 常驻预览栏：半折叠时一律让位给副半屏（v0.58）——两半各摆一套预览只会互相挤。
     /// </summary>
     public bool ShowPreviewPaneNow => !IsHalfFolded && IsExpandedOrAbove && !IsShortViewport &&
-        SettingsStore.Settings.ShowPreviewPane && Preview.HasItem;
+        (SettingsStore.Settings.ShowPreviewPane || _previewPaneRequested) && Preview.HasItem;
+
+    /// <summary>
+    /// 显式打开预览（v0.60，Ctrl+P / 预览按钮）：宽屏打开预览栏，窄屏打开浮窗预览页。
+    /// <para>
+    /// 两处「打不开预览」的根因都在这里：① 宽屏的预览栏只看设置开关，用户把开关关过
+    /// 之后就再也点不开；② 窄屏与半折叠根本没有「打开预览」这个入口，只能靠点文件。
+    /// 现在两个断点走同一个命令，并且**不要求先有选中项**——没有内容时给出明确提示，
+    /// 而不是什么都不发生。
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    private void OpenPreviewPane()
+    {
+        if (IsExpandedOrAbove && !IsShortViewport && !IsHalfFolded)
+        {
+            _previewPaneRequested = true;
+            OnPropertyChanged(nameof(ShowPreviewPaneNow));
+            OnPropertyChanged(nameof(ShowPreviewPaneEffective));
+            OnPropertyChanged(nameof(ShowPreviewPageNow));
+            if (!Preview.HasItem)
+                Notify("预览栏已打开；选中一个文件即可显示内容");
+            return;
+        }
+
+        IsPreviewPageOpen = true;
+        if (!Preview.HasItem)
+            Notify("预览已打开；选中一个文件即可显示内容");
+    }
+
+    /// <summary>关预览栏：同时清掉「手动请求」，否则下一次选中文件它又自己冒出来。</summary>
+    public void ClosePreviewPane()
+    {
+        // 先清请求再写开关：OnShowPreviewPaneChanged 会把请求同步成开关值，
+        // 顺序反过来就会把「已关闭」又写成「已请求」。
+        _previewPaneRequested = false;
+        ShowPreviewPane = false;
+        OnPropertyChanged(nameof(ShowPreviewPaneNow));
+        OnPropertyChanged(nameof(ShowPreviewPaneEffective));
+        OnPropertyChanged(nameof(ShowPreviewPageNow));
+    }
     public bool ShowPreviewPaneEffective => IsBrowser && ShowPreviewPaneNow;
     /// <summary>预览页：没有常驻预览栏时（含矮视口）改为覆盖式预览页，而不是挤一列。</summary>
     public bool ShowPreviewPageNow => IsPreviewPageOpen && !ShowPreviewPaneNow;
@@ -1409,6 +1526,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
             "· Ctrl+L：编辑路径    Ctrl+F / Ctrl+K：悬浮搜索面板（回车递归搜索）",
             "· Alt+← / Alt+→：后退 / 前进    Alt+↑：上一级",
             "· F5 或 Ctrl+R：刷新    Ctrl+Shift+D：打开/关闭对照窗格（仅 1600+ dp）    F6：切换活动窗格",
+            "· Ctrl+P：打开预览（宽屏开预览栏，窄屏开浮窗预览）",
             "",
             "标签页",
             "· Ctrl+T：复制当前标签    Ctrl+W：关闭标签",
@@ -3371,6 +3489,35 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         Notify("已清除最近搜索");
     }
 
+    /// <summary>语义结果里「来源」这一列的人话文案（v0.60）。</summary>
+    private static string DescribeSemanticSource(SemanticHitMatch match) => match switch
+    {
+        SemanticHitMatch.Name => "文件名命中",
+        SemanticHitMatch.Folder => "文件夹命中",
+        SemanticHitMatch.FileType => "类型命中",
+        SemanticHitMatch.Content => "正文命中",
+        _ => "语义相近",
+    };
+
+    /// <summary>一句话说明这一页结果里各路通道各占多少——没有它，用户分不清「字面找到」和「模型猜的」。</summary>
+    private static string DescribeSemanticMix(IReadOnlyList<SemanticSearchHit> hits)
+    {
+        if (hits.Count == 0)
+            return string.Empty;
+        var lexical = hits.Count(hit => hit.Match != SemanticHitMatch.Semantic);
+        if (lexical == 0)
+            return " · 全部按语义排序";
+        var semanticOnly = hits.Count - lexical;
+        return semanticOnly == 0
+            ? $" · 全部字面/类型命中（{lexical} 项）"
+            : $" · 字面/类型 {lexical} 项 · 语义 {semanticOnly} 项";
+    }
+
+    /// <summary>正文通道回调：把全文索引的查询原样交给内容索引服务。</summary>
+    private Task<IReadOnlyList<ContentSearchHit>> SearchContentForSemanticAsync(
+        string query, int limit, CancellationToken cancellationToken) =>
+        _services.ContentIndex.SearchAsync(query, limit, cancellationToken);
+
     private async Task RunSemanticSearchAsync(string query, IReadOnlySet<FileKind>? kinds, CancellationTokenSource cts)
     {
         await RefreshSemanticSearchIndexAsync().ConfigureAwait(true);
@@ -3391,11 +3538,16 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         }
 
         IsSearchCenterBusy = true;
-        SearchCenterStatusText = "正在本机计算语义相似度…";
+        SearchCenterStatusText = "正在本机检索：文件名 / 类型 / 正文 / 语义…";
         try
         {
+            // v0.60：AI 搜索不再只是向量余弦。文件名 / 文件夹名 / 文件类型 / 正文四路字面通道
+            // 与向量融合，并逐条给出「为什么在这里」。正文通道要用到全文索引——它没建好时
+            // 只是少一路召回，其它三路照常工作。
             var hits = await _services.SemanticSearch.SearchAsync(
-                    query, kinds, SearchResultLimit, cts.Token)
+                    query, kinds, SearchResultLimit, cts.Token,
+                    EnableContentIndex && HasContentIndex ? _services.ContentIndex : null,
+                    EnableContentIndex && HasContentIndex ? SearchContentForSemanticAsync : null)
                 .ConfigureAwait(true);
             // v0.54：语义结果自带文件事实，大小 / 修改时间筛选在这里就地过一遍；
             // 置信度按「筛完之后的结果」重算，否则「低置信」的阈值会对不上你实际看到的那几条。
@@ -3408,19 +3560,28 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 SearchCenterResults.Add(new FileItemViewModel(hit.Item)
                 {
                     IsFavorite = _services.SettingsStore.IsFavorite(hit.Item.FullPath),
-                    SearchScoreText = $"语义 {hit.Score:P0}",
+                    // 来源写在分数前面：用户先要「为什么是它」，再谈相似度。
+                    SearchSourceText = DescribeSemanticSource(hit.Match),
+                    SearchScoreText = hit.Match == SemanticHitMatch.Semantic
+                        ? $"语义 {hit.SemanticScore:P0}"
+                        : hit.SemanticScore > 0f
+                            ? $"综合 {hit.Score:P0}（语义 {hit.SemanticScore:P0}）"
+                            : $"相关度 {hit.Score:P0}",
                     SearchConfidenceText = confidence.IsLowConfidence(hit.Score) ? "低置信" : null,
+                    SearchSnippetText = hit.Snippet,
+                    SearchSnippetHighlightStart = hit.SnippetHighlightStart,
+                    SearchSnippetHighlightLength = hit.SnippetHighlightLength,
                 });
             }
 
             var semanticFilterNote = HasActiveSearchFilter ? $" · 筛选：{ActiveSearchFilterText}" : string.Empty;
             SearchCenterStatusText = visible.Count == 0
                 ? (filter is null
-                    ? "没有足够相似的结果；可换个描述，或扩展并重建索引"
+                    ? "没有命中的结果；关键字或类型词会走字面匹配，描述性句子走语义匹配，可换个说法或重建索引"
                     : $"没有符合筛选条件的语义结果{semanticFilterNote}")
                 : confidence.HasStrongMatch
-                    ? $"{visible.Count} 项 · 本机语义检索 · {visible[0].ModelName}{(confidence.HasLowConfidence ? $" · {confidence.LowConfidenceCount} 项低置信" : string.Empty)}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}{semanticFilterNote}"
-                    : $"{visible.Count} 项 · 最高相似度只有 {confidence.TopScore:P0}，约等于没找到；已按相似度排序供参考，换个说法通常更准{semanticFilterNote}";
+                    ? $"{visible.Count} 项 · 本机语义 + 字面检索 · {visible[0].ModelName}{DescribeSemanticMix(visible)}{(confidence.HasLowConfidence ? $" · {confidence.LowConfidenceCount} 项低置信" : string.Empty)}{(SemanticSearchIndexIsPartial ? " · 索引有上限" : string.Empty)}{semanticFilterNote}"
+                    : $"{visible.Count} 项 · 最高相关度只有 {confidence.TopScore:P0}，约等于没找到；已按相关度排序供参考，换个说法通常更准{semanticFilterNote}";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -4028,6 +4189,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
     partial void OnShowPreviewPaneChanged(bool value)
     {
+        // 用户自己动了开关，就回到「以设置为准」：手动请求不再覆盖设置。
+        _previewPaneRequested = value;
         _services.SettingsStore.Settings.ShowPreviewPane = value;
         _ = SaveAsync();
         RefreshPreviewVisibility();

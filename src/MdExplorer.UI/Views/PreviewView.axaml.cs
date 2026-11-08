@@ -40,6 +40,16 @@ public partial class PreviewView : UserControl
             ApplySource();
     }
 
+    /// <summary>
+    /// v0.60：把本视图的可用高度交给 VM 作为「放大画面」的上限。
+    /// 预览栏只有 ~400 高时，展开到 1200 会把控制条挤出屏幕——高度必须由宿主说了算。
+    /// </summary>
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+        _vm?.SetExpandedVideoBudget(e.NewSize.Height);
+    }
+
     /// <summary>KeePass 分组/条目行没有独立的选中控件，点击即交给 VM 切换（同压缩包面包屑的既定做法）。</summary>
     private void OnKeePassGroupClick(object? sender, RoutedEventArgs e)
     {

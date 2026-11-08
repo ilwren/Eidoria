@@ -119,6 +119,9 @@ public partial class MainView : UserControl
         {
             topLevel.AddHandler(TopLevel.BackRequestedEvent, OnBackRequested, RoutingStrategies.Bubble);
             Shell?.UseSystemClipboard(() => TopLevel.GetTopLevel(this));
+            // v0.60：UI 线程停顿采样（100 ms 一次，开销可忽略）。诊断报告里「界面停顿 p95」
+            // 就是它给的——有采样才写数字，没有就说「未采样」。
+            Shell?.StartUiStallSampling();
             if (topLevel is WindowBase window)
             {
                 _clipboardWindow = window;
@@ -1855,8 +1858,9 @@ public partial class MainView : UserControl
 
     private void OnClosePreviewPane(object? sender, RoutedEventArgs e)
     {
-        if (Shell is { } shell)
-            shell.ShowPreviewPane = false;
+        // v0.60：走 Shell 的统一入口，同时清掉「手动打开」请求；否则下一次选中文件时
+        // 预览栏会自己再弹回来，用户会觉得「关不掉」。
+        Shell?.ClosePreviewPane();
     }
 
     // ---------- 键盘 ----------
@@ -1903,6 +1907,14 @@ public partial class MainView : UserControl
             (e.KeyModifiers & KeyModifiers.Shift) != 0 && e.Key == Key.D)
         {
             shell.ToggleDualPaneCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+        if (shell.Page == ShellPage.Browser && !shell.IsDialogOpen && ctrl && e.Key == Key.P)
+        {
+            // v0.60：预览栏 / 浮窗预览的显式入口。宽屏开预览栏、窄屏开浮窗，
+            // 用户不必先去设置页把开关打开（那正是「打不开预览」的一半原因）。
+            shell.OpenPreviewPaneCommand.Execute(null);
             e.Handled = true;
             return;
         }

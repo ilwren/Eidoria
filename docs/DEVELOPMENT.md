@@ -913,6 +913,76 @@ public interface ISettingsService { T Get<T>(...); ValueTask SetAsync(...); IObs
 
 ---
 
+## 7.6 卡顿与搜索质量的量化口径（v0.60）
+
+「卡」「搜得不准」都不是可直接验收的描述。这一节固定三类指标的定义、采集点与门槛，
+任何「变好了」的结论都必须带这里的数字（真机复测见 §7.6.4）。
+
+### 7.6.1 媒体：帧节奏而不是「感觉」
+
+定义在 `MdExplorer.Domain.FramePacingStats`（纯算法、零 I/O，单测 `ResponsivenessMetricTests` 钉死）：
+
+| 指标 | 定义 | 门槛（Windows 推帧后端，480×270 / 30 fps 采样） |
+|---|---|---|
+| 首帧时延 | `MarkFirstFramePending`（挂上帧呈现面或按下播放）→ 第一帧送到宿主 | ≤ 400 ms |
+| 帧间隔 p50 | 相邻两帧间隔的中位数 | ≤ 40 ms（即 ≥ 25 fps 观感） |
+| 帧间隔 p95 | 第 95 百分位 | ≤ 70 ms |
+| 最大间隔 | 窗口内最刺眼的一次卡顿 | 记录，不设硬门槛（卡一次不可怕，怕的是不知道卡了多久） |
+| 掉帧 | 间隔 > 1.5 × 理想周期（33.3 ms）的帧数 | 10 秒内 ≤ 5 |
+| 解码超时 | 单帧「解码 + 呈现」本身超过理想周期的次数 | 为 0 才能说「解码侧没问题」 |
+
+**为什么要分位数**：30 fps 匀速掉 3 帧和连续掉 3 帧，平均值一样，观感完全不同。
+
+**采集点**：`WindowsMediaPlaybackService.PumpFrames` 在 `sink.PresentFrame(...)` 之后记一笔
+（用户看到的是呈现节奏，不是解码节奏）；Linux `GStreamerMediaPlaybackService` 同一口径。
+两个后端都实现 `IMediaFrameTelemetry`，预览卡的「帧统计」行与「复制性能诊断」直接读它。
+
+**怎么读数字**（排查顺序固定，避免猜）：
+1. 掉帧多、解码超时为 0 → 主循环在等别的东西：看 UI 线程停顿（§7.6.2）。
+2. 解码超时多 → 解码侧跟不上：降 `FrameWidth/FrameHeight` 或换系统播放器；这跟 UI 无关。
+3. fps 稳定偏低但间隔均匀 → 采样率本来就这么高（`TargetFrameRate=30`），不是「卡」。
+4. 首帧时延 > 400 ms → 帧呈现面挂接太晚或 `FrameLead` 不够，先查 `SinkAttached` 时序。
+
+### 7.6.2 索引：被回灌到 UI 线程的工作量
+
+- **进度节流**：`ProgressThrottle` 按时间（≥200 ms）而不是按篇数派发；`IProgress<T>` 的回调
+  是投递到 UI 线程的，1 万篇每 25 篇报一次 = 400 次跨线程投递，用户点一下按钮要排在它们后面。
+  全文索引与 AI 向量索引都改用同一个节流器（`ProgressMinimumIntervalMs = 200`）。
+- **重建账本**：`SqliteContentIndex.LastRebuildTelemetry` 给出 `耗时 / 候选篇数 / 实际写入 / 进度回调次数`，
+  显示在设置 → 关于的诊断里。验收口径：1 万篇重建的「进度回调次数」必须 ≤ 耗时(秒) × 5 + 2。
+- **UI 线程停顿**：`UiStallRecorder`（默认 100 ms 采样、50 ms 视为长停顿）在 `MainView` 挂载时启动，
+  给 p95 / 最大 / 长停顿次数。**索引期间的最小验收**：p95 ≤ 100 ms、最大 ≤ 250 ms、长停顿次数 ≤ 3。
+- 采样没跑起来时报告写「未采样」，绝不把 0 ms 当成「很流畅」。
+
+### 7.6.3 搜索质量：固定查询集的命中断言
+
+AI（语义）搜索从 v0.60 起是**混合检索**：向量相似度 + 文件名 / 文件夹名 / 文件类型 / 正文四路字面通道，
+每条结果标注命中来源（`SemanticHitMatch`）与理由（`SemanticSearchHit.Rationale`）。
+
+| 查询 | 必须命中 | 不允许出现 | 实现通道 |
+|---|---|---|---|
+| `视频` | 所有 `FileKind.Video`（.mp4/.mkv/...） | 与视频无关的文本 | 类型通道（`SemanticQuery.KindHints`） |
+| `笔吧验机` | 文件名/文件夹名含「验机」的项；正文含「验机」的项 | — | CJK 二元组字面通道 + 正文逐词查询 |
+| `mp4` / `pdf` | 对应类型 | — | 扩展名 → `FileKindClassifier` |
+| `季度报告` | 按字面/语义找，**不**整类召回 Document | — | 「报告」不做类型推断 |
+
+**为什么正文要逐词查**：`SqliteContentIndex.BuildMatchQuery` 把多个词按 **AND** 连接，
+整句「笔吧验机」会展开成「笔吧 AND 吧验 AND 验机」，真实文件几乎不可能同时满足。
+所以混合检索把查询拆词后逐个调全文索引，再按路径合并。
+
+**可解释性**：结果行必须写清来源（文件名命中 / 文件夹命中 / 类型命中 / 正文命中 / 语义相近），
+正文命中带摘要与高亮偏移。没有理由的命中比没有命中更让人不信任。
+
+### 7.6.4 真机复测清单（Windows / Android）
+
+1. 媒体：选中一个 1080p 视频 → 开启内嵌画面 → 播 10 秒 → 设置 → 关于 → 复制性能诊断，
+   把「帧统计」整行贴回来（首帧/fps/p50/p95/最大/掉帧/解码超时）。
+2. 索引：清空内容索引 → 重建 → 结束后抄「全文索引上次重建」一行（耗时、篇数、进度回调次数）。
+   重建期间拖动窗口：界面不应冻住超过 250 ms。
+3. 搜索：分别搜 `视频`、`笔吧验机`，确认结果行的来源标注与预期一致；正文命中要能看到摘要高亮。
+
+---
+
 ## 8. Material Design 3 规范与 UI 实现
 
 ### 8.1 主题系统
@@ -1347,6 +1417,7 @@ A1 文本朗读（OS 原生先行 → sherpa-onnx+Kokoro）→ A2 语义搜图�
 | 2026-11-06 | **v0.45 AI 搜索阈值与可解释性**：新增 `SemanticSearchConfidence`（纯函数 `Evaluate(scores)`）——每条命中显示余弦相似度（悬停说明「不是概率」），低于 `max(0.45, 第一名×0.85)` 的尾部命中标注「低置信」，整次查询最高分低于 0.45 时状态栏直接说「约等于没找到，按相似度排序供参考」。**设计取舍**：门槛只影响标注与文案，**不筛掉任何结果、不改排序**——模型/量化/运行时换代最多让标注变保守，不会让搜索突然查不到文件；不设固定 Top-1 硬门槛，避免 ONNX 版本漂移造成随机变红。9 例纯函数单测固定两把尺子（绝对下限、相对比例、边界包含、NaN 防护、计数上界）| run `42155746952` 十 Job 全绿；Linux 单测 380 例（376 通过 / 4 例无真实权重跳过），其中新增低置信 9 例 |
 | 2026-11-06 | **v0.47 全文索引覆盖 Office/OpenDocument**：此前「全文」只认白名单纯文本扩展名，用户的 docx/pptx/xlsx/odt 在搜索里等于不存在。新增 `OfficeDocumentText`：ZIP + XML 流式扫文本节点（docx 读 `word/document.xml`、pptx 按页号排序读 `ppt/slides/*`、xlsx 读 `sharedStrings.xml` 与各 sheet、ODF 读 `content.xml`，平面 `.fodt/.fods/.fodp` 直接扫），段落/行/单元格处补换行；`SqliteContentIndex` 对这些扩展名放宽到 32 MB 并走抽取器，纯文本仍限 512 KB。**安全与边界**：`DtdProcessing.Prohibit` + 禁外部解析、单部件 32 MB、整包展开 256 MB、单篇 40 万字符上限；坏包/加密/无正文一律返回 null 并跳过该篇，不让一份坏文档搞挂整次重建。**明确不做**：PDF 正文抽取需要新的文本层依赖（PDFium 只光栅化），留作待决策项；扫描件文字仍搜不到。10 例新单测（docx 段落、pptx 页序、xlsx 共享串、odt、fodt、坏包、DTD 拒绝、无正文、不支持扩展名、与内容索引端到端）。**同版跟随修正**：截图 84 目检发现矮视口下（400 宽减去 84 导轨）路径行把路径胶囊压到几乎不可读——矮视口收起「前进 / 刷新」两个次级按钮（`ShowPathRowExtras`），优先保住后退/上一级/路径/搜索，并在截图测试里断言路径胶囊仍有 ≥ 80 DIP | run `42172278184` 十 Job 全绿（Linux 单测 375 例：371 通过 / 4 例无真实权重跳过；新增 10 例文档抽取用例全过；截图 83/84/85 已目检：844×390 手机横屏为导轨 + 全高内容、400×520 分屏小窗路径胶囊可读） ||
 | 2026-11-07 | **v0.56 索引真增量（目录监听驱动）**：新增 `IndexRootWatcher`（事件攒批 + 700 ms 静默 + 溢出回调）；文件名索引 `ApplyIncrementalAsync` 就地增删改快照（目录连子树、值没变就不写、写盘 3 秒节流、`ClearAsync` 取消待写），`IsCurrent`/`CoversAsync` 保持为真、不再回落实时扫描；全文索引新增 `IContentIndexMaintenance`（`StartWatching`/`StopWatching`/`ApplyChangesAsync`/`Changed`/`WatchFailed`），只重解变化文件、删掉消失行、共同口径 `IsCandidate` + `ReadDocumentTextAsync`，`ClearAsync` 顺带停监听；宿主按「开关 + 已建立 + 有根」同步监听并在增量后刷新统计，监看不住时提示重建。7 例新单测（新建补入、删除剔除、改名搬移、整目录挪入、根变了/无快照拒绝增量，以及全文增量的改/删/增、未变与越界跳过、未建库时空操作）+ 改写 1 例旧测试（「新建文件让快照失效」→「新建文件就地补进快照」）。**边界**：没做增量向量索引；监听失效一律如实退化 | run `42328776156` 十 Job 全绿（Linux 单测 417 例：413 通过 / 4 例无真实权重跳过，较 v0.55 的 410 例正好多出本版 7 例；截图、Windows/Linux 自包含、linux-x64 Native AOT、Android APK、性能冒烟与真实模型缓存 Job 均通过）。本版首轮即绿，没有出现「等监视器事件」的时序抖动：轮询式用例按 6 秒上限等待，实测在 700 ms 静默窗口后 1–2 次轮询内就满足 |
+| 2026-11-08 | **v0.60 三件事：卡顿量化、索引期 UI 卡顿、AI 搜索质量**：①媒体「卡不卡」变成可复现数字——`FramePacingStats`（首帧时延 / fps / 间隔 p50·p95·最大 / 掉帧 / 解码超时）由 Windows 取帧循环与 Linux appsink **在真正的 `PresentFrame` 之后**记账，两个后端实现 `IMediaFrameTelemetry`，预览卡新增「帧统计」行、「放大画面」（画面高度不再写死 280，按宿主高度夹取）与「复制性能诊断」；②建索引不再往 UI 线程灌进度：`ProgressThrottle` 按 ≥200 ms 节流，`SqliteContentIndex.LastRebuildTelemetry` 记耗时/篇数/回调次数，`UiStallRecorder` 量 UI 停顿 p95/最大/长停顿；③AI 搜索改混合检索——`SemanticQuery` 把中文拆二元组并识别类型词（`视频`→Video、`mp4`→Video），`SemanticSearchService.SearchAsync` 融合向量 + 文件名 + 文件夹 + 类型 + 正文（正文逐词查，绕开 FTS 的 AND 语义），每条结果带 `SemanticHitMatch` 与理由；`ComposeIndexText` 补上类型与扩展名。同时修「预览打不开」：新增 `OpenPreviewPaneCommand`（Ctrl+P / 溢出菜单），手动请求不再被设置开关永久挡住；`ClosePreviewPane()` 清请求，窄屏走浮窗。测试：`ResponsivenessMetricTests`（帧节奏/停顿/节流/查询解析/字面打分）、`SemanticSearchTests` 增 4 例（视频类型、验机二元组、正文逐词、类型筛选）、`PreviewExpandTests`（打开预览、放大画面、帧统计）。指标口径见 §7.6 | 待 CI |
 | 2026-11-07 | **v0.59 折叠屏真机自查（设置 → 关于「设备姿态」）**：`FoldablePosture` 增加 `HingeAngleDegrees` 与 `IsSensorSupported`（位置参数带默认值，既有构造不受影响）；`FoldableLayout.FromHingeAngle` 摊平时也带上角度与可用标记，不再直接返回 `Flat`。Android `AndroidFoldablePostureSource` 按「整度变化或走向变化」派发 `Changed`；`ShellViewModel.ApplyFoldablePosture` 在姿态未变时仍刷新 `FoldableDiagnosticText`。设置页「关于」新增只读一行：未检测到传感器 / 平铺（铰链角 N°）/ 书本式半折叠 / 桌面式半折叠。测试：`FoldablePostureTests` 增 `DiagnosticsSeparateNoSensorFromFlatPosture`，摊平角度理论数据补断言（角度与可用标记） | push run `42348325478` 十 Job 全绿（Build+Test 441 例：437 过 / 4 跳过；UI screenshots 全过；Android APK、linux-x64 Native AOT、两个自包含发布、Performance smoke 均 success；1 万篇内容索引重建 2441 ms、未变再建 54 ms、查询 12.5 ms） |
 | 2026-11-07 | **v0.58 折叠屏半折叠布局**：新增 `IFoldablePostureSource` / `FoldablePosture` / `FoldableLayout`（`MdExplorer.Platform.Abstractions`，纯函数：角度区间 30°–150° 判半折叠、`Compute` 给出主区让白与副半屏尺寸、留白钳在 96 DIP）+ `FlatFoldablePostureSource`（桌面/无头/无传感器）；`AppHost.FoldablePostureFactory` 与 `Build(foldablePosture:)` 双入口，平铺时行为与 v0.57 完全一致。Android 宿主用系统铰链角度传感器（`Sensor.StringTypeHingeAngle`，零新依赖）实现 `AndroidFoldablePostureSource`，`OnCreate` 注册、`OnDestroy` 摘监听、`OnConfigurationChanged` 重算走向。界面：`PaneGrid` 绑 `FoldPrimaryMargin`（竖铰链让右 616、横铰链让下 436.5，均为「副半屏 + 32 铰链带」），新增 `FoldSecondaryBookPane` / `FoldSecondaryTabletopPane` 两块副半屏（常驻预览 + 空态说明）；`IsShortViewport` 半折叠时按半边高度判定，桌面式 841→404.5 触发矮视口（抽屉收起、底栏不出现、导轨兜底）；书本式断点改按主区半宽（1200→584→Compact），且 `ShowBottomNav` 加 `!IsHalfFolded`（底栏会横跨铰链/落进副半屏，半折叠时统一退成导轨）。副半屏每边 < 260 DIP 时放弃副屏。测试：`FoldablePostureTests` 15 例（角度区间 7 条数据 / 走向推断 / 几何与留白 / 窄屏放弃 / 留白钳制 / 两处界面联动）+ 截图 `86-foldable-half-folded-book.png`、`87-foldable-half-folded-tabletop.png`（断言主区不压进副半屏） | push run `42344769851` 与收尾 run `42345593915` 均十 Job 全绿（Build+Test 440 例：436 过 / 4 跳过；UI screenshots 87 例全过；Android APK、linux-x64 Native AOT、两个自包含发布、Performance smoke 均 success）。过程修两处：`Android.Content.Res.Configuration` 在 `MdExplorer.Android` 命名空间里被解析成自身（改 `global::` 前缀）；铰链传感器 `GetDefaultSensor` 只收 `SensorType`（按原值 36 强转）、`SensorEvent.Values` 是 `IList<float>`（用 `Count`）。另一处真错：主区半宽 584 落在 Compact（不是 Medium），且底栏挂在窗口最底下会横跨铰链——半折叠时统一退成导轨。收尾再打磨一处：副半屏不再自带「副半屏 · 预览」标题（预览本身有标题栏），空态才显示说明 |
 | 2026-11-07 | **v0.57 PDF 正文进全文索引（`PdfPig 0.1.16`）**：维护者拍板后新增 `PdfDocumentText`（`TryExtract(string) → string?`，与 v0.47 的 `OfficeDocumentText` 同形态）；`SqliteContentIndex` 的 `IsCandidate` 与 `ReadDocumentTextAsync` 改用共用 `IsDocumentExtension`，`.pdf` 与 Office/OpenDocument 同档（32 MB），**重建与 v0.56 增量两条路径同时生效**。硬顶公开为常量并被测试引用：32 MB / 400 页 / 40 万字符（入库再封顶 4 万）/ 单篇 15 s 超时；加密、损坏、无文本层扫描件、超限、超时一律 `null` 跳过，一份坏 PDF 拖不垮整次重建。取词用逐页 `page.GetWords()` 拼空格（英文正常分词、中文照旧二元组），取词失败退回整页文本。**预览链路零改动**（OfficeViewer 直接控件 + PDFtoImage 光栅照旧）；文案四处写明「含文本型 PDF 与 Office 文档；扫描件需 OCR，本版不做」。`Directory.Packages.props` 固定 `PdfPig 0.1.16`（Apache-2.0、纯托管、不走 `-alpha`）。新增 `PdfDocumentTextTests` 5 例 + `ContentIndexTests` 2 例（PDF 可搜、坏 PDF 不影响重建） | push run `42330712910` 十 Job 全绿（Build+Test ubuntu 424 例：420 过 / 4 跳过；Performance smoke 1 万篇重建 2919 ms、库 4.88 MB、查询 12.3 ms；linux-x64 Native AOT、Android APK、UI screenshots、Real model AI smoke 均 success）。体积同比 v0.56（CI 产物 zip）：AOT +3.97 MB、linux-x64 +1.86 MB、win-x64 +1.86 MB、Android 多 ABI +7.06 MB，未出现 PdfPig 相关 trim 警告 |

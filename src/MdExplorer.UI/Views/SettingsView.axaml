@@ -429,7 +429,18 @@
         <TextBlock Classes="caption" TextWrapping="Wrap">
           <Run Text="设备姿态：" /><Run Text="{Binding FoldableDiagnosticText}" />
         </TextBlock>
-        <md:MdButton Variant="Outlined" Content="开源许可证" HorizontalAlignment="Left" Click="OnLicensesClick" />
+        <!-- v0.60：卡顿 / 掉帧 / 建索引耗时的可复制账本。用户不必描述「感觉有点卡」，
+             复制这段就能对数字定位问题。 -->
+        <TextBlock Classes="caption" TextWrapping="Wrap"
+                   Text="「不卡」要有数字支撑：媒体帧率、掉帧、首帧时延、建索引耗时与进度回调次数都在这里。" />
+        <WrapPanel Orientation="Horizontal">
+          <md:MdButton Variant="Outlined" Content="复制性能诊断" Margin="0,0,8,0"
+                       Command="{Binding CopyPerformanceDiagnosticsCommand}" />
+          <md:MdButton Variant="Outlined" Content="开源许可证" Click="OnLicensesClick" />
+        </WrapPanel>
+        <SelectableTextBlock Classes="caption" FontSize="11.5" MaxLines="14" TextWrapping="Wrap"
+                             Text="{Binding PerformanceDiagnosticsText}"
+                             ToolTip.Tip="复制后可贴给开发者：里面没有文件内容，只有耗时与帧节奏数字。" />
       </StackPanel>
       </Border>
           <Border Classes="card settings-card" x:Name="SettingsCardStorage">
