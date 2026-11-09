@@ -1,16 +1,16 @@
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/bin/Release/net10.0/MdExplorer.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-[xUnit.net 00:00:02.36]     MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack [FAIL]
-[xUnit.net 00:00:02.37]     MdExplorer.Tests.PreviewExpandTests.OpenPreviewCommandRestoresThePaneAfterTheSettingWasTurnedOff [FAIL]
-  Failed MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack [7 ms]
+[xUnit.net 00:00:01.07]     MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack [FAIL]
+[xUnit.net 00:00:01.08]     MdExplorer.Tests.PreviewExpandTests.OpenPreviewCommandRestoresThePaneAfterTheSettingWasTurnedOff [FAIL]
+  Failed MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack [23 ms]
   Error Message:
    Assert.False() Failure
 Expected: False
 Actual:   True
   Stack Trace:
-     at MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/PreviewExpandTests.cs:line 87
+     at MdExplorer.Tests.PreviewExpandTests.ClosingThePaneClearsTheManualRequestSoItDoesNotComeBack() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/PreviewExpandTests.cs:line 86
 --- End of stack trace from previous location ---
-  Failed MdExplorer.Tests.PreviewExpandTests.OpenPreviewCommandRestoresThePaneAfterTheSettingWasTurnedOff [13 ms]
+  Failed MdExplorer.Tests.PreviewExpandTests.OpenPreviewCommandRestoresThePaneAfterTheSettingWasTurnedOff [15 ms]
   Error Message:
    Assert.False() Failure
 Expected: False
@@ -18,38 +18,13 @@ Actual:   True
   Stack Trace:
      at MdExplorer.Tests.PreviewExpandTests.OpenPreviewCommandRestoresThePaneAfterTheSettingWasTurnedOff() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/PreviewExpandTests.cs:line 53
 --- End of stack trace from previous location ---
-[xUnit.net 00:00:02.57]     MdExplorer.Tests.SemanticSearchTests.ChineseTopicQueryMatchesFilesContainingATwoCharacterFragment [FAIL]
-  Failed MdExplorer.Tests.SemanticSearchTests.ChineseTopicQueryMatchesFilesContainingATwoCharacterFragment [20 ms]
-  Error Message:
-   Assert.Single() Failure: The collection contained 3 items
-Collection: [SemanticSearchHit { Item = FileItem { Locator = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads/2024-验机实录.mp4, Name = 2024-验机实录.mp4, Kind = Video, Length = 11, LastWriteTime = 11/09/2026 06:33:03 +00:00, IsHidden = False, IsSymlink = False, Extension = .mp4, FullPath = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads/2024-验机实录.mp4, IsFolder = False }, Score = 0.8925, ModelName = Test embedding, Match = Name, SemanticScore = 1, Rationale = 文件名命中 · 语义 100 %, Snippet = , SnippetHighlightStart = -1, SnippetHighlightLength = 0 }, SemanticSearchHit { Item = FileItem { Locator = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads/cooking.webm, Name = cooking.webm, Kind = Video, Length = 11, LastWriteTime = 11/09/2026 06:33:03 +00:00, IsHidden = False, IsSymlink = False, Extension = .webm, FullPath = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads/cooking.webm, IsFolder = False }, Score = 0.45, ModelName = Test embedding, Match = Semantic, SemanticScore = 1, Rationale = 语义 100 %, Snippet = , SnippetHighlightStart = -1, SnippetHighlightLength = 0 }, SemanticSearchHit { Item = FileItem { Locator = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads, Name = downloads, Kind = Folder, Length = , LastWriteTime = 11/09/2026 06:33:03 +00:00, IsHidden = False, IsSymlink = False, Extension = , FullPath = /tmp/mdexplorer-semantic-tests/4eb4d257f3f04b73a7086be869cf6bb2/files/downloads, IsFolder = True }, Score = 0.45, ModelName = Test embedding, Match = Semantic, SemanticScore = 1, Rationale = 语义 100 %, Snippet = , SnippetHighlightStart = -1, SnippetHighlightLength = 0 }]
-  Stack Trace:
-     at MdExplorer.Tests.SemanticSearchTests.ChineseTopicQueryMatchesFilesContainingATwoCharacterFragment() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/SemanticSearchTests.cs:line 175
---- End of stack trace from previous location ---
-[xUnit.net 00:00:02.59]     MdExplorer.Tests.SemanticSearchTests.RebuildEmbedsTextSearchesByMeaningAndStoresNoRawContent [FAIL]
-  Failed MdExplorer.Tests.SemanticSearchTests.RebuildEmbedsTextSearchesByMeaningAndStoresNoRawContent [20 ms]
-  Error Message:
-   Assert.True() Failure
-Expected: True
-Actual:   False
-  Stack Trace:
-     at MdExplorer.Tests.SemanticSearchTests.RebuildEmbedsTextSearchesByMeaningAndStoresNoRawContent() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/SemanticSearchTests.cs:line 66
---- End of stack trace from previous location ---
-[xUnit.net 00:00:02.67]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
+[xUnit.net 00:00:01.28]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
   Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
-[xUnit.net 00:00:03.11]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
-[xUnit.net 00:00:03.11]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
+[xUnit.net 00:00:02.04]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:02.05]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
+[xUnit.net 00:00:02.05]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [1 ms]
-[xUnit.net 00:00:03.11]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
-[xUnit.net 00:00:04.18]     MdExplorer.Tests.BrowserNavigationTests.RecentFoldersAndFilesAreDedupedSurfacedAndClearable [FAIL]
-  Failed MdExplorer.Tests.BrowserNavigationTests.RecentFoldersAndFilesAreDedupedSurfacedAndClearable [127 ms]
-  Error Message:
-   System.ArgumentOutOfRangeException : Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')
-  Stack Trace:
-     at System.Collections.Generic.List`1.get_Item(Int32 index)
-   at MdExplorer.Tests.BrowserNavigationTests.RecentFoldersAndFilesAreDedupedSurfacedAndClearable() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/BrowserNavigationAndTasksTests.cs:line 119
---- End of stack trace from previous location ---
 
-Failed!  - Failed:     5, Passed:   454, Skipped:     4, Total:   463, Duration: 7 s - MdExplorer.Tests.dll (net10.0)
+Failed!  - Failed:     2, Passed:   457, Skipped:     4, Total:   463, Duration: 3 s - MdExplorer.Tests.dll (net10.0)
