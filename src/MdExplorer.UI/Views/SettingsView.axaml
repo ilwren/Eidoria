@@ -165,7 +165,7 @@
         </StackPanel>
         <!-- v0.61：改用 Md3 分段按钮组，单选语义直接写在控件形态上（Md3.Avalonia MdSegmentedButtonGroup）。 -->
         <md:MdSegmentedButtonGroup SelectedValue="{Binding ThemeMode, Mode=TwoWay}"
-                                   SelectedValueBinding="{Binding Value}">
+                                   SelectedValueBinding="{ReflectionBinding Value}">
           <md:MdSegmentedButton Value="System" Content="跟随系统" ToolTip.Tip="随系统明暗切换" />
           <md:MdSegmentedButton Value="Light" Content="浅色" />
           <md:MdSegmentedButton Value="Dark" Content="深色" />
@@ -182,7 +182,7 @@
           <TextBlock Classes="body" Text="列表密度" />
           <TextBlock Classes="caption" TextWrapping="Wrap" Text="紧凑会收紧列表行高、网格间距与详细信息行高；图标井、选中描边和拖放目标保持不变" />
           <md:MdSegmentedButtonGroup Margin="0,6,0,0" SelectedValue="{Binding Density, Mode=TwoWay}"
-                                     SelectedValueBinding="{Binding Value}">
+                                     SelectedValueBinding="{ReflectionBinding Value}">
             <md:MdSegmentedButton Value="Comfortable" Content="舒适" />
             <md:MdSegmentedButton Value="Compact" Content="紧凑" />
           </md:MdSegmentedButtonGroup>
@@ -289,7 +289,7 @@
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="档位只决定解码目标宽度：小档省内存与磁盘，大档在高分屏和网格视图里更清楚。换档会清掉已呈现的缩略图并按新档重新解码。" />
           <md:MdSegmentedButtonGroup SelectedValue="{Binding ThumbnailTierName, Mode=TwoWay}"
-                                     SelectedValueBinding="{Binding Value}">
+                                     SelectedValueBinding="{ReflectionBinding Value}">
             <md:MdSegmentedButton Value="Small" Content="小 128" ToolTip.Tip="解码目标宽度 128 DIP，省内存与磁盘" />
             <md:MdSegmentedButton Value="Medium" Content="中 192" ToolTip.Tip="默认档位" />
             <md:MdSegmentedButton Value="Large" Content="大 288" ToolTip.Tip="高分屏与网格视图更清楚" />
@@ -631,7 +631,7 @@
             <StackPanel Spacing="6">
               <TextBlock Classes="body" Text="下载源" />
               <md:MdSegmentedButtonGroup SelectedValue="{Binding AiModelSourceName, Mode=TwoWay}"
-                                         SelectedValueBinding="{Binding Value}">
+                                         SelectedValueBinding="{ReflectionBinding Value}">
                 <md:MdSegmentedButton Value="Auto" Content="自动回落"
                                       ToolTip.Tip="huggingface.co → hf-mirror.com → modelscope.cn 依次尝试" />
                 <md:MdSegmentedButton Value="HuggingFace" Content="HuggingFace" />
@@ -667,7 +667,7 @@
               <StackPanel Spacing="6" Margin="0,4,0,0">
                 <TextBlock Classes="body" Text="下载代理" />
                 <md:MdSegmentedButtonGroup SelectedValue="{Binding AiModelProxyMode, Mode=TwoWay}"
-                                           SelectedValueBinding="{Binding Value}">
+                                           SelectedValueBinding="{ReflectionBinding Value}">
                   <md:MdSegmentedButton Value="System" Content="跟随系统" />
                   <md:MdSegmentedButton Value="None" Content="直连" />
                   <md:MdSegmentedButton Value="Custom" Content="自定义" />
