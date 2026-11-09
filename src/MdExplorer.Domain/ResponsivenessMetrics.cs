@@ -207,6 +207,16 @@ public sealed class UiStallRecorder
 
     /// <summary>超过阈值的长停顿次数。</summary>
     public int LongStalls => _longStalls;
+    
+    /// <summary>清空采样（如重新挂窗口、切会话）。</summary>
+    public void Reset()
+    {
+        _stalls.Clear();
+        _lastTimestamp = 0;
+        _ticks = 0;
+        _maxStallMs = 0d;
+        _longStalls = 0;
+    }
 
     public double MaxStallMs => _maxStallMs;
 
