@@ -665,7 +665,18 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// 「预览」时不该再被设置挡回来——"打不开预览"有一半原因是开关被关过就再也点不开。
     /// 这是会话内状态，不写设置文件；设置页里改开关仍以设置为准。
     /// </summary>
-    private bool _previewPaneRequested = true;
+    /// <summary>
+    /// 本次会话里用户显式要求打开预览栏（Ctrl+P / 菜单）。默认关闭：常态可见性只看
+    /// 持久化设置；会话内打开后，设置即使曾经关过也压得不住这次请求。
+    /// </summary>
+    private bool _previewPaneRequested;
+
+    /// <summary>
+    /// 本次会话里用户用面板上的「×」主动关掉了预览栏（v0.60）。只活在这个窗口生命周期内，
+    /// 不写回设置——「这次关掉」≠「以后都别开」，也不会反过来在下一次选中文件时自己弹出来：
+    /// 要回来就用 Ctrl+P / 菜单显式打开（浮动预览不受这个位影响，它跟的是 IsPreviewPageOpen）。
+    /// </summary>
+    private bool _previewPaneDismissed;
 
     /// <summary>
     /// 主区要让出的边距：竖铰链让右、横铰链让下。
@@ -749,6 +760,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// 常驻预览栏：半折叠时一律让位给副半屏（v0.58）——两半各摆一套预览只会互相挤。
     /// </summary>
     public bool ShowPreviewPaneNow => !IsHalfFolded && IsExpandedOrAbove && !IsShortViewport &&
+        !_previewPaneDismissed &&
         (SettingsStore.Settings.ShowPreviewPane || _previewPaneRequested) && Preview.HasItem;
 
     /// <summary>
@@ -766,6 +778,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         if (IsExpandedOrAbove && !IsShortViewport && !IsHalfFolded)
         {
             _previewPaneRequested = true;
+            _previewPaneDismissed = false;
             OnPropertyChanged(nameof(ShowPreviewPaneNow));
             OnPropertyChanged(nameof(ShowPreviewPaneEffective));
             OnPropertyChanged(nameof(ShowPreviewPageNow));
@@ -782,9 +795,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     /// <summary>关预览栏：同时清掉「手动请求」，否则下一次选中文件它又自己冒出来。</summary>
     public void ClosePreviewPane()
     {
-        // 先清请求再写开关：OnShowPreviewPaneChanged 会把请求同步成开关值，
-        // 顺序反过来就会把「已关闭」又写成「已请求」。
+        // 只把本次会话的请求清掉 + 记下「用户主动关过」：
+        // 不动设置里的持久化开关，「关掉这次」不等于「永久关掉」。
         _previewPaneRequested = false;
+        _previewPaneDismissed = true;
         // 直接写请求 + 刷新可见性，不经过开关持久化：用户按「关闭预览」关的只是这一次，
         // 不该顺手把设置里的「预览侧栏（宽屏）」永久改成关闭。
         RefreshPreviewVisibility();
@@ -4191,8 +4205,9 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
     partial void OnShowPreviewPaneChanged(bool value)
     {
-        // 用户自己动了开关，就回到「以设置为准」：手动请求不再覆盖设置。
+        // 用户自己动了开关，就回到「以设置为准」：手动请求与「这次关掉了」都不再覆盖设置。
         _previewPaneRequested = value;
+        _previewPaneDismissed = false;
         _services.SettingsStore.Settings.ShowPreviewPane = value;
         _ = SaveAsync();
         RefreshPreviewVisibility();
