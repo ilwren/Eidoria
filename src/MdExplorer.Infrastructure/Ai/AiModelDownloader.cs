@@ -81,18 +81,54 @@ public interface IAiModelTransport
 /// <summary>真实实现：共享一个 <see cref="HttpClient"/>，不设整体超时（大文件），靠连接超时 + 取消令牌兜底。</summary>
 public sealed class HttpAiModelTransport : IAiModelTransport
 {
-    private static readonly HttpClient Shared = new(new SocketsHttpHandler
-    {
-        ConnectTimeout = TimeSpan.FromSeconds(20),
-        AllowAutoRedirect = true,
-        AutomaticDecompression = DecompressionMethods.None,
-    })
-    {
-        // 权重大则几分钟，不设整体超时；取消由 CancellationToken 负责。
-        Timeout = Timeout.InfiniteTimeSpan,
-    };
+    private static readonly HttpClient Shared = CreateClient(AiProxyPlan.System);
+
+    /// <summary>
+    /// 代理配方提供器（v0.61）：每次请求前现读设置，用户在设置页改完代理立即生效，
+    /// 不用重启。配方变化才重建 HttpClient；同一配方持续复用同一连接池。
+    /// </summary>
+    private readonly Func<AiProxyPlan>? _proxyPlanProvider;
+    private readonly object _clientGate = new();
+    private HttpClient? _configuredClient;
+    private string _configuredClientKey = string.Empty;
+
+    public HttpAiModelTransport(Func<AiProxyPlan>? proxyPlanProvider = null) => _proxyPlanProvider = proxyPlanProvider;
 
     public const string UserAgent = "Eidoria/1.0 (+https://github.com/ilwren/Eidoria)";
+
+    /// <summary>当前配方对应的客户端；配方变化时重建，飞行中的旧请求由旧客户端自行收尾。</summary>
+    private HttpClient ResolveClient()
+    {
+        if (_proxyPlanProvider is null)
+            return Shared;
+        var plan = _proxyPlanProvider();
+        lock (_clientGate)
+        {
+            if (_configuredClient is not null && string.Equals(_configuredClientKey, plan.CacheKey, StringComparison.Ordinal))
+                return _configuredClient;
+            _configuredClient = CreateClient(plan);
+            _configuredClientKey = plan.CacheKey;
+            return _configuredClient;
+        }
+    }
+
+    private static HttpClient CreateClient(AiProxyPlan plan)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(20),
+            AllowAutoRedirect = true,
+            AutomaticDecompression = DecompressionMethods.None,
+            UseProxy = plan.UseProxy,
+        };
+        if (plan.UseProxy && plan.Address is { Length: > 0 })
+            handler.Proxy = plan.CreateWebProxy();
+        return new HttpClient(handler)
+        {
+            // 权重大则几分钟，不设整体超时；取消由 CancellationToken 负责。
+            Timeout = Timeout.InfiniteTimeSpan,
+        };
+    }
 
     public async Task<AiModelTransportResponse> GetAsync(
         Uri uri, long rangeFrom, CancellationToken cancellationToken)
@@ -102,7 +138,7 @@ public sealed class HttpAiModelTransport : IAiModelTransport
         if (rangeFrom > 0)
             request.Headers.Range = new RangeHeaderValue(rangeFrom, null);
 
-        var response = await Shared
+        var response = await ResolveClient()
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 

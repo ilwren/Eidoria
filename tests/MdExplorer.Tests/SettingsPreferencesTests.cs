@@ -423,4 +423,53 @@ public sealed class SettingsPreferencesTests : IDisposable
         Assert.Equal(48, second.RecentItemLimit);
         Assert.Equal(96d, second.PullRefreshTriggerDistance);
     }
+
+    // ── v0.61：设置页控件多样化（滑杆桥接与代理设置） ────────────────────
+
+    [Fact]
+    public async Task SliderBridgesRoundToSteps_AndPersist()
+    {
+        var shell = CreateShell();
+
+        shell.ItemPageSizeNumber = 137d;
+        Assert.Equal(120, shell.ItemPageSize);
+        Assert.Equal(120d, shell.ItemPageSizeNumber);
+
+        shell.RecentItemLimitNumber = 20d;
+        Assert.Equal(18, shell.RecentItemLimit); // 20 不在 6 的倍数上 → 收到 18
+
+        shell.SearchResultLimitNumber = 2400d;
+        Assert.Equal(2500, shell.SearchResultLimit);
+
+        await shell.SettingsStore.SaveSettingsAsync(TestContext.Current.CancellationToken);
+        var reloaded = CreateShell();
+        Assert.Equal(120, reloaded.ItemPageSize);
+        Assert.Equal(18, reloaded.RecentItemLimit);
+        Assert.Equal(2500, reloaded.SearchResultLimit);
+    }
+
+    [Fact]
+    public async Task ProxySettingsRoundTripAndNormalize()
+    {
+        var shell = CreateShell();
+        Assert.Equal("System", shell.AiModelProxyMode);
+        Assert.False(shell.AiModelProxyIsCustom);
+
+        shell.AiModelProxyMode = "Custom";
+        Assert.True(shell.AiModelProxyIsCustom);
+        Assert.Contains("未填地址", shell.AiModelProxySummaryText, StringComparison.Ordinal);
+
+        shell.AiModelProxyAddress = "127.0.0.1:7890";
+        Assert.Contains("127.0.0.1:7890", shell.AiModelProxySummaryText, StringComparison.Ordinal);
+
+        shell.AiModelProxyMode = "garbage";
+        Assert.Equal("System", shell.AiModelProxyMode);
+
+        shell.AiModelProxyMode = "Custom";
+        shell.AiModelProxyAddress = "http://10.0.0.2:8080";
+        await shell.SettingsStore.SaveSettingsAsync(TestContext.Current.CancellationToken);
+        var reloaded = CreateShell();
+        Assert.Equal("Custom", reloaded.AiModelProxyMode);
+        Assert.Equal("http://10.0.0.2:8080", reloaded.AiModelProxyAddress);
+    }
 }

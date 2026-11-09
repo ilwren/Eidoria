@@ -515,12 +515,12 @@
           </Border>
 
           <!-- 浏览器页：独立白色工作区浮在外层柔和底板上（预览亦同语言） -->
-          <Border x:Name="BrowserWorkspace" IsVisible="{Binding IsBrowser}" Classes="workspace-surface" ClipToBounds="True" Margin="10">
+          <Border x:Name="BrowserWorkspace" IsVisible="{Binding IsBrowser}" Classes="workspace-surface" ClipToBounds="True" Margin="0">
           <Grid RowDefinitions="Auto,*">
             <!-- 非桌面窗口宿主的回落标签条；桌面无边框窗口改由顶部 DesktopWindowChrome 承载同一模板 -->
             <Border x:Name="WorkspaceTabStripHost" Grid.Row="0" Background="{DynamicResource Md.Sys.Color.SurfaceContainerLow.Brush}"
                     BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="0,0,0,1"
-                    CornerRadius="23,23,0,0" Padding="10,8,10,0" MinHeight="50">
+                    Padding="10,8,10,0" MinHeight="50">
               <md:MdScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" AllowMouseDrag="False">
                 <StackPanel Orientation="Horizontal" Spacing="5">
                   <ItemsControl x:Name="TabStrip" ItemsSource="{Binding Browser.Tabs}" ItemTemplate="{StaticResource BrowserTabTemplate}">
@@ -1429,8 +1429,10 @@
                                        ResetRequested="OnPreviewSplitterResetRequested"
                                        ToolTip.Tip="拖动调整预览栏宽度；双击或按 Home 恢复默认"
                                        AutomationProperties.Name="调整预览栏宽度" />
-        <Border x:Name="PreviewPane" Grid.Row="1" Grid.Column="5" IsVisible="{Binding ShowPreviewPaneEffective}" Margin="0,10,10,10"
-                Classes="workspace-surface" ClipToBounds="True">
+        <!-- v0.61：预览栏并入连续表面；左缘 1px 分隔线取代圆角浮卡，与概念稿一致。 -->
+        <Border x:Name="PreviewPane" Grid.Row="1" Grid.Column="5" IsVisible="{Binding ShowPreviewPaneEffective}" Margin="0"
+                Classes="workspace-surface" ClipToBounds="True"
+                BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1,0,0,0">
           <Border.Transitions>
             <Transitions>
               <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
@@ -1456,7 +1458,8 @@
               IsVisible="{Binding IsFoldSecondaryBook}"
               Width="{Binding FoldSecondaryWidth}"
               HorizontalAlignment="Right" VerticalAlignment="Stretch"
-              Margin="0,10,10,10" Classes="workspace-surface" ClipToBounds="True">
+              Margin="0" Classes="workspace-surface" ClipToBounds="True"
+              BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="1,0,0,0">
         <Grid RowDefinitions="Auto,*">
           <!-- 有内容就直接铺满（预览自己带标题），空着才放一行说明 -->
           <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"
@@ -1477,7 +1480,8 @@
               IsVisible="{Binding IsFoldSecondaryTabletop}"
               Height="{Binding FoldSecondaryHeight}"
               HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
-              Margin="10,0,10,10" Classes="workspace-surface" ClipToBounds="True">
+              Margin="0" Classes="workspace-surface" ClipToBounds="True"
+              BorderBrush="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" BorderThickness="0,1,0,0">
         <Grid RowDefinitions="Auto,*">
           <!-- 有内容就直接铺满（预览自己带标题），空着才放一行说明 -->
           <TextBlock Grid.Row="1" Classes="body" Margin="17" TextWrapping="Wrap"

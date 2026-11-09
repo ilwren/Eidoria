@@ -206,6 +206,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         _showMediaDiagnostics = s.ShowMediaDiagnostics;
         _enableLocalAi = s.EnableLocalAi;
         _aiModelSourceName = s.AiModelSource;
+        _aiModelProxyMode = AiProxyPlan.NormalizeMode(s.AiModelProxyMode);
+        _aiModelProxyAddress = s.AiModelProxyAddress;
         _useSearchIndex = s.UseSearchIndex;
         _enableContentIndex = s.EnableContentIndex;
         _isDualPaneEnabled = s.DualPaneEnabled;
@@ -4096,9 +4098,17 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         OnPropertyChanged(nameof(ThumbnailCacheSummary));
     }
 
+    /// <summary>缩略图档位的字符串桥（分段按钮的 SelectedValue 绑这个；枚举属性保留给逻辑判断）。</summary>
+    public string ThumbnailTierName
+    {
+        get => ThumbnailTierNames.ToSettingValue(ThumbnailSize);
+        set => ThumbnailSize = ThumbnailTierNames.Parse(value);
+    }
+
     partial void OnThumbnailSizeChanged(ThumbnailTier value)
     {
         _services.SettingsStore.Settings.ThumbnailTier = ThumbnailTierNames.ToSettingValue(value);
+        OnPropertyChanged(nameof(ThumbnailTierName));
         _ = SaveAsync();
         OnPropertyChanged(nameof(IsThumbnailSizeSmall));
         OnPropertyChanged(nameof(IsThumbnailSizeMedium));
@@ -4151,6 +4161,48 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public bool IsSearchLimit1000 => SearchResultLimit == 1000;
     public bool IsSearchLimit2000 => SearchResultLimit == 2000;
     public bool IsSearchLimit5000 => SearchResultLimit == 5000;
+
+    // ── 滑杆桥接（v0.61）─────────────────────────────────────────────
+    // MdSlider 的 Value 是 double；设置里这些值是 int / 有档位语义的 int。
+    // 桥接属性的 setter 做四舍五入 + 变更检测，只有真变化才落到既有属性
+    // （现有 partial OnXxxChanged 负责持久化与联动刷新），避免滑杆轻微抖动
+    // 就把设置文件写个没完。
+
+    /// <summary>每页项目数（60–480，步进 60）。</summary>
+    public double ItemPageSizeNumber
+    {
+        get => ItemPageSize;
+        set
+        {
+            var rounded = (int)Math.Round(value / 60.0) * 60;
+            if (rounded != ItemPageSize)
+                ItemPageSize = rounded;
+        }
+    }
+
+    /// <summary>最近访问保留条数（6–60，步进 6）。</summary>
+    public double RecentItemLimitNumber
+    {
+        get => RecentItemLimit;
+        set
+        {
+            var rounded = (int)Math.Round(value / 6.0) * 6;
+            if (rounded != RecentItemLimit)
+                RecentItemLimit = rounded;
+        }
+    }
+
+    /// <summary>搜索结果上限（500–20000，步进 500；既有过滤 200–20000 这里收窄到千位档）。</summary>
+    public double SearchResultLimitNumber
+    {
+        get => SearchResultLimit;
+        set
+        {
+            var rounded = (int)Math.Round(value / 500.0) * 500;
+            if (rounded != SearchResultLimit)
+                SearchResultLimit = rounded;
+        }
+    }
 
     /// <summary>滚动续页的统一门槛：关闭自动加载后只剩页脚按钮与快捷键。</summary>
     public bool ShouldAutoLoadMore(double remainingFromBottom) =>
@@ -4373,6 +4425,15 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
     /// <summary>当前下载源名（字符串形态，存进设置）；非法值一律收回 Auto。</summary>
     [ObservableProperty] private string _aiModelSourceName = "Auto";
+
+    /// <summary>AI 模型下载代理方式（v0.61）：System / None / Custom，分段按钮直接 TwoWay 绑这个。</summary>
+    [ObservableProperty] private string _aiModelProxyMode = "System";
+
+    /// <summary>自定义代理地址；只在 Custom 档生效，MdTextBox TwoWay 直接写。</summary>
+    [ObservableProperty] private string _aiModelProxyAddress = string.Empty;
+
+    /// <summary>AI 模型下载的实时进度（0–100）；不做任务时保持上一次值，进度条以 Busy 位决定可见性。</summary>
+    [ObservableProperty] private double _aiModelDownloadPercent;
     [ObservableProperty] private string _localAiDownloadStatusText = string.Empty;
     [ObservableProperty] private bool _isLocalAiDownloadBusy;
 
@@ -4383,6 +4444,16 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
     public bool IsAiSourceModelScope => AiModelSource == AiModelSource.ModelScope;
     public string AiModelSourceHintText => AiModelSourceNames.Describe(AiModelSource);
     public bool CanDownloadAiModels => !IsLocalAiDownloadBusy;
+    public bool AiModelProxyIsCustom => AiModelProxyMode == "Custom";
+    /// <summary>代理刚改完时的即时反馈，避免「改了没生效」的疑问。</summary>
+    public string AiModelProxySummaryText => AiModelProxyMode switch
+    {
+        "None" => "直连：不走任何代理",
+        "Custom" => AiModelProxyAddress.Trim().Length == 0
+            ? "自定义模式但未填地址，按「跟随系统」处理"
+            : $"自定义代理：{AiModelProxyAddress.Trim()}",
+        _ => "跟随系统代理",
+    };
 
     /// <summary>默认轻量包的体积口径，直接由清单算，别手写一个会过期的数字。</summary>
     public string LocalAiDefaultPackageText
@@ -4395,6 +4466,28 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
                 ? "清单里没有默认模型"
                 : $"默认轻量包：{string.Join(" + ", defaults.Select(model => model.Name))} 共约 {megabytes} MB";
         }
+    }
+
+    partial void OnAiModelProxyModeChanged(string value)
+    {
+        var normalized = AiProxyPlan.NormalizeMode(value);
+        if (!string.Equals(value, normalized, StringComparison.Ordinal))
+        {
+            AiModelProxyMode = normalized;
+            return;
+        }
+
+        _services.SettingsStore.Settings.AiModelProxyMode = normalized;
+        _ = SaveAsync();
+        OnPropertyChanged(nameof(AiModelProxyIsCustom));
+        OnPropertyChanged(nameof(AiModelProxySummaryText));
+    }
+
+    partial void OnAiModelProxyAddressChanged(string value)
+    {
+        _services.SettingsStore.Settings.AiModelProxyAddress = value;
+        _ = SaveAsync();
+        OnPropertyChanged(nameof(AiModelProxySummaryText));
     }
 
     partial void OnAiModelSourceNameChanged(string value)
@@ -4459,16 +4552,31 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         var source = AiModelSource;
         AiModelDownloadOutcome? last = null;
         IsLocalAiDownloadBusy = true;
+        AiModelDownloadPercent = 0;
         LocalAiDownloadStatusText = verifyOnly
             ? "正在校验已下载文件…"
-            : $"正在从 {AiModelSourceNames.ToName(source)} 下载…";
+            : $"正在从 {AiModelSourceNames.ToName(source)} 下载… · {AiModelProxySummaryText}";
         try
         {
+            // 设置页的进度条吃同一份报告：任务中心给的是任务级进度，
+            // 这里实时刷「当前文件 + 百分比」，用户不用打开任务中心也知道在下什么。
+            var liveProgress = new Progress<OperationProgress>(report =>
+            {
+                AiModelDownloadPercent = Math.Clamp(report.Fraction, 0d, 1d) * 100d;
+                LocalAiDownloadStatusText = report.CurrentItemName.Length == 0
+                    ? $"{AiModelDownloadPercent:0}%"
+                    : $"{report.CurrentItemName} · {AiModelDownloadPercent:0}%";
+            });
             await RunOperationAsync(title, async (progress, ct) =>
             {
+                var fanOut = new Progress<OperationProgress>(report =>
+                {
+                    progress.Report(report);
+                    liveProgress.Report(report);
+                });
                 last = verifyOnly
-                    ? await _services.AiModelDownloads.VerifyAsync(modelIds, progress, ct).ConfigureAwait(true)
-                    : await _services.AiModelDownloads.DownloadAsync(modelIds, source, progress, ct)
+                    ? await _services.AiModelDownloads.VerifyAsync(modelIds, fanOut, ct).ConfigureAwait(true)
+                    : await _services.AiModelDownloads.DownloadAsync(modelIds, source, fanOut, ct)
                         .ConfigureAwait(true);
                 return new OperationOutcome(
                     last.SucceededCount,
@@ -4532,6 +4640,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
 
     private void NotifyItemPageSizeState()
     {
+        OnPropertyChanged(nameof(ItemPageSizeNumber));
         OnPropertyChanged(nameof(ItemPageSizeText));
         OnPropertyChanged(nameof(IsPageSize60));
         OnPropertyChanged(nameof(IsPageSize120));
@@ -4584,6 +4693,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         if (settings.RecentFilePaths.Count > limit)
             settings.RecentFilePaths.RemoveRange(limit, settings.RecentFilePaths.Count - limit);
         _ = SaveAsync();
+        OnPropertyChanged(nameof(RecentItemLimitNumber));
         OnPropertyChanged(nameof(RecentLimitText));
         OnPropertyChanged(nameof(IsRecentLimit12));
         OnPropertyChanged(nameof(IsRecentLimit24));
@@ -4668,6 +4778,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         var limit = Math.Clamp(value, 200, 20000);
         _services.SettingsStore.Settings.SearchResultLimit = limit;
         _ = SaveAsync();
+        OnPropertyChanged(nameof(SearchResultLimitNumber));
         OnPropertyChanged(nameof(SearchResultLimitText));
         OnPropertyChanged(nameof(IsSearchLimit1000));
         OnPropertyChanged(nameof(IsSearchLimit2000));

@@ -13,6 +13,8 @@ namespace MdExplorer.UI.Services;
 public sealed class MdSystemNotificationServiceAdapter : ISystemNotificationService
 {
     public const string ApplicationName = "Eidoria";
+    // AppUserModelID 是 Windows Toast/快捷方式的持久身份：已注册过的机器不能换名，
+    // 内部代号留在这一处身份里（不显示给用户）；品牌面向用户统一为 Eidoria。
     public const string WindowsAppUserModelId = "MdExplorer.Eidoria";
     public const string AndroidChannelId = "eidoria.tasks";
     public const string AndroidChannelName = "任务与自动化";

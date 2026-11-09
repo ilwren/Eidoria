@@ -134,12 +134,14 @@
   </Style>
 
   <!-- 通用表面：概念稿的关键不是更艳，而是底板、工作区与卡片之间有稳定的明暗阶梯。 -->
+  <!-- v0.61：对照概念稿，主工作面（浏览器/预览栏/折叠副屏）不再各自画圆角浮卡，
+       改为同一张连续表面——圆角与阴影只保留给真正的浮层（搜索岛、任务中心、对话框）。 -->
   <Style Selector="Border.workspace-surface">
     <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Surface.Brush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.OutlineVariant.Brush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="24" />
-    <Setter Property="BoxShadow" Value="0 5 18 #10000000" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BoxShadow" Value="none" />
   </Style>
 
   <!-- 对照窗格标签（v0.30）：非活动用低对比表面，活动标签抬高到 secondary container。 -->

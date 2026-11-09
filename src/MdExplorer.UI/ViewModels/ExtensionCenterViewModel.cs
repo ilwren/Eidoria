@@ -18,10 +18,15 @@ public sealed partial class ExtensionCenterViewModel : ObservableObject
     [ObservableProperty] private string _statusText = string.Empty;
 
     public ObservableCollection<PluginCardModel> Packages { get; } = [];
+
+    /// <summary>内置示例包（v0.61 起开箱即有，便于验证插件管线；装完即从该列表消失）。</summary>
+    public ObservableCollection<BuiltInPluginCardModel> BuiltInPackages { get; } = [];
     public ObservableCollection<PluginPackageIssue> Issues { get; } = [];
     public string PackageDirectory => _catalog.PackageDirectory;
     public string PackageCountText => Packages.Count == 1 ? "1 个本地扩展" : $"{Packages.Count} 个本地扩展";
     public bool HasPackages => Packages.Count > 0;
+    /// <summary>还没装进本机的内置示例；「本地扩展」里已出现同 id 即视为已装。</summary>
+    public bool HasBuiltInPackages => BuiltInPackages.Count > 0;
     public bool HasIssues => Issues.Count > 0;
 
     public ExtensionCenterViewModel(
@@ -45,6 +50,7 @@ public sealed partial class ExtensionCenterViewModel : ObservableObject
             Packages.Clear();
             foreach (var package in snapshot.Packages)
                 Packages.Add(new PluginCardModel(package, _currentSeedColor()));
+            RefreshBuiltIns();
             Issues.Clear();
             foreach (var issue in snapshot.Issues)
                 Issues.Add(issue);
@@ -72,21 +78,8 @@ public sealed partial class ExtensionCenterViewModel : ObservableObject
             if (!fileName.EndsWith(PluginPackageCatalog.PackageExtension, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("请选择 .mepx 插件包。");
 
-            var candidate = await _catalog.InspectAsync(packageStream, CancellationToken.None).ConfigureAwait(true);
-            var manifest = candidate.Manifest;
-            var replaces = Packages.FirstOrDefault(item => item.Id == manifest.Id);
-            var details =
-                $"{manifest.Name} · {manifest.Version}\n发布者：{manifest.Publisher}\n" +
-                $"能力：主题色（{manifest.Theme!.SeedColor}）\nSHA-256：{candidate.Sha256}\n\n" +
-                "此包未签名。当前版本只接受一个 JSON 清单，不包含可执行代码、脚本、程序集或网络能力；" +
-                "安装前请确认来源可信。" +
-                (replaces is null ? string.Empty : "\n同 ID 的已安装包将被替换。");
-            if (!await _dialogs.ConfirmAsync("安装声明式扩展？", details, "安装").ConfigureAwait(true))
-                return;
-
-            await _catalog.InstallAsync(candidate, CancellationToken.None).ConfigureAwait(true);
-            Refresh();
-            StatusText = $"已安装「{manifest.Name}」。";
+            // 统一走 InstallBytesAsync：外部导入与内置示例的确认文案完全一致，不漂移。
+            await InstallBytesAsync(packageStream).ConfigureAwait(true);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or UnauthorizedAccessException)
         {
@@ -139,6 +132,62 @@ public sealed partial class ExtensionCenterViewModel : ObservableObject
     [RelayCommand]
     private void Rescan() => Refresh();
 
+    /// <summary>安装一枚内置示例包；与「导入 .mepx」走同一条 InspectAsync → 确认 → InstallAsync 管线。</summary>
+    [RelayCommand]
+    private async Task InstallBuiltInAsync(BuiltInPluginCardModel? builtIn)
+    {
+        if (builtIn is null || IsBusy)
+            return;
+        IsBusy = true;
+        try
+        {
+            var bytes = BuiltInPluginPackages.CreatePackageBytes(builtIn.Definition);
+            using var stream = new MemoryStream(bytes, writable: false);
+            await InstallBytesAsync(stream).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or UnauthorizedAccessException)
+        {
+            StatusText = $"安装失败：{ex.Message}";
+            await _dialogs.ConfirmAsync("扩展包无法安装", ex.Message, "知道了").ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>导入与内置安装共用的确认 + 安装骨架。</summary>
+    private async Task InstallBytesAsync(Stream packageStream)
+    {
+        var candidate = await _catalog.InspectAsync(packageStream, CancellationToken.None).ConfigureAwait(true);
+        var manifest = candidate.Manifest;
+        var replaces = Packages.FirstOrDefault(item => item.Id == manifest.Id);
+        var details =
+            $"{manifest.Name} · {manifest.Version}\n发布者：{manifest.Publisher}\n" +
+            $"能力：主题色（{manifest.Theme!.SeedColor}）\nSHA-256：{candidate.Sha256}\n\n" +
+            "此包未签名。当前版本只接受一个 JSON 清单，不包含可执行代码、脚本、程序集或网络能力。" +
+            (replaces is null ? string.Empty : "\n同 ID 的已安装包将被替换。");
+        if (!await _dialogs.ConfirmAsync("安装声明式扩展？", details, "安装").ConfigureAwait(true))
+            return;
+
+        await _catalog.InstallAsync(candidate, CancellationToken.None).ConfigureAwait(true);
+        Refresh();
+        StatusText = $"已安装「{manifest.Name}」。";
+    }
+
+    /// <summary>内置区只列本机还没装的示例；已装的出现在「本地扩展」名单里。</summary>
+    private void RefreshBuiltIns()
+    {
+        BuiltInPackages.Clear();
+        foreach (var definition in BuiltInPluginPackages.Definitions)
+        {
+            if (Packages.Any(package => package.Id == definition.Id))
+                continue;
+            BuiltInPackages.Add(new BuiltInPluginCardModel(definition));
+        }
+        OnPropertyChanged(nameof(HasBuiltInPackages));
+    }
+
     private void NotifyCollectionStateChanged()
     {
         OnPropertyChanged(nameof(PackageCountText));
@@ -158,4 +207,19 @@ public sealed class PluginCardModel(InstalledPluginPackage package, string curre
     public bool HasTheme => package.Manifest.Theme is not null;
     public bool IsThemeApplied => string.Equals(ThemeSeedColor, currentSeedColor, StringComparison.OrdinalIgnoreCase);
     public string HashText => package.Sha256;
+}
+
+public sealed class BuiltInPluginCardModel(BuiltInPluginPackageDefinition definition)
+{
+    public BuiltInPluginPackageDefinition Definition => definition;
+    /// <summary>行内色板：Brush 由 VM 直接给，XAML 不依赖 Color 字符串转换。</summary>
+    public Avalonia.Media.IBrush SeedColorBrush { get; } =
+        new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(definition.SeedColor));
+    public string Id => definition.Id;
+    public string Name => definition.Name;
+    public string Version => definition.Version;
+    public string Description => definition.Description;
+    public string Publisher => "Eidoria 示例";
+    public string SeedColor => definition.SeedColor;
+    public string Hint => $"种子色 {definition.SeedColor} 的主题标签；写盘只有一份 manifest.json。";
 }

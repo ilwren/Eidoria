@@ -145,7 +145,8 @@
         </WrapPanel>
         <md:MdScrollViewer x:Name="SettingsContentScroll" Grid.Row="1"
                            HorizontalScrollBarVisibility="Disabled" AllowMouseDrag="True">
-          <StackPanel x:Name="SettingsContent" MaxWidth="900" HorizontalAlignment="Left" Spacing="16" Margin="0,0,0,24">
+          <!-- v0.61：占满可见宽度，不再留 900 DIP 上限；宽屏下左侧是固定的设置分类栏。 -->
+          <StackPanel x:Name="SettingsContent" HorizontalAlignment="Stretch" Spacing="16" Margin="0,0,0,24">
             <StackPanel Spacing="4" Margin="2,0,0,2">
               <TextBlock x:Name="SettingsSectionTitle" Classes="h2" Text="外观" />
               <TextBlock x:Name="SettingsSectionSubtitle" Classes="body" TextWrapping="Wrap"
@@ -162,11 +163,13 @@
               </Border>
           <TextBlock Classes="h3" Text="外观" VerticalAlignment="Center" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <md:MdButton Variant="Tonal" Content="跟随系统" Command="{Binding SetThemeModeCommand}" CommandParameter="System" />
-          <md:MdButton Variant="Tonal" Content="浅色" Command="{Binding SetThemeModeCommand}" CommandParameter="Light" />
-          <md:MdButton Variant="Tonal" Content="深色" Command="{Binding SetThemeModeCommand}" CommandParameter="Dark" />
-        </StackPanel>
+        <!-- v0.61：改用 Md3 分段按钮组，单选语义直接写在控件形态上（Md3.Avalonia MdSegmentedButtonGroup）。 -->
+        <md:MdSegmentedButtonGroup SelectedValue="{Binding ThemeMode, Mode=TwoWay}"
+                                   SelectedValueBinding="{Binding Value}">
+          <md:MdSegmentedButton Value="System" Content="跟随系统" ToolTip.Tip="随系统明暗切换" />
+          <md:MdSegmentedButton Value="Light" Content="浅色" />
+          <md:MdSegmentedButton Value="Dark" Content="深色" />
+        </md:MdSegmentedButtonGroup>
         <TextBlock Classes="caption">
           <Run Text="当前主题：" /><Run Text="{Binding ThemeModeText}" />
         </TextBlock>
@@ -178,14 +181,11 @@
         <StackPanel Spacing="2" Margin="0,8,0,0">
           <TextBlock Classes="body" Text="列表密度" />
           <TextBlock Classes="caption" TextWrapping="Wrap" Text="紧凑会收紧列表行高、网格间距与详细信息行高；图标井、选中描边和拖放目标保持不变" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsDensityComfortable}" Variant="Text"
-                         Content="舒适" Margin="0,0,6,0"
-                         Command="{Binding SetDensityCommand}" CommandParameter="Comfortable" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsDensityCompact}" Variant="Text"
-                         Content="紧凑"
-                         Command="{Binding SetDensityCommand}" CommandParameter="Compact" />
-          </WrapPanel>
+          <md:MdSegmentedButtonGroup Margin="0,6,0,0" SelectedValue="{Binding Density, Mode=TwoWay}"
+                                     SelectedValueBinding="{Binding Value}">
+            <md:MdSegmentedButton Value="Comfortable" Content="舒适" />
+            <md:MdSegmentedButton Value="Compact" Content="紧凑" />
+          </md:MdSegmentedButtonGroup>
         </StackPanel>
         <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
           <StackPanel>
@@ -250,14 +250,11 @@
           </Grid>
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="首屏与每次续载创建的行数；底层仍先完整枚举并统一排序，因此这是渐进呈现，不是磁盘分页读取" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsPageSize60}" Variant="Text"
-                         Content="60" Margin="0,0,6,0" Command="{Binding SetItemPageSizeCommand}" CommandParameter="60" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsPageSize120}" Variant="Text"
-                         Content="120" Margin="0,0,6,0" Command="{Binding SetItemPageSizeCommand}" CommandParameter="120" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsPageSize240}" Variant="Text"
-                         Content="240" Command="{Binding SetItemPageSizeCommand}" CommandParameter="240" />
-          </WrapPanel>
+          <md:MdSlider Margin="0,6,0,0" Minimum="60" Maximum="480" TickFrequency="60"
+                       IsSnapToTickEnabled="True" Value="{Binding ItemPageSizeNumber, Mode=TwoWay}"
+                       ShowValueIndicator="True" ValueFormat="0"
+                       ToolTip.Tip="拖动选择每页项目数（60–480，步进 60）"
+                       AutomationProperties.Name="每页项目数" />
         </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
@@ -273,17 +270,11 @@
           </Grid>
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="距离列表底部多少时开始加载下一页；调大更早预取、调小更省内存" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAutoLoadDistance160}" Variant="Text"
-                         Content="160 DIP" Margin="0,0,6,0"
-                         Command="{Binding SetAutoLoadMoreDistanceCommand}" CommandParameter="160" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAutoLoadDistance320}" Variant="Text"
-                         Content="320 DIP" Margin="0,0,6,0"
-                         Command="{Binding SetAutoLoadMoreDistanceCommand}" CommandParameter="320" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAutoLoadDistance480}" Variant="Text"
-                         Content="480 DIP"
-                         Command="{Binding SetAutoLoadMoreDistanceCommand}" CommandParameter="480" />
-          </WrapPanel>
+          <md:MdSlider Margin="0,6,0,0" Minimum="120" Maximum="600" TickFrequency="40"
+                       IsSnapToTickEnabled="True" Value="{Binding AutoLoadMoreDistance, Mode=TwoWay}"
+                       ShowValueIndicator="True" ValueFormat="0"
+                       ToolTip.Tip="距列表底部多少 DIP 自动加载下一页（120–600）"
+                       AutomationProperties.Name="自动续页距离" />
         </StackPanel>
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel>
@@ -297,17 +288,12 @@
           <TextBlock Classes="body" Text="缩略图档位" />
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="档位只决定解码目标宽度：小档省内存与磁盘，大档在高分屏和网格视图里更清楚。换档会清掉已呈现的缩略图并按新档重新解码。" />
-          <WrapPanel Orientation="Horizontal">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeSmall}" Variant="Text"
-                         Content="小 128" Margin="0,0,6,0"
-                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Small" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeMedium}" Variant="Text"
-                         Content="中 192" Margin="0,0,6,0"
-                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Medium" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsThumbnailSizeLarge}" Variant="Text"
-                         Content="大 288"
-                         Command="{Binding SetThumbnailTierCommand}" CommandParameter="Large" />
-          </WrapPanel>
+          <md:MdSegmentedButtonGroup SelectedValue="{Binding ThumbnailTierName, Mode=TwoWay}"
+                                     SelectedValueBinding="{Binding Value}">
+            <md:MdSegmentedButton Value="Small" Content="小 128" ToolTip.Tip="解码目标宽度 128 DIP，省内存与磁盘" />
+            <md:MdSegmentedButton Value="Medium" Content="中 192" ToolTip.Tip="默认档位" />
+            <md:MdSegmentedButton Value="Large" Content="大 288" ToolTip.Tip="高分屏与网格视图更清楚" />
+          </md:MdSegmentedButtonGroup>
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel>
               <TextBlock Classes="body" Text="缩略图磁盘缓存" />
@@ -362,14 +348,11 @@
             <TextBlock Grid.Column="1" Classes="caption" Text="{Binding PullTriggerText}" VerticalAlignment="Center" />
           </Grid>
           <TextBlock Classes="caption" TextWrapping="Wrap" Text="手指或鼠标从文件面顶部向下拖过该距离才触发刷新；桌面刷新按钮与 F5/Ctrl+R 不受影响" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsPullTrigger72}" Variant="Text"
-                         Content="72 DIP" Margin="0,0,6,0"
-                         Command="{Binding SetPullRefreshTriggerDistanceCommand}" CommandParameter="72" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsPullTrigger96}" Variant="Text"
-                         Content="96 DIP"
-                         Command="{Binding SetPullRefreshTriggerDistanceCommand}" CommandParameter="96" />
-          </WrapPanel>
+          <md:MdSlider Margin="0,6,0,0" Minimum="48" Maximum="120" TickFrequency="12"
+                       IsSnapToTickEnabled="True" Value="{Binding PullRefreshTriggerDistance, Mode=TwoWay}"
+                       ShowValueIndicator="True" ValueFormat="0"
+                       ToolTip.Tip="下拉多少 DIP 触发刷新（48–120）"
+                       AutomationProperties.Name="下拉刷新触发距离" />
         </StackPanel>
       </StackPanel>
       </Border>
@@ -397,14 +380,11 @@
             <TextBlock Grid.Column="1" Classes="caption" Text="{Binding RecentLimitText}" VerticalAlignment="Center" />
           </Grid>
           <TextBlock Classes="caption" TextWrapping="Wrap" Text="同时约束主页最近访问与浏览历史记录；调小后立即裁剪最旧条目" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsRecentLimit12}" Variant="Text"
-                         Content="12" Margin="0,0,6,0" Command="{Binding SetRecentItemLimitCommand}" CommandParameter="12" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsRecentLimit24}" Variant="Text"
-                         Content="24" Margin="0,0,6,0" Command="{Binding SetRecentItemLimitCommand}" CommandParameter="24" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsRecentLimit48}" Variant="Text"
-                         Content="48" Command="{Binding SetRecentItemLimitCommand}" CommandParameter="48" />
-          </WrapPanel>
+          <md:MdSlider Margin="0,6,0,0" Minimum="6" Maximum="60" TickFrequency="6"
+                       IsSnapToTickEnabled="True" Value="{Binding RecentItemLimitNumber, Mode=TwoWay}"
+                       ShowValueIndicator="True" ValueFormat="0"
+                       ToolTip.Tip="最近访问保留条数（6–60）"
+                       AutomationProperties.Name="最近访问保留条数" />
         </StackPanel>
       </StackPanel>
       </Border>
@@ -650,21 +630,14 @@
 
             <StackPanel Spacing="6">
               <TextBlock Classes="body" Text="下载源" />
-              <WrapPanel Orientation="Horizontal">
-                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceAuto}"
-                             Variant="Text" Content="自动回落" Margin="0,0,6,6"
-                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="Auto"
-                             ToolTip.Tip="huggingface.co → hf-mirror.com → modelscope.cn 依次尝试" />
-                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceHuggingFace}"
-                             Variant="Text" Content="HuggingFace" Margin="0,0,6,6"
-                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="HuggingFace" />
-                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceHfMirror}"
-                             Variant="Text" Content="hf-mirror" Margin="0,0,6,6"
-                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="HfMirror" />
-                <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsAiSourceModelScope}"
-                             Variant="Text" Content="魔搭 ModelScope" Margin="0,0,6,6"
-                             Command="{Binding SetAiModelSourceCommand}" CommandParameter="ModelScope" />
-              </WrapPanel>
+              <md:MdSegmentedButtonGroup SelectedValue="{Binding AiModelSourceName, Mode=TwoWay}"
+                                         SelectedValueBinding="{Binding Value}">
+                <md:MdSegmentedButton Value="Auto" Content="自动回落"
+                                      ToolTip.Tip="huggingface.co → hf-mirror.com → modelscope.cn 依次尝试" />
+                <md:MdSegmentedButton Value="HuggingFace" Content="HuggingFace" />
+                <md:MdSegmentedButton Value="HfMirror" Content="hf-mirror" />
+                <md:MdSegmentedButton Value="ModelScope" Content="魔搭" />
+              </md:MdSegmentedButtonGroup>
               <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding AiModelSourceHintText}" />
 
               <WrapPanel Orientation="Horizontal">
@@ -680,7 +653,32 @@
                              ToolTip.Tip="按 checksums.txt 复核 SHA-256；没有记录的文件会如实标注" />
               </WrapPanel>
               <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDefaultPackageText}" />
-              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDownloadStatusText}" />
+
+              <!-- v0.61：下载进行中就地显示实时进度条，不必打开任务中心也知道在下什么。 -->
+              <StackPanel Spacing="4" IsVisible="{Binding IsLocalAiDownloadBusy}">
+                <md:MdLinearProgressIndicator Value="{Binding AiModelDownloadPercent}" Maximum="100"
+                                              IndicatorBrush="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDownloadStatusText}" />
+              </StackPanel>
+              <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding LocalAiDownloadStatusText}"
+                         IsVisible="{Binding !IsLocalAiDownloadBusy}" />
+
+              <!-- v0.61：代理三档——跟随系统/直连/自定义 HTTP 代理（走 HuggingFace 的网络环境很常见）。 -->
+              <StackPanel Spacing="6" Margin="0,4,0,0">
+                <TextBlock Classes="body" Text="下载代理" />
+                <md:MdSegmentedButtonGroup SelectedValue="{Binding AiModelProxyMode, Mode=TwoWay}"
+                                           SelectedValueBinding="{Binding Value}">
+                  <md:MdSegmentedButton Value="System" Content="跟随系统" />
+                  <md:MdSegmentedButton Value="None" Content="直连" />
+                  <md:MdSegmentedButton Value="Custom" Content="自定义" />
+                </md:MdSegmentedButtonGroup>
+                <md:MdTextBox Variant="Outlined" Label="代理地址（http://host:port 或 host:port）"
+                              Watermark="例如 http://127.0.0.1:7890"
+                              Text="{Binding AiModelProxyAddress, Mode=TwoWay}"
+                              IsVisible="{Binding AiModelProxyIsCustom}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding AiModelProxySummaryText}"
+                           Foreground="{DynamicResource Md.Sys.Color.OnSurfaceVariant.Brush}" />
+              </StackPanel>
 
               <TextBlock Classes="caption" TextWrapping="Wrap"
                          Text="{Binding LocalAiModelsDirectoryText}" />
@@ -725,17 +723,11 @@
           </Grid>
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="递归搜索与搜索中心单次最多返回的条数；达到上限时结果会被截断，不会静默当成全部" />
-          <WrapPanel Orientation="Horizontal" Margin="0,6,0,0">
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsSearchLimit1000}" Variant="Text"
-                         Content="1000" Margin="0,0,6,0"
-                         Command="{Binding SetSearchResultLimitCommand}" CommandParameter="1000" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsSearchLimit2000}" Variant="Text"
-                         Content="2000" Margin="0,0,6,0"
-                         Command="{Binding SetSearchResultLimitCommand}" CommandParameter="2000" />
-            <md:MdButton Classes="segmented-choice" Classes.selected="{Binding IsSearchLimit5000}" Variant="Text"
-                         Content="5000"
-                         Command="{Binding SetSearchResultLimitCommand}" CommandParameter="5000" />
-          </WrapPanel>
+          <md:MdSlider Margin="0,6,0,0" Minimum="500" Maximum="10000" TickFrequency="500"
+                       IsSnapToTickEnabled="True" Value="{Binding SearchResultLimitNumber, Mode=TwoWay}"
+                       ShowValueIndicator="True" ValueFormat="0"
+                       ToolTip.Tip="单次搜索最多返回条数（500–10000）"
+                       AutomationProperties.Name="搜索结果上限" />
         </StackPanel>
         <TextBlock Classes="caption">
           <Run Text="{Binding SearchIndexStateText}" /><Run Text=" · " /><Run Text="{Binding SearchIndexEntryCountText}" /><Run Text=" 项 · " /><Run Text="{Binding SearchIndexSizeText}" />

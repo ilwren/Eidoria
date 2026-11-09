@@ -55,7 +55,7 @@ public static class AppHost
     private const string DefaultMediaDiagnostic =
         "当前宿主没有注册内嵌解码后端（桌面端为 Media Foundation / GStreamer，Android 为 MediaPlayer）。可用系统应用打开。";
 
-    /// <param name="dataDirectory">设置/收藏落点；为空时按平台默认（LocalApplicationData/MdExplorer）。</param>
+    /// <param name="dataDirectory">设置/收藏落点；为空时按平台默认（LocalApplicationData/Eidoria，自动迁移旧 MdExplorer 目录）。</param>
     /// <param name="startFolder">初始文件夹；为空时桌面=用户主目录，Android=个人目录。</param>
     /// <param name="launcher">打开方式服务；为空时使用桌面进程拉起实现（Android 宿主运行期由 MainView 重绑为 Launcher 实现）。</param>
     public static AppServices Build(
@@ -88,8 +88,10 @@ public static class AppHost
         var contentIndex = new SqliteContentIndex(Path.Combine(dataDir, "content-index.db"), textFiles);
         var search = new IndexedSearchService(searchIndex, new SearchService(), store);
         var aiModels = new AiModelCatalog(AiModelCatalog.ResolveDirectory(dataDir));
-        // 内置模型下载器：用户不必再去跑 PowerShell/bash 脚本；源与镜像可在设置里切换。
-        var aiModelDownloads = new AiModelDownloader(aiModels);
+        // 内置模型下载器：用户不必再去跑 PowerShell/bash 脚本；源与镜像可在设置里切换；
+        // 代理跟随设置页的三档（跟随系统/直连/自定义），改档立即生效、不走重启。
+        var aiModelDownloads = new AiModelDownloader(
+            aiModels, new HttpAiModelTransport(() => AiProxyPlan.Resolve(store.Settings)));
         var embeddings = new OnnxTextEmbeddingService(aiModels);
         var semanticSearch = new SemanticSearchService(dataDir, searchIndex, store, embeddings);
 
@@ -151,6 +153,12 @@ public static class AppHost
 
     public static ShellViewModel CreateShell(AppServices services) => new(services);
 
+    /// <summary>应用数据根目录名（v0.61 起用户可见品牌统一为 Eidoria）。</summary>
+    public const string DataDirectoryName = "Eidoria";
+
+    /// <summary>旧内部代号的数据目录名；仅用于一次性迁移，不再新建。</summary>
+    private const string LegacyDataDirectoryName = "MdExplorer";
+
     private static string DefaultDataDirectory()
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -158,6 +166,30 @@ public static class AppHost
             baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         if (string.IsNullOrEmpty(baseDir))
             baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share");
-        return Path.Combine(baseDir, "MdExplorer");
+        return ResolveDataDirectory(Path.Combine(baseDir, DataDirectoryName), Path.Combine(baseDir, LegacyDataDirectoryName));
+    }
+
+    /// <summary>
+    /// 品牌升级迁移：用户数据（设置、索引、授权根、缩略图缓存、插件包）不能用新目录名直接丢下。
+    /// 新目录不存在而旧目录在时，同卷原子改名；改名失败（占用、跨卷挂载、权限）就继续读旧目录，
+    /// 绝不在启动时复制一遍或丢弃数据。两个目录都已经存在时以新目录为准（老目录交还用户自行处理）。
+    /// </summary>
+    public static string ResolveDataDirectory(string next, string legacy)
+    {
+        if (Directory.Exists(next) || !Directory.Exists(legacy))
+            return next;
+        try
+        {
+            Directory.Move(legacy, next);
+            return next;
+        }
+        catch (IOException)
+        {
+            return legacy;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return legacy;
+        }
     }
 }
