@@ -3,9 +3,41 @@
   MdExplorer.Application -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Application/bin/Release/net10.0/MdExplorer.Application.dll
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/TrashService.cs(23,34): warning CA1416: This call site is reachable on all platforms. 'WindowsTrash.MoveToTrash(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/MdExplorer.Infrastructure.csproj]
   MdExplorer.Infrastructure -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/bin/Release/net10.0/MdExplorer.Infrastructure.dll
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/ShellViewModel.cs(575,26): error CS1061: 'UiStallRecorder' does not contain a definition for 'Reset' and no accessible extension method 'Reset' accepting a first argument of type 'UiStallRecorder' could be found (are you missing a using directive or an assembly reference?) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
+  MdExplorer.UI -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/bin/Release/net10.0/MdExplorer.UI.dll
+  MdExplorer.Performance -> /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
+Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+/home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
+[xUnit.net 00:00:00.24]   Discovering: MdExplorer.Performance
+[xUnit.net 00:00:00.57]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.81]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [492 ms]
+  Standard Output Messages:
+ [perf] 1 万条目录首批上屏：317.5 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：68.2 ms
+
+
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [2 s]
+  Standard Output Messages:
+ [perf] 内容索引重建 10000 篇：2375 ms，库体积 4.88 MB
+ [perf] 内容索引重建（10000 篇全未变）：94 ms，库体积 4.88 MB
+ [perf] 内容索引查询命中 50 条：17.6 ms
+
+
+[xUnit.net 00:00:06.14]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
+  Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [2 ms]
+  Standard Output Messages:
+ [perf] 组合根 + Shell 构造：1.4 ms
+
+
+
+Test Run Successful.
+Total tests: 3
+     Passed: 3
+ Total time: 6.7371 Seconds
