@@ -150,7 +150,7 @@
                       </TextBlock>
                     </StackPanel>
                     <md:MdButton Grid.Column="2" Variant="Tonal" VerticalAlignment="Center" Content="安装"
-                                 Command="{Binding DataContext.ExtensionCenter.InstallBuiltInCommand, RelativeSource={RelativeSource AncestorType=views:ExtensionCenterView}}"
+                                 Command="{ReflectionBinding DataContext.ExtensionCenter.InstallBuiltInCommand, RelativeSource={RelativeSource AncestorType=views:ExtensionCenterView}}"
                                  CommandParameter="{Binding}"
                                  ToolTip.Tip="按与外部导入相同的标准走校验与确认" />
                   </Grid>
