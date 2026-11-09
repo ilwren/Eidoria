@@ -785,7 +785,9 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         // 先清请求再写开关：OnShowPreviewPaneChanged 会把请求同步成开关值，
         // 顺序反过来就会把「已关闭」又写成「已请求」。
         _previewPaneRequested = false;
-        ShowPreviewPane = false;
+        // 直接写请求 + 刷新可见性，不经过开关持久化：用户按「关闭预览」关的只是这一次，
+        // 不该顺手把设置里的「预览侧栏（宽屏）」永久改成关闭。
+        RefreshPreviewVisibility();
         OnPropertyChanged(nameof(ShowPreviewPaneNow));
         OnPropertyChanged(nameof(ShowPreviewPaneEffective));
         OnPropertyChanged(nameof(ShowPreviewPageNow));
@@ -4196,6 +4198,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         RefreshPreviewVisibility();
         // Expanded+ 的预览栏是常驻列：关掉它等于关掉预览，重负载必须显式释放，
         // 否则第三方直接 PDF 控件会把整本页面树留在内存里。
+        // v0.60：只放重负载、不连内容一起丢——否则「关掉再打开」会得到一块空白，
+        // 用户以为预览坏了。下一条选集/重新打开时按既有管线重载。
         if (!value)
         {
             Preview.ReleaseHeavyContent();

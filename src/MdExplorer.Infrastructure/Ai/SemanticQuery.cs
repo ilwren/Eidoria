@@ -1,25 +1,7 @@
 using MdExplorer.Domain;
+using MdExplorer.Platform.Abstractions;
 
 namespace MdExplorer.Infrastructure.Ai;
-
-/// <summary>一条命中的「为什么在这里」来源（v0.60）。</summary>
-public enum SemanticMatchSource
-{
-    /// <summary>纯向量相似度。</summary>
-    Semantic,
-
-    /// <summary>文件名里有查询词。</summary>
-    Name,
-
-    /// <summary>所在文件夹名里有查询词。</summary>
-    Folder,
-
-    /// <summary>查询点名了类型（「视频」「图片」），文件正是该类型。</summary>
-    FileType,
-
-    /// <summary>全文索引里的正文命中。</summary>
-    Content,
-}
 
 /// <summary>
 /// 一次语义查询的解析结果：字面词 + 用户点名的文件类型（v0.60）。
@@ -228,9 +210,9 @@ public static class SemanticQuery
     /// 正文由全文索引通道负责，向量通道负责「意思相近」。三路各管一段，互不冒充。
     /// </summary>
     public static float LexicalScore(
-        string? name, string? parentFolder, IReadOnlyList<string> terms, out SemanticMatchSource source)
+        string? name, string? parentFolder, IReadOnlyList<string> terms, out SemanticHitMatch source)
     {
-        source = SemanticMatchSource.Semantic;
+        source = SemanticHitMatch.Semantic;
         if (string.IsNullOrWhiteSpace(name) || terms.Count == 0)
             return 0f;
 
@@ -242,7 +224,7 @@ public static class SemanticQuery
             if (score > best)
             {
                 best = score;
-                source = SemanticMatchSource.Name;
+                source = SemanticHitMatch.Name;
             }
         }
 
@@ -257,7 +239,7 @@ public static class SemanticQuery
                 if (folderScore > best)
                 {
                     best = folderScore;
-                    source = SemanticMatchSource.Folder;
+                    source = SemanticHitMatch.Folder;
                 }
                 break;
             }

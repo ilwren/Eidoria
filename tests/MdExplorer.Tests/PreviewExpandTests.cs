@@ -44,13 +44,13 @@ public sealed class PreviewExpandTests : IDisposable
         var shell = CreateShell();
         shell.SetViewportSize(1440, 900);
         await shell.OpenFolderAsync(_startDir);
-        var file = Assert.Single(shell.Browser.Items, item => item.Name == "note.txt");
 
-        // 用户曾经关过预览栏（设置里的开关被写成 false）。
+        // 用户曾经关过预览栏（设置里的开关被写成 false）。关预览会一并丢弃预览内容，
+        // 所以这里在关之前先让预览停在某个文件上，模拟「关掉后还想再看」的真实路径。
+        shell.Preview.LoadAsync(Item("note.txt", FileKind.Text)).GetAwaiter().GetResult();
+        Assert.True(shell.Preview.HasItem);
         shell.ClosePreviewPane();
         Assert.False(shell.ShowPreviewPane);
-
-        await shell.Preview.LoadAsync(file.Model);
         Assert.False(shell.ShowPreviewPaneEffective);
 
         // Ctrl+P 的入口：必须能把预览栏重新打开，而不是「设置关了就永远打不开」。
