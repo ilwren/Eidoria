@@ -1,24 +1,12 @@
 Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/bin/Release/net10.0/MdExplorer.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
-[xUnit.net 00:00:01.65]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
-  Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
-[xUnit.net 00:00:02.01]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
-[xUnit.net 00:00:02.01]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
-[xUnit.net 00:00:02.02]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:01.30]     MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
+[xUnit.net 00:00:01.30]     MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [SKIP]
+[xUnit.net 00:00:01.30]     MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [SKIP]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.MiniLmEnglishEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.RealModelsRankLocalFixtureFilesByNaturalLanguageIntent [1 ms]
   Skipped MdExplorer.Tests.RealModelEmbeddingTests.BgeChineseEmbedsRelatedTextCloserThanUnrelatedText [1 ms]
-[xUnit.net 00:00:03.54]     MdExplorer.Tests.BuiltInPluginAndProxyTests.BuiltInPackages_AreDeterministicAcrossRuns [FAIL]
-  Failed MdExplorer.Tests.BuiltInPluginAndProxyTests.BuiltInPackages_AreDeterministicAcrossRuns [3 ms]
-  Error Message:
-   Assert.Equal() Failure: Strings differ
-                        ↓ (pos 13)
-Expected: "4884609601135E0DCC3A44E03293B6D12420F43F54AA5C5328"···
-Actual:   "4884609601135e0dcc3a44e03293b6d12420f43f54aa5c5328"···
-                        ↑ (pos 13)
-  Stack Trace:
-     at MdExplorer.Tests.BuiltInPluginAndProxyTests.BuiltInPackages_AreDeterministicAcrossRuns() in /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Tests/BuiltInPluginAndProxyTests.cs:line 47
-   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:02.20]     MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [SKIP]
+  Skipped MdExplorer.Tests.RealModelAcceptanceTests.RealModelEndToEndAcceptanceReport [1 ms]
 
-Failed!  - Failed:     1, Passed:   477, Skipped:     4, Total:   482, Duration: 5 s - MdExplorer.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   478, Skipped:     4, Total:   482, Duration: 3 s - MdExplorer.Tests.dll (net10.0)
