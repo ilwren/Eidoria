@@ -1,5 +1,6 @@
 using System.Text;
 using MdExplorer.Domain;
+using MdExplorer.Platform.Abstractions;
 using MdExplorer.Infrastructure;
 using MdExplorer.Infrastructure.Ai;
 using Xunit;
