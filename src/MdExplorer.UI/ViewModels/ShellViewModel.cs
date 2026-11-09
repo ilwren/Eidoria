@@ -4560,19 +4560,20 @@ public sealed partial class ShellViewModel : ObservableObject, IDialogs
         {
             // 设置页的进度条吃同一份报告：任务中心给的是任务级进度，
             // 这里实时刷「当前文件 + 百分比」，用户不用打开任务中心也知道在下什么。
-            var liveProgress = new Progress<OperationProgress>(report =>
+            // 这里在 VM 线程上更新（测试环境里 ConfigureAwait(true) 回落同步执行），不能挂 UI 调度器。
+            void PushLive(OperationProgress report)
             {
                 AiModelDownloadPercent = Math.Clamp(report.Fraction, 0d, 1d) * 100d;
                 LocalAiDownloadStatusText = report.CurrentItemName.Length == 0
                     ? $"{AiModelDownloadPercent:0}%"
                     : $"{report.CurrentItemName} · {AiModelDownloadPercent:0}%";
-            });
+            }
             await RunOperationAsync(title, async (progress, ct) =>
             {
                 var fanOut = new Progress<OperationProgress>(report =>
                 {
                     progress.Report(report);
-                    liveProgress.Report(report);
+                    PushLive(report);
                 });
                 last = verifyOnly
                     ? await _services.AiModelDownloads.VerifyAsync(modelIds, fanOut, ct).ConfigureAwait(true)
