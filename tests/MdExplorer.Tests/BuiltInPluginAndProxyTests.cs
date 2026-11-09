@@ -46,7 +46,7 @@ public sealed class BuiltInPluginAndProxyTests : IDisposable
             var second = BuiltInPluginPackages.CreatePackageBytes(definition);
             Assert.Equal(
                 Convert.ToHexString(SHA256.HashData(first)),
-                Convert.ToHexString(SHA256.HashData(second)).ToLowerInvariant());
+                Convert.ToHexString(SHA256.HashData(second)));
         }
     }
 
