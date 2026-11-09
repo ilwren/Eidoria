@@ -5,8 +5,8 @@
   MdExplorer.Infrastructure -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.Infrastructure/bin/Release/net10.0/MdExplorer.Infrastructure.dll
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/ViewModels/BrowserViewModel.cs(2701,29): warning CS0618: 'Bitmap.Save(Stream, int?)' is obsolete: 'Use the overload accepting BitmapEncoderOptions instead.' [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(140,20): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
-/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(160,33): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageCount(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
+/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(163,29): warning CA1416: This call site is reachable on all platforms. 'Conversion.GetPageSizes(byte[], string?)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
 /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/Preview/PreviewProviders.cs(209,9): warning CA1416: This call site is reachable on all platforms. 'Conversion.SavePng(Stream, byte[], Index, string?, RenderOptions)' is only supported on: 'Android' 31.0 and later, 'iOS' 13.6 and later, 'Linux', 'maccatalyst' 13.5 and later, 'macOS/OSX', 'Windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/MdExplorer.UI.csproj]
   MdExplorer.UI -> /home/runner/work/Eidoria/Eidoria/src/MdExplorer.UI/bin/Release/net10.0/MdExplorer.UI.dll
   MdExplorer.Performance -> /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
@@ -14,30 +14,30 @@ Test run for /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/
 A total of 1 test files matched the specified pattern.
 /home/runner/work/Eidoria/Eidoria/tests/MdExplorer.Performance/bin/Release/net10.0/MdExplorer.Performance.dll
 [xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.14)
-[xUnit.net 00:00:00.18]   Discovering: MdExplorer.Performance
-[xUnit.net 00:00:00.40]   Discovered:  MdExplorer.Performance
-[xUnit.net 00:00:00.60]   Starting:    MdExplorer.Performance
-  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [387 ms]
+[xUnit.net 00:00:00.19]   Discovering: MdExplorer.Performance
+[xUnit.net 00:00:00.45]   Discovered:  MdExplorer.Performance
+[xUnit.net 00:00:00.67]   Starting:    MdExplorer.Performance
+  Passed MdExplorer.Performance.PerformanceSmokeTests.TenThousandEntryDirectoryMaterializesFirstPageWithinBudget [516 ms]
   Standard Output Messages:
- [perf] 1 万条目录首批上屏：220.1 ms（首屏 120 行，总数 10000）
- [perf] 补齐剩余 9880 行：76.9 ms
+ [perf] 1 万条目录首批上屏：310.7 ms（首屏 120 行，总数 10000）
+ [perf] 补齐剩余 9880 行：107.5 ms
 
 
   Passed MdExplorer.Performance.PerformanceSmokeTests.ContentIndexRebuildAndQueryOverTenThousandFilesStaysWithinBudget [2 s]
   Standard Output Messages:
- [perf] 内容索引重建 10000 篇：1967 ms，库体积 4.88 MB
- [perf] 内容索引重建（10000 篇全未变）：78 ms，库体积 4.88 MB
- [perf] 内容索引查询命中 50 条：16.2 ms
+ [perf] 内容索引重建 10000 篇：2371 ms，库体积 4.88 MB
+ [perf] 内容索引重建（10000 篇全未变）：96 ms，库体积 4.88 MB
+ [perf] 内容索引查询命中 50 条：17.6 ms
 
 
+[xUnit.net 00:00:06.00]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
   Passed MdExplorer.Performance.PerformanceSmokeTests.ShellCompositionStaysWithinBudget [1 ms]
   Standard Output Messages:
- [perf] 组合根 + Shell 构造：1.2 ms
+ [perf] 组合根 + Shell 构造：1.4 ms
 
 
-[xUnit.net 00:00:04.80]   Finished:    MdExplorer.Performance (ID = 'c778963431481a1807c6d6fcea6d17bf6aea69df152d547df36eb8ead6e2ded3')
 
 Test Run Successful.
 Total tests: 3
      Passed: 3
- Total time: 5.2659 Seconds
+ Total time: 6.5167 Seconds
