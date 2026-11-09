@@ -45,12 +45,11 @@ public sealed class PreviewExpandTests : IDisposable
         shell.SetViewportSize(1440, 900);
         await shell.OpenFolderAsync(_startDir);
 
-        // 用户曾经关过预览栏（设置里的开关被写成 false）。关预览会一并丢弃预览内容，
-        // 所以这里在关之前先让预览停在某个文件上，模拟「关掉后还想再看」的真实路径。
+        // 用户在设置里关过预览侧栏。这个持久化开关会压住常规可见性，
+        // Ctrl+P 必须把「手动请求」抬上来、不能再被设置永久挡住。
+        shell.SettingsStore.Settings.ShowPreviewPane = false;
         shell.Preview.LoadAsync(Item("note.txt", FileKind.Text)).GetAwaiter().GetResult();
         Assert.True(shell.Preview.HasItem);
-        shell.ClosePreviewPane();
-        Assert.False(shell.ShowPreviewPane);
         Assert.False(shell.ShowPreviewPaneEffective);
 
         // Ctrl+P 的入口：必须能把预览栏重新打开，而不是「设置关了就永远打不开」。
@@ -85,7 +84,9 @@ public sealed class PreviewExpandTests : IDisposable
 
         shell.ClosePreviewPane();
         Assert.False(shell.ShowPreviewPaneEffective);
-        Assert.False(shell.ShowPreviewPane);
+        // 关面板只是把这次会话的请求清掉；设置里「预览侧栏（宽屏）」的持久化开关保持不变——
+        // 不然「关了又开」就会变成「再也打不开」。
+        Assert.True(shell.ShowPreviewPane);
     }
 
     [Fact]

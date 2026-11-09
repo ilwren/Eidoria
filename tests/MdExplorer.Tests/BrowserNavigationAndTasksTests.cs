@@ -116,6 +116,11 @@ public sealed class BrowserNavigationTests : IDisposable
         Assert.Equal(_filePath, Assert.Single(shell.RecentFiles).FullPath);
 
         await browser.NavigateToAsync(_otherDir);
+        // 转文件夹又会触发一次 RecentsChanged → 异步刷新是「先 Clear 再 Add」，
+        // 紧跟着读 RecentFiles[0] 可能读到 Clear 与 Add 之间的窗口（CI 上偶发越界）。
+        // 等这新一轮落定再读，断言本身不变。
+        for (var i = 0; i < 50 && shell.RecentFiles.Count == 0; i++)
+            await Task.Delay(20);
         await shell.OpenRecentFileAsync(shell.RecentFiles[0]);
         Assert.Equal(_docsDir, browser.CurrentPath);
         Assert.Equal(_filePath, Assert.Single(browser.SelectedItems).FullPath);
