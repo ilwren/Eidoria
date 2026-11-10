@@ -110,6 +110,8 @@ v3 的生成约束来自 [hamen/material-3-skill](https://github.com/hamen/mater
 - 预览标签下只保留内容与 3 个快速事实 Chips；完整元数据不再挤回预览页。
 - 深色与浅色保持同尺寸、同选集、同滚动位置，方便逐像素对照状态色。
 
+> **v0.62 实现对齐（真实内容微缩）**：列表/网格的真实内容缩略图已覆盖图片与 PDF（首页 PDFium 光栅，走同一磁盘缓存与负缓存；桌面 ≤32 MB、Android ≤16 MB，Android < API 31 无 PDFium 资产所以保留图标井）。**代码文件经评估后不落真实微缩**：等宽小字在 128–288 DIP 缩略面上读不出内容，渲染每个文件前若干行又要常驻文本测量成本，继续用类型色图标井；概念图本体中 `README.md`/`Program.cs` 也以图标井呈现，此处以一致口径为准。
+
 ### 3.2 Compact 浏览器 · 深浅成对
 
 ![Compact 浅色悬浮预览](assets/mockups/ai-v3/03-compact-browser-light.png)

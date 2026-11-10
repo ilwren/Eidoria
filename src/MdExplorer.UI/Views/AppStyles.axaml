@@ -360,11 +360,12 @@
     <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
 
-  <!-- 迷你“搜索岛”：深色胶囊只占导航行一小段，状态变化时通过文字与缩放反馈。 -->
+  <!-- 迷你“搜索岛”：概念稿 §2.1 把主色留给关键动作——搜索是导航行的唯一实心主动作，
+       深浅主题各自取 Primary/OnPrimary 角色；状态变化通过文字与缩放反馈。 -->
   <Style Selector="md|MdButton.search-island">
-    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.InverseSurface.Brush}" />
-    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.InverseOnSurface.Brush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.InverseSurface.Brush}" />
+    <Setter Property="Background" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnPrimary.Brush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Md.Sys.Color.Primary.Brush}" />
     <Setter Property="RenderTransformOrigin" Value="50%,50%" />
     <Setter Property="Transitions">
       <Transitions>
@@ -374,7 +375,7 @@
     </Setter>
   </Style>
   <Style Selector="md|MdButton.search-island md|MdIcon">
-    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.InverseOnSurface.Brush}" />
+    <Setter Property="Foreground" Value="{DynamicResource Md.Sys.Color.OnPrimary.Brush}" />
   </Style>
   <Style Selector="md|MdButton.search-island:pointerover">
     <Setter Property="RenderTransform" Value="scale(1.035)" />

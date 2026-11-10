@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using MdExplorer.Application;
 using MdExplorer.Domain;
 using MdExplorer.Platform.Abstractions;
+using MdExplorer.UI.Preview;
 using MdExplorer.UI.Services;
 
 namespace MdExplorer.UI.ViewModels;
@@ -2662,8 +2663,13 @@ public sealed partial class BrowserViewModel : ObservableObject
             _thumbCts = new CancellationTokenSource();
         var ct = _thumbCts.Token;
         var tier = CurrentThumbnailTier;
+        // PDFium 的 Android 资产要求 API 31+；不支持平台上的 PDF 一律只画图标井，
+        // 且不留负缓存——系统升级后应立即可得首页图。
+        var pdfRasterAvailable = !OperatingSystem.IsAndroid() || OperatingSystem.IsAndroidVersionAtLeast(31);
         var targets = candidates
-            .Where(i => i.Kind == FileKind.Image && i.Thumbnail is null)
+            .Where(i => i.Thumbnail is null
+                && ListingThumbnails.Decide(i.Kind, i.Model.Extension, i.Model.Length, pdfRasterAvailable)
+                    is not ListingThumbnailStyle.None)
             .Take(300)
             .ToList();
         if (targets.Count == 0) return;
@@ -2692,15 +2698,44 @@ public sealed partial class BrowserViewModel : ObservableObject
                     // ③ 未命中：解码 → 编码成 PNG 入缓存 → 显示
                     byte[] encoded;
                     Bitmap bitmap;
-                    await using (var stream = await _fileSystem.OpenReadAsync(item.FullPath, ct).ConfigureAwait(false))
+                    var style = ListingThumbnails.Decide(
+                        item.Kind, item.Model.Extension, item.Model.Length, pdfRasterAvailable);
+                    if (style == ListingThumbnailStyle.PdfFirstPage)
                     {
-                        (bitmap, encoded) = await Task.Run(() =>
+                        // PDF：有界读入字节 → PDFium 光栅化首页（renderer 自带进程级串行 Gate）。
+                        var pdfLimit = ListingThumbnails.PdfMaxBytes();
+                        byte[] pdfData;
+                        await using (var stream = await _fileSystem.OpenReadAsync(item.FullPath, ct).ConfigureAwait(false))
                         {
-                            var decoded = Bitmap.DecodeToWidth(stream, ThumbnailTierNames.Pixels(tier));
-                            using var buffer = new MemoryStream();
-                            decoded.Save(buffer);
-                            return (decoded, buffer.ToArray());
-                        }, ct).ConfigureAwait(false);
+                            using var memory = new MemoryStream();
+                            var chunk = new byte[81920];
+                            int read;
+                            while ((read = await stream.ReadAsync(chunk.AsMemory(), ct).ConfigureAwait(false)) > 0)
+                            {
+                                if (memory.Length + read > pdfLimit)
+                                    throw new InvalidDataException("PDF 超过缩略图体积上限。");
+                                await memory.WriteAsync(chunk.AsMemory(0, read), ct).ConfigureAwait(false);
+                            }
+                            pdfData = memory.ToArray();
+                        }
+                        var page = await PdfPreviewRenderer.RenderPageAsync(
+                            pdfData, 0, ct, renderWidth: ThumbnailTierNames.Pixels(tier)).ConfigureAwait(false);
+                        using var buffer = new MemoryStream();
+                        page.Save(buffer);
+                        (bitmap, encoded) = (page, buffer.ToArray());
+                    }
+                    else
+                    {
+                        await using (var stream = await _fileSystem.OpenReadAsync(item.FullPath, ct).ConfigureAwait(false))
+                        {
+                            (bitmap, encoded) = await Task.Run(() =>
+                            {
+                                var decoded = Bitmap.DecodeToWidth(stream, ThumbnailTierNames.Pixels(tier));
+                                using var buffer = new MemoryStream();
+                                decoded.Save(buffer);
+                                return (decoded, buffer.ToArray());
+                            }, ct).ConfigureAwait(false);
+                        }
                     }
 
                     await _thumbnailCache.StoreAsync(request, encoded, ct).ConfigureAwait(false);
