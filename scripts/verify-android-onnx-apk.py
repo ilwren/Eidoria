@@ -47,7 +47,7 @@ def main() -> int:
         )
         for name in libraries:
             payload = archive.read(name)
-            binary = Path("/tmp") / f"mdexplorer-{apk.stem}-{Path(name).name}"
+            binary = Path("/tmp") / f"eidoria-{apk.stem}-{Path(name).name}"
             binary.write_bytes(payload)
             try:
                 dependencies = readelf("-dW", binary=binary)

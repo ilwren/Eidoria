@@ -92,7 +92,7 @@ server = ThreadingHTTPServer(("127.0.0.1", 0), FakeModelScopeHandler)
 thread = threading.Thread(target=server.serve_forever, daemon=True)
 thread.start()
 try:
-    with tempfile.TemporaryDirectory(prefix="mdexplorer-modelscope-test-") as temp:
+    with tempfile.TemporaryDirectory(prefix="eidoria-modelscope-test-") as temp:
         destination = Path(temp) / "models"
         endpoint = f"http://127.0.0.1:{server.server_port}"
         module.fetch_modelscope(destination, endpoint)

@@ -56,6 +56,16 @@ internal sealed class WindowsMediaPlaybackService
     private MediaComposition? _composition;
     private string? _compositionPath;
 
+    // v0.63：探测时就预取第 0 秒那一帧存起来，挂上帧呈现面后立刻呈现，
+    // 「首帧 6–9 秒」大部分发生在组合建立 + 第一次解码，提前到 Probe 阶段消化掉。
+    private RawFrame? _primedFrame;
+    private string? _primedFramePath;
+
+    // v0.63：自适应取帧节奏——解码耗时 EMA 决定当前有效周期，持续跟不上 30 fps
+    // 时目标如实降档（账本同步 Retarget），而不是每一帧都记一次「解码超时」。
+    private double _decodeEmaMs;
+    private TimeSpan _adaptiveFramePeriod = FramePeriod;
+
     private IMediaFrameSink? _frameSink;
     private CancellationTokenSource? _frameCts;
     // v0.60：帧节奏账本。用户说「卡」时，这里给出帧率 / 间隔分位数 / 掉帧 / 首帧时延，
@@ -121,7 +131,7 @@ internal sealed class WindowsMediaPlaybackService
 
     public MediaPlaybackCapabilities Capabilities => Unavailable is null
         ? new(true, true, "Windows Media Foundation",
-            $"音频由系统 Media Foundation 解码；视频画面由 MediaComposition 取帧，采样目标最高 {TargetFrameRate} fps（实际帧率受解码速度影响），" +
+            $"音频由系统 Media Foundation 解码；视频画面由 MediaComposition 取帧，采样目标最高 {TargetFrameRate} fps（解码持续跟不上时按实测能力自适应降档），" +
             "完整播放请用系统应用打开。")
         : new(false, false, "none", $"Windows 媒体栈不可用：{Unavailable}");
 
@@ -340,6 +350,22 @@ internal sealed class WindowsMediaPlaybackService
         try
         {
             var lastPosition = TimeSpan.MinValue;
+
+            // 探测阶段预取好的第 0 秒画面直接上屏：用户点「内嵌观看」的那一刻不该再等
+            // 一次完整解码。一次性的，取走即清，同一路径才生效。
+            if (ReferenceEquals(_primedFramePath, _path) ||
+                string.Equals(_primedFramePath, _path, StringComparison.Ordinal))
+            {
+                if (_primedFrame is { } primed && !token.IsCancellationRequested)
+                {
+                    sink.PresentFrame(primed.Pixels, primed.Width, primed.Height, primed.Stride);
+                    FramePacing.Record(Stopwatch.GetTimestamp());
+                    lastPosition = TimeSpan.Zero;
+                }
+                _primedFrame = null;
+                _primedFramePath = null;
+            }
+
             while (!token.IsCancellationRequested)
             {
                 var started = Stopwatch.GetTimestamp();
@@ -351,13 +377,18 @@ internal sealed class WindowsMediaPlaybackService
                         if (lastPosition == TimeSpan.MinValue ||
                             Math.Abs((position - lastPosition).Ticks) >= MinimumFrameAdvance.Ticks)
                         {
-                            var frame = GrabFrameAsync(position + FrameLead, token).GetAwaiter().GetResult();
+                            // 取帧提前量跟着解码 EMA 走：固定 60 ms 在慢解码机器上永远补不齐流水线延迟。
+                            var lead = _decodeEmaMs > 0
+                                ? TimeSpan.FromMilliseconds(Math.Max(FrameLead.TotalMilliseconds, _decodeEmaMs * 0.75))
+                                : FrameLead;
+                            var frame = GrabFrameAsync(position + lead, token).GetAwaiter().GetResult();
                             if (frame is { } raw && !token.IsCancellationRequested)
                             {
                                 sink.PresentFrame(raw.Pixels, raw.Width, raw.Height, raw.Stride);
                                 // 记在「真正交给宿主」之后：用户看到的节奏是呈现节奏，不是解码节奏。
                                 FramePacing.Record(Stopwatch.GetTimestamp());
                                 lastPosition = position;
+                                UpdateAdaptivePace(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                             }
                         }
                     }
@@ -372,10 +403,12 @@ internal sealed class WindowsMediaPlaybackService
                 }
 
                 var elapsed = Stopwatch.GetElapsedTime(started);
-                // 一次解码 + 一次呈现超过目标周期，说明「跟不上」的原因在解码侧，而不是主循环空转。
-                if (elapsed > FramePeriod)
+                // 一次解码 + 一次呈现超过当前有效周期，说明「跟不上」的原因在解码侧，而不是主循环空转。
+                // 有效周期本身会随解码 EMA 降档（UpdateAdaptivePace），所以这里的超时只记「连降档后的节奏都跟不上」。
+                var effectivePeriod = _adaptiveFramePeriod; // 仅本线程读写
+                if (elapsed > effectivePeriod)
                     FramePacing.RecordOverrun(elapsed.TotalMilliseconds);
-                var wait = FramePeriod - elapsed;
+                var wait = effectivePeriod - elapsed;
                 if (wait <= TimeSpan.Zero)
                     continue;
                 try
@@ -408,6 +441,51 @@ internal sealed class WindowsMediaPlaybackService
             cts.Dispose();
             if (restart)
                 StartFramePump();
+        }
+    }
+
+    /// <summary>
+    /// 探测成功后立刻预取第 0 秒的画面。这一步要几秒是常态（组合刚建完，第一次解码最慢），
+    /// 放在 Probe 阶段消化，用户按下「内嵌观看」时首帧近乎即得。失败只意味着没有预取帧，
+    /// 不影响探测结论——取帧仍会在播放时继续尝试。
+    /// </summary>
+    private async Task PrimeFirstFrameAsync(string path, CancellationToken cancellationToken)
+    {
+        _primedFrame = null;
+        _primedFramePath = null;
+        try
+        {
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            budget.CancelAfter(TimeSpan.FromSeconds(8));
+            var frame = await GrabFrameAsync(TimeSpan.Zero, budget.Token).ConfigureAwait(true);
+            if (frame is { } primed)
+            {
+                _primedFrame = primed;
+                _primedFramePath = path;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) when (IsPlatformFailure(ex)) { }
+    }
+
+    /// <summary>
+    /// 自适应取帧节奏（v0.63）：解码耗时 EMA 超过 30 fps 预算时，有效周期按
+    /// 「EMA × 1.15 + 调度余量」放宽，账本目标同步降档（最低 8 fps，避免数字失真）；
+    /// 解码宽裕后又升回最高 30 fps。这样「解码超时」只记录连本机实际能力都跟不上的帧。
+    /// </summary>
+    private void UpdateAdaptivePace(double decodeMs)
+    {
+        _decodeEmaMs = _decodeEmaMs <= 0 ? decodeMs : _decodeEmaMs * 0.8 + decodeMs * 0.2;
+        var period = FramePeriod;
+        if (_decodeEmaMs * 1.15 > FramePeriod.TotalMilliseconds)
+            period = TimeSpan.FromMilliseconds(_decodeEmaMs * 1.15 + 2);
+        var maxPeriod = TimeSpan.FromSeconds(1d / 8d); // 目标帧率下限 8 fps
+        if (period > maxPeriod)
+            period = maxPeriod;
+        if (period != _adaptiveFramePeriod)
+        {
+            _adaptiveFramePeriod = period;
+            FramePacing.Retarget(1000d / period.TotalMilliseconds);
         }
     }
 
@@ -515,11 +593,12 @@ internal sealed class WindowsMediaPlaybackService
             try
             {
                 await EnsureCompositionAsync(path).ConfigureAwait(true);
+                await PrimeFirstFrameAsync(path, cancellationToken).ConfigureAwait(true);
                 return new MediaProbeResult(
                     true, true, true,
                     $"视频 · 系统解码 · 取帧目标最高 {TargetFrameRate} fps",
-                    "画面按播放器时间轴由 MediaComposition 取出后交给 Avalonia 绘制，采样间隔覆盖 30 fps 视频；" +
-                    "实际帧率仍随解码与绘制负载变化；" +
+                    "画面按播放器时间轴由 MediaComposition 取出后交给 Avalonia 绘制，探测阶段已预取首帧；" +
+                    "解码持续跟不上 30 fps 时目标会按实测解码耗时如实降档（帧统计里看得到当前目标）；" +
                     "HEVC 需系统扩展、DTS/AC-3 默认缺失，完整播放请用系统应用打开。");
             }
             catch (Exception ex) when (IsPlatformFailure(ex))

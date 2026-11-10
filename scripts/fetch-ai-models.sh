@@ -159,14 +159,17 @@ files_of() {
 
 # ── 目录 ────────────────────────────────────────────────────────────────────
 if [ -z "$TARGET_DIR" ]; then
-  if [ -n "${MDEXPLORER_MODELS:-}" ]; then
+  # 环境变量与默认目录更名于 v0.63：新名 EIDORIA_* / Eidoria 优先，旧名继续当退路读取。
+  if [ -n "${EIDORIA_MODELS:-}" ]; then
+    TARGET_DIR="$EIDORIA_MODELS"
+  elif [ -n "${MDEXPLORER_MODELS:-}" ]; then
     TARGET_DIR="$MDEXPLORER_MODELS"
   elif [ -n "${LOCALAPPDATA:-}" ] && [ "$(uname -s 2>/dev/null || echo)" != "Linux" ]; then
-    TARGET_DIR="$LOCALAPPDATA/MdExplorer/models"
+    TARGET_DIR="$LOCALAPPDATA/Eidoria/models"
   elif [ -n "${LOCALAPPDATA:-}" ] && command -v cmd.exe >/dev/null 2>&1; then
-    TARGET_DIR="$LOCALAPPDATA/MdExplorer/models"
+    TARGET_DIR="$LOCALAPPDATA/Eidoria/models"
   else
-    TARGET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/MdExplorer/models"
+    TARGET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/Eidoria/models"
   fi
 fi
 TARGET_DIR="${TARGET_DIR%/}"
@@ -361,9 +364,9 @@ done
 log ""
 log "完成：新下载 $total_ok 个、已就绪 $total_skip 个、失败 $total_fail 个"
 log "模型目录：$TARGET_DIR"
-log "应用会在这里找模型（也可用环境变量 MDEXPLORER_MODELS 指向别处）："
-log "  Linux/macOS: \${XDG_DATA_HOME:-\$HOME/.local/share}/MdExplorer/models"
-log "  Windows:     %LOCALAPPDATA%\\MdExplorer\\models"
+log "应用会在这里找模型（也可用环境变量 EIDORIA_MODELS 指向别处）："
+log "  Linux/macOS: \${XDG_DATA_HOME:-\$HOME/.local/share}/Eidoria/models"
+log "  Windows:     %LOCALAPPDATA%\\Eidoria\\models"
 log "校验随时可重跑：$0 --verify（可用 --only 或 --all 选择范围）"
 
 [ "$total_fail" -eq 0 ] || exit 2

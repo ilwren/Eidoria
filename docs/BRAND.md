@@ -64,7 +64,7 @@
 
 - GitHub 仓库名、解决方案/项目目录与 C# 命名空间：仍为 `MdExplorer`；
 - Android `ApplicationId=dev.mdexplorer.app`：保持应用更新身份连续；
-- 桌面 `AssemblyName=MdExplorer` 与本地数据目录 `MdExplorer`：保持已有设置、收藏与快捷方式可继续使用；
-- 应用内拖放私有数据格式仍为 `x-mdexplorer-paths`。
+- 桌面 `AssemblyName=MdExplorer`：保持已有快捷方式与插件审计基线可继续使用；本地数据目录自 v0.61 起为 `Eidoria`（旧 `MdExplorer` 目录由应用启动时同卷原子改名迁移，迁移失败才继续沿用旧目录）
+- 应用内拖放私有数据格式仍为 `x-mdexplorer-paths`（已发布版本间互拖的兼容锚点，属保留的内部标识）。
 
 若 1.0 前进行仓库级改名，应单独立项处理重定向、数据目录迁移与发布兼容。

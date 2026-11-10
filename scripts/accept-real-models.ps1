@@ -10,7 +10,9 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Models = $(if ($env:MDEXPLORER_MODELS) { $env:MDEXPLORER_MODELS } else { Join-Path $PSScriptRoot '..\models' }),
+    [string]$Models = $(if ($env:EIDORIA_MODELS) { $env:EIDORIA_MODELS }
+                        elseif ($env:MDEXPLORER_MODELS) { $env:MDEXPLORER_MODELS }
+                        else { Join-Path $PSScriptRoot '..\models' }),
     [string]$Out = (Join-Path $PSScriptRoot '..\artifacts\real-model-acceptance\report.md'),
     [switch]$SkipDownload
 )
@@ -84,9 +86,9 @@ else {
     }
 }
 
-$env:MDEXPLORER_RUN_REAL_MODEL_TESTS = '1'
-$env:MDEXPLORER_MODELS = (Resolve-Path $Models).Path
-$env:MDEXPLORER_ACCEPTANCE_REPORT = $Out
+$env:EIDORIA_RUN_REAL_MODEL_TESTS = '1'
+$env:EIDORIA_MODELS = (Resolve-Path $Models).Path
+$env:EIDORIA_ACCEPTANCE_REPORT = $Out
 
 Write-Step '运行真实权重验收（首次会加载 ONNX Session，CPU 上约数十秒）'
 $log = Join-Path ([System.IO.Path]::GetTempPath()) ("eidoria-acceptance-" + [guid]::NewGuid().ToString('N') + '.log')

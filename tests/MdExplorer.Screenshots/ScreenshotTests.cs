@@ -52,7 +52,7 @@ public sealed class ScreenshotTests
     {
         get
         {
-            var dir = Environment.GetEnvironmentVariable("MDEXPLORER_SCREENSHOTS")
+            var dir = Environment.GetEnvironmentVariable("EIDORIA_SCREENSHOTS") ?? Environment.GetEnvironmentVariable("MDEXPLORER_SCREENSHOTS")
                       ?? Path.Combine(AppContext.BaseDirectory, "screenshots");
             Directory.CreateDirectory(dir);
             return dir;

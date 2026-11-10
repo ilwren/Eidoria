@@ -12,7 +12,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-MODELS="${MDEXPLORER_MODELS:-$ROOT_DIR/models}"
+MODELS="${EIDORIA_MODELS:-${MDEXPLORER_MODELS:-$ROOT_DIR/models}}"
 OUT="$ROOT_DIR/artifacts/real-model-acceptance/report.md"
 SKIP_DOWNLOAD=0
 
@@ -75,9 +75,9 @@ else
 fi
 
 # ── 2. 跑验收 ───────────────────────────────────────────────────────────────
-export MDEXPLORER_RUN_REAL_MODEL_TESTS=1
-export MDEXPLORER_MODELS="$MODELS"
-export MDEXPLORER_ACCEPTANCE_REPORT="$OUT"
+export EIDORIA_RUN_REAL_MODEL_TESTS=1
+export EIDORIA_MODELS="$MODELS"
+export EIDORIA_ACCEPTANCE_REPORT="$OUT"
 
 log "== 运行真实权重验收（首次会加载 ONNX Session，CPU 上约数十秒）"
 LOG="$(mktemp -t eidoria-acceptance.XXXXXX)"

@@ -60,7 +60,7 @@ def read_manifest() -> dict[str, tuple[str, list[str]]]:
 
 
 def request_json(url: str) -> dict:
-    request = Request(url, headers={"User-Agent": "MdExplorer-real-model-smoke/1.0"})
+    request = Request(url, headers={"User-Agent": "Eidoria-real-model-smoke/1.0"})
     with urlopen(request, timeout=45) as response:
         return json.load(response)
 
@@ -70,7 +70,7 @@ def download_file(url: str, destination: Path, expected_size: int, expected_sha2
     partial = destination.with_name(destination.name + ".part")
     digest = hashlib.sha256()
     byte_count = 0
-    request = Request(url, headers={"User-Agent": "MdExplorer-real-model-smoke/1.0"})
+    request = Request(url, headers={"User-Agent": "Eidoria-real-model-smoke/1.0"})
     try:
         with urlopen(request, timeout=90) as response, partial.open("wb") as output:
             while True:
@@ -143,7 +143,7 @@ def fetch_modelscope(destination: Path, endpoint: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", required=True, type=Path, help="Model directory to populate")
-    parser.add_argument("--endpoint", default=os.environ.get("MDEXPLORER_MODELSCOPE_ENDPOINT", DEFAULT_ENDPOINT))
+    parser.add_argument("--endpoint", default=os.environ.get("EIDORIA_MODELSCOPE_ENDPOINT", os.environ.get("MDEXPLORER_MODELSCOPE_ENDPOINT", DEFAULT_ENDPOINT)))
     args = parser.parse_args()
     endpoint = args.endpoint.rstrip("/")
     try:

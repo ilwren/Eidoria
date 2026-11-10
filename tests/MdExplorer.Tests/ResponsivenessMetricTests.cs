@@ -78,6 +78,32 @@ public sealed class ResponsivenessMetricTests
         Assert.Equal(0, stats.DroppedFrames);
     }
 
+    [Fact]
+    public void FramePacingRetargetChangesDropCriterionAndDescription()
+    {
+        // v0.63：Windows 取帧路线解码跟不上时把目标从 30 降到 ≈10 fps，
+        // 之后 ~95 ms 的间隔就是「正常节奏」而不是掉帧，摘要里要看得出当前目标。
+        var stats = new FramePacingStats(targetFps: 30d);
+        Assert.Equal(30d, stats.TargetFps);
+
+        stats.Retarget(10d);
+        Assert.Equal(10d, stats.TargetFps);
+
+        var step = (long)(Stopwatch.Frequency * 0.095); // 95 ms ≈ 10.5 fps 的正常间隔
+        stats.Record(1_000L);
+        for (var i = 0; i < 6; i++)
+            stats.Record(1_000L + step * (i + 1));
+        Assert.Equal(0, stats.DroppedFrames);
+        Assert.Contains("目标 10 fps", stats.Describe());
+
+        // 升回 30 fps 后，同样的 95 ms 间隔又会被如实记成掉帧。
+        stats.Retarget(30d);
+        stats.Record(1_000L + step * 10 + (long)(Stopwatch.Frequency * 0.095));
+        Assert.Equal(1, stats.DroppedFrames);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => stats.Retarget(0d));
+    }
+
     // ── UI 停顿 ───────────────────────────────────────────────────────────
 
     [Fact]

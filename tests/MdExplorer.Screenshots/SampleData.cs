@@ -14,7 +14,7 @@ internal static class SampleData
         lock (Gate)
         {
             if (_root is not null) return _root;
-            var root = Path.Combine(Path.GetTempPath(), "mdexplorer-sample");
+            var root = Path.Combine(Path.GetTempPath(), "eidoria-sample");
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
 
@@ -33,9 +33,9 @@ internal static class SampleData
             WritePhotoPng(Path.Combine(camera, "IMG_0001.png"), 3);
 
             File.WriteAllText(Path.Combine(pictures, "Program.cs"),
-                "// MdExplorer 样例源文件\nusing Avalonia;\n\ninternal static class Program\n{\n    [STAThread]\n    public static void Main(string[] args)\n        => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);\n\n    public static AppBuilder BuildAvaloniaApp()\n        => AppBuilder.Configure<App>()\n            .UsePlatformDetect()\n            .WithInterFont()\n            .LogToTrace();\n}\n");
+                "// Eidoria 样例源文件\nusing Avalonia;\n\ninternal static class Program\n{\n    [STAThread]\n    public static void Main(string[] args)\n        => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);\n\n    public static AppBuilder BuildAvaloniaApp()\n        => AppBuilder.Configure<App>()\n            .UsePlatformDetect()\n            .WithInterFont()\n            .LogToTrace();\n}\n");
             File.WriteAllText(Path.Combine(pictures, "README.md"),
-                "# MdExplorer\n\n跨平台本地文件资源管理器（Avalonia 12 + .NET 10 + Material Design 3）。\n\n- 五档断点响应式布局\n- 预览与递归搜索\n- Native AOT 发布\n");
+                "# Eidoria\n\n跨平台本地文件资源管理器（Avalonia 12 + .NET 10 + Material Design 3）。\n\n- 五档断点响应式布局\n- 预览与递归搜索\n- Native AOT 发布\n");
             File.WriteAllText(Path.Combine(pictures, "会议纪要.txt"),
                 "会议纪要（样例）\n\n1. 决策：许可证采用 Apache-2.0\n2. Android 全文件变体稍后做\n3. 媒体播放后续版本跟进\n");
             WriteSamplePdf(Path.Combine(pictures, "设计规范 v3.pdf"));

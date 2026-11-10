@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成 MdExplorer 响应式布局线框图（SVG）。
+"""生成 Eidoria 响应式布局线框图（SVG）。
 
 每个断点一张：Compact / Medium / Expanded / Large / ExtraLarge。
 线框图表达的是「区域、尺寸、层级」而非最终像素稿；颜色取 MD3 浅色
@@ -182,7 +182,7 @@ def rail(s: Svg, x, y, w, h, labels, active=0):
         iy += 64
 
 
-def drawer(s: Svg, x, y, w, h, title="MdExplorer"):
+def drawer(s: Svg, x, y, w, h, title="Eidoria"):
     s.rect(x, y, w, h, SURFACE_CONTAINER)
     s.text(x + 20, y + 38, title, size=17, weight="bold")
     fab(s, x + 76, y + 88, "+ 新建", extended=True)
@@ -245,7 +245,7 @@ def header(s: Svg, title, subtitle):
 # ---------------------------------------------------------------- Compact
 def compact():
     W, H = 390, 844
-    s = Svg(W, H, "MdExplorer Compact <600dp 手机竖屏")
+    s = Svg(W, H, "Eidoria Compact <600dp 手机竖屏")
     # 状态栏示意
     s.rect(0, 0, W, 36, SURFACE)
     s.text(16, 24, "9:41", size=12, weight="bold")
@@ -293,7 +293,7 @@ def compact():
 # ---------------------------------------------------------------- Medium
 def medium():
     W, H = 768, 1024
-    s = Svg(W, H, "MdExplorer Medium 600–839dp 平板竖屏/折叠屏")
+    s = Svg(W, H, "Eidoria Medium 600–839dp 平板竖屏/折叠屏")
     rail(s, 0, 0, 80, H, ["主页", "最近", "收藏", "图库", "回收站", "设置"])
     fab(s, 40, 52)
     # 顶栏 + 居中搜索
@@ -317,7 +317,7 @@ def medium():
 # ---------------------------------------------------------------- Expanded
 def expanded():
     W, H = 1100, 760
-    s = Svg(W, H, "MdExplorer Expanded 840–1199dp 平板横屏/小桌面窗口")
+    s = Svg(W, H, "Eidoria Expanded 840–1199dp 平板横屏/小桌面窗口")
     drawer(s, 0, 0, 272, H)
     # 内容区
     X = 272
@@ -345,7 +345,7 @@ def expanded():
 # ---------------------------------------------------------------- Large
 def large():
     W, H = 1440, 900
-    s = Svg(W, H, "MdExplorer Large 1200–1599dp 桌面")
+    s = Svg(W, H, "Eidoria Large 1200–1599dp 桌面")
     drawer(s, 0, 0, 288, H)
     X = 288
     # 桌面顶栏：窗口标题/标签页 + 地址栏式面包屑 + 搜索
@@ -384,7 +384,7 @@ def large():
 # ---------------------------------------------------------------- ExtraLarge
 def xlarge():
     W, H = 1920, 1080
-    s = Svg(W, H, "MdExplorer ExtraLarge 1600dp+ 大屏/超宽屏（可选双窗格）")
+    s = Svg(W, H, "Eidoria ExtraLarge 1600dp+ 大屏/超宽屏（可选双窗格）")
     drawer(s, 0, 0, 300, H)
     X = 300
     s.rect(X, 0, W - X, 48, SURFACE_CONTAINER_HIGH)

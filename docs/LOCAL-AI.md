@@ -44,7 +44,7 @@ model|<id>|<名称>|<用途>|<许可>|<许可链接>|<HF 仓库>|<固定 revisio
 file|<id>|<仓库内路径>
 ```
 
-应用把它作为**嵌入资源**（`MdExplorer.Ai.Models.manifest`）编译进来，所以「脚本下的目录」与「程序找的目录」不会漂移；清单写错会在开发期就抛 `InvalidDataException`，而不是给用户一张残缺的表。
+应用把它作为**嵌入资源**（内部逻辑名含工程代号，属保留的内部标识）编译进来，所以「脚本下的目录」与「程序找的目录」不会漂移；清单写错会在开发期就抛 `InvalidDataException`，而不是给用户一张残缺的表。
 
 ### 3.2 目录布局与校验
 
@@ -53,7 +53,7 @@ file|<id>|<仓库内路径>
 <模型目录>/checksums.txt             首次下载后记录每个文件的 SHA-256
 ```
 
-- 默认目录：`MDEXPLORER_MODELS` → 否则 `<应用数据目录>/models`（Linux `~/.local/share/MdExplorer/models`、Windows `%LOCALAPPDATA%\MdExplorer\models`）。应用与脚本用的是同一套优先级。
+- 默认目录：`EIDORIA_MODELS` → 否则 `<应用数据目录>/models`（Linux `~/.local/share/Eidoria/models`、Windows `%LOCALAPPDATA%\Eidoria\models`）。应用与脚本用的是同一套优先级；v0.63 之前的旧变量名 `MDEXPLORER_MODELS` 仍被读取作为退路，但不再出现在文档与日志里。
 - 下载：先写入同目录 `.part`，`curl -C -` 断点续传、`-f` 让 4xx/5xx 直接失败；SHA-256 与大小验证通过后才原子改名，半截文件/错误页永远不会被应用看到；小于 1 KiB 的文件判为失败。`--force` 从头下；普通网络中断留下 `.part` 供续传。
 - 校验：首次完整下载记录 SHA-256；之后每次运行按记录校验，坏文件重新下载；`--verify` 只校验不下载，缺 checksum 也会返回失败，不会把「没校验」报成通过。`--clean --only <id>` 只删除指定模型及其 checksum，不影响其它已安装模型。
 - 镜像：设置 `HF_ENDPOINT=https://hf-mirror.com` 给下载脚本用；PowerShell 还可显式传 `-Mirror https://hf-mirror.com`。
@@ -126,7 +126,7 @@ pwsh scripts/accept-real-models.ps1            # Windows PowerShell 7
 - **模型路由**：中文查询优先 BGE small zh v1.5（512 维）；无中文字符时优先 MiniLM L6 v2（384 维）；某模型没安装则回退已安装的另一个。BERT 使用 `[CLS]`/`[SEP]`，动态序列长度最长 128，masked mean pooling + L2 normalize；BGE 查询加检索指令前缀。
 - **搜索中心**新增「关键词 / AI 语义」模式和「建立 / 更新 AI 索引」。必须先配置并重建现有文件名索引、在设置中打开本地 AI、下载文本模型，再显式生成向量索引；索引文件变化、根集合变化或模型版本变化都会使 AI 索引过期并要求重建。更新时仍重新枚举当前文件并重新生成受限的嵌入文本指纹（指纹不包含或保存原始正文）；仅当路径、名称、类型、大小、修改时间、嵌入文本指纹及模型 revision 均匹配时复用已有量化向量。这样即使文件大小不变且时间戳被还原，实际参与 embedding 的文本变化仍会触发重嵌入。旧版 v1 快照可读取，但没有指纹的条目会在下一次重建时重新嵌入。
 - 语义索引只覆盖用户加入的本地根，最多 20,000 项；保存路径/文件类型/大小/时间和每个可用文本模型的 int8 量化向量，不保存原始正文。文件名与父目录始终参与；仅对受支持的纯文本扩展名、≤2 MiB 文件最多读取前 4,000 字符作为摘要；不读 PDF、Office、压缩包、图片或 SAF。命中前再次核验文件时间/大小，stale 项不会被返回。`清除本地搜索索引` 同时清除文件名与 AI 向量快照。
-- `AppSettings.EnableLocalAi` 默认关闭；关闭时保留本机 AI 向量文件但不运行推理/搜索。`MDEXPLORER_MODELS` 仍可覆盖模型目录。设置卡与搜索中心说明数据只在本机处理。
+- `AppSettings.EnableLocalAi` 默认关闭；关闭时保留本机 AI 向量文件但不运行推理/搜索。`EIDORIA_MODELS` 仍可覆盖模型目录。设置卡与搜索中心说明数据只在本机处理。
 - **Android 原生库解析修正**：Microsoft.ML.OnnxRuntime 的桌面 Linux RID 原生库可能通过共享 `net10.0` 资产图混入 Android APK，并与 Android AAR 内的 Bionic 库发生重名冲突。Android app head 的窄作用域 MSBuild target 只移除 `linux-*` 的 native copy/publish 项；Linux/Windows 依赖不受影响。CI 会解包 arm64 APK，拒绝 glibc/Linux 依赖，并验证 ONNX ELF 的每个 `LOAD` 段均按 16 KiB 对齐。
 - **验收边界**：CI 使用确定性的假 embedding 覆盖重建、排序、持久化、模型版本失效、清除、开关及无效向量拒绝；另有 opt-in 的真实权重 smoke tests（检查 BGE/MiniLM ONNX 加载、输出维度、有限值、单位归一化，并以多组中英文相关/无关文本对检查基本排序）。Linux Native AOT、Android trimming/AOT 发布及 APK 原生库检查均通过。GitHub Actions 曾以固定 revision 的真实权重跑通 CPU smoke test；检索基准、跨实现 embedding 数值对齐、完整 top-k 指标、Android 真机质量/性能仍待验收。
 - **本地真实模型验证**（需 .NET 10 与可访问 Hugging Face 的网络）：`model_dir="$HOME/.local/share/MdExplorer/models"; scripts/fetch-ai-models.sh --dir "$model_dir" && scripts/fetch-ai-models.sh --dir "$model_dir" --verify && MDEXPLORER_MODELS="$model_dir" MDEXPLORER_RUN_REAL_MODEL_TESTS=1 dotnet test tests/MdExplorer.Tests -c Release --filter FullyQualifiedName~RealModelEmbeddingTests`。这会用固定 revision 下载默认 BGE + MiniLM 两个模型，并实际运行 ONNX CPU 推理；每个模型对多个场景检查相关文本的余弦相似度是否高于无关文本，作为基本语义 smoke check（不是完整 top-k 质量基准）。

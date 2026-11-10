@@ -23,7 +23,7 @@
   "id": "community.calm-theme",
   "name": "Calm Surface",
   "version": "1.2.0",
-  "publisher": "MdExplorer Community",
+  "publisher": "Eidoria Community",
   "description": "A calm Material 3 seed color.",
   "capabilities": ["theme"],
   "theme": { "seedColor": "#6750A4" }

@@ -20,8 +20,10 @@ namespace MdExplorer.Tests;
 /// </summary>
 public sealed class RealModelAcceptanceTests
 {
-    private const string EnableVariable = "MDEXPLORER_RUN_REAL_MODEL_TESTS";
-    private const string ReportVariable = "MDEXPLORER_ACCEPTANCE_REPORT";
+    private const string EnableVariable = "EIDORIA_RUN_REAL_MODEL_TESTS";
+    private const string LegacyEnableVariable = "MDEXPLORER_RUN_REAL_MODEL_TESTS";
+    private const string ReportVariable = "EIDORIA_ACCEPTANCE_REPORT";
+    private const string LegacyReportVariable = "MDEXPLORER_ACCEPTANCE_REPORT";
 
     private readonly ITestOutputHelper _output;
 
@@ -286,7 +288,8 @@ public sealed class RealModelAcceptanceTests
 
     private static string ResolveReportPath(string workspace)
     {
-        var configured = Environment.GetEnvironmentVariable(ReportVariable);
+        var configured = Environment.GetEnvironmentVariable(ReportVariable)
+            ?? Environment.GetEnvironmentVariable(LegacyReportVariable);
         return string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(workspace, "report.md")
             : Path.GetFullPath(configured);
@@ -294,7 +297,8 @@ public sealed class RealModelAcceptanceTests
 
     private static void EnsureEnabled()
     {
-        if (!string.Equals(Environment.GetEnvironmentVariable(EnableVariable), "1", StringComparison.Ordinal))
+        if (!string.Equals(Environment.GetEnvironmentVariable(EnableVariable), "1", StringComparison.Ordinal)
+            && !string.Equals(Environment.GetEnvironmentVariable(LegacyEnableVariable), "1", StringComparison.Ordinal))
         {
             Assert.Skip(
                 $"设置 {EnableVariable}=1 并下载清单里的真实权重后运行；或用 scripts/accept-real-models.sh（Windows：scripts/accept-real-models.ps1）一条命令跑完。");

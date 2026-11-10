@@ -95,11 +95,11 @@ public sealed class RealModelEmbeddingTests
     private static void EnsureRealModelTestsEnabled()
     {
         if (!string.Equals(
-                Environment.GetEnvironmentVariable("MDEXPLORER_RUN_REAL_MODEL_TESTS"),
+                Environment.GetEnvironmentVariable("EIDORIA_RUN_REAL_MODEL_TESTS") ?? Environment.GetEnvironmentVariable("MDEXPLORER_RUN_REAL_MODEL_TESTS"),
                 "1",
                 StringComparison.Ordinal))
         {
-            Assert.Skip("Set MDEXPLORER_RUN_REAL_MODEL_TESTS=1 and download the pinned models to run real-weight integration tests.");
+            Assert.Skip("Set EIDORIA_RUN_REAL_MODEL_TESTS=1 and download the pinned models to run real-weight integration tests.");
         }
     }
 

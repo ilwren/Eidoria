@@ -89,9 +89,11 @@ function Test-Wanted([string]$id) {
 # ── 目录 ────────────────────────────────────────────────────────────────────
 $TargetDir =
     if ($Dir) { $Dir }
+    # v0.63：新名 EIDORIA_* / Eidoria 目录优先，旧 MDEXPLORER_MODELS 继续当退路读取。
+    elseif ($env:EIDORIA_MODELS) { $env:EIDORIA_MODELS }
     elseif ($env:MDEXPLORER_MODELS) { $env:MDEXPLORER_MODELS }
-    elseif ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'MdExplorer\models' }
-    else { Join-Path $HOME '.local/share/MdExplorer/models' }
+    elseif ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Eidoria\models' }
+    else { Join-Path $HOME '.local/share/Eidoria/models' }
 $TargetDir = $TargetDir.TrimEnd([char]92, [char]47)
 $ChecksumsPath = Join-Path $TargetDir 'checksums.txt'
 
@@ -282,8 +284,8 @@ foreach ($id in $models.Keys) {
 Write-Host ''
 Write-Host "完成：新下载 $ok 个、已就绪 $skip 个、失败 $fail 个"
 Write-Host "模型目录：$TargetDir"
-Write-Host '应用会在这里找模型（也可用环境变量 MDEXPLORER_MODELS 指向别处）：'
-Write-Host '  Windows: %LOCALAPPDATA%\MdExplorer\models'
+Write-Host '应用会在这里找模型（也可用环境变量 EIDORIA_MODELS 指向别处）：'
+Write-Host '  Windows: %LOCALAPPDATA%\Eidoria\models'
 Write-Host "校验随时可重跑：pwsh scripts/fetch-ai-models.ps1 -Verify（可用 -Only 或 -All 选择范围）"
 
 if ($fail -ne 0) { exit 2 }

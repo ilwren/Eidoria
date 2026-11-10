@@ -38,11 +38,11 @@ jobs:
           python3 scripts/test-fetch-ai-models-modelscope.py
           scripts/test-fetch-ai-models.sh
           scripts/fetch-ai-models.sh --list
-          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --dry-run
-          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --all --dry-run
-          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-asr-tiny --dry-run
-          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only audio-classify-yamnet --dry-run
-          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/mdexplorer-ai-dry-run" --only image-vlm-smol --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/eidoria-ai-dry-run" --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/eidoria-ai-dry-run" --all --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/eidoria-ai-dry-run" --only audio-asr-tiny --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/eidoria-ai-dry-run" --only audio-classify-yamnet --dry-run
+          scripts/fetch-ai-models.sh --dir "$RUNNER_TEMP/eidoria-ai-dry-run" --only image-vlm-smol --dry-run
       - name: Restore unit-test project
         run: |
           set -o pipefail
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      MDEXPLORER_RUN_REAL_MODEL_TESTS: "1"
+      EIDORIA_RUN_REAL_MODEL_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -103,24 +103,24 @@ jobs:
       - name: Restore cached BGE and MiniLM weights
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/mdexplorer-real-models
-          key: mdexplorer-real-models-linux-v1-${{ hashFiles('scripts/ai-models.manifest', 'scripts/fetch-ai-models-modelscope.py') }}
+          path: ${{ runner.temp }}/eidoria-real-models
+          key: eidoria-real-models-linux-v1-${{ hashFiles('scripts/ai-models.manifest', 'scripts/fetch-ai-models-modelscope.py') }}
       - name: Configure model directory
-        run: echo "MDEXPLORER_MODELS=$RUNNER_TEMP/mdexplorer-real-models" >> "$GITHUB_ENV"
+        run: echo "EIDORIA_MODELS=$RUNNER_TEMP/eidoria-real-models" >> "$GITHUB_ENV"
       - name: Verify cache or fetch from Hugging Face, hf-mirror, then ModelScope
         run: |
-          if scripts/fetch-ai-models.sh --dir "$MDEXPLORER_MODELS" --verify; then
+          if scripts/fetch-ai-models.sh --dir "$EIDORIA_MODELS" --verify; then
             echo "Verified cached real model files."
             echo "::notice title=Model cache::Cache hit; model download skipped"
           else
             echo "::notice title=Model cache::Cache miss or invalid; fetching models now"
-            rm -rf "$MDEXPLORER_MODELS"
-            scripts/fetch-real-models-with-fallback.sh --dir "$MDEXPLORER_MODELS"
-            scripts/fetch-ai-models.sh --dir "$MDEXPLORER_MODELS" --verify
+            rm -rf "$EIDORIA_MODELS"
+            scripts/fetch-real-models-with-fallback.sh --dir "$EIDORIA_MODELS"
+            scripts/fetch-ai-models.sh --dir "$EIDORIA_MODELS" --verify
           fi
       - name: Run real-weight AI embedding, semantic search and acceptance tests
         env:
-          MDEXPLORER_ACCEPTANCE_REPORT: ${{ github.workspace }}/real-model-report.md
+          EIDORIA_ACCEPTANCE_REPORT: ${{ github.workspace }}/real-model-report.md
         run: |
           set -o pipefail
           dotnet test tests/MdExplorer.Tests -c Release \
@@ -212,11 +212,11 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/fetch-ai-models.ps1 -List
-          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -DryRun
-          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -All -DryRun
-          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only audio-asr-tiny -DryRun
-          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only audio-classify-yamnet -DryRun
-          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/mdexplorer-ai-dry-run" -Only image-vlm-smol -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/eidoria-ai-dry-run" -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/eidoria-ai-dry-run" -All -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/eidoria-ai-dry-run" -Only audio-asr-tiny -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/eidoria-ai-dry-run" -Only audio-classify-yamnet -DryRun
+          ./scripts/fetch-ai-models.ps1 -Dir "$env:RUNNER_TEMP/eidoria-ai-dry-run" -Only image-vlm-smol -DryRun
       - name: Unit tests (windows only)
         if: runner.os == 'Windows'
         shell: bash
@@ -235,7 +235,7 @@ jobs:
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:
-          name: mdexplorer-${{ matrix.rid }}
+          name: eidoria-${{ matrix.rid }}
           path: artifacts/${{ matrix.rid }}
 
   publish-aot-linux:
@@ -254,7 +254,7 @@ jobs:
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:
-          name: mdexplorer-linux-x64-aot
+          name: eidoria-linux-x64-aot
           path: artifacts/linux-x64-aot
 
   lua-runtime-aot-spike:
@@ -381,6 +381,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mdexplorer-android
+          name: eidoria-android
           path: artifacts/android/*.apk
           if-no-files-found: warn

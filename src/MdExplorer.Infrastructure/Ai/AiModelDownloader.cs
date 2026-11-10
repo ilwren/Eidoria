@@ -209,9 +209,9 @@ public sealed class AiModelDownloader : IAiModelDownloader
     public const string HuggingFaceEndpoint = "https://huggingface.co";
     public const string HfMirrorEndpoint = "https://hf-mirror.com";
     public const string ModelScopeEndpoint = "https://modelscope.cn";
-    public const string ModelscopeEndpointEnvironmentVariable = "MDEXPLORER_MODELSCOPE_ENDPOINT";
-    public const string HfEndpointEnvironmentVariable = "MDEXPLORER_HF_ENDPOINT";
-    public const string HfMirrorEndpointEnvironmentVariable = "MDEXPLORER_HF_MIRROR_ENDPOINT";
+    public const string ModelscopeEndpointEnvironmentVariable = "EIDORIA_MODELSCOPE_ENDPOINT";
+    public const string HfEndpointEnvironmentVariable = "EIDORIA_HF_ENDPOINT";
+    public const string HfMirrorEndpointEnvironmentVariable = "EIDORIA_HF_MIRROR_ENDPOINT";
 
     /// <summary>每个文件最多尝试几次（第一次 + 一次重试）。哈希不符/网络截断都算。</summary>
     private const int MaxAttemptsPerFile = 2;
@@ -679,12 +679,25 @@ public sealed class AiModelDownloader : IAiModelDownloader
 
     private static string ResolveEndpoint(AiModelSource source) => source switch
     {
-        AiModelSource.HfMirror => Trim(Environment.GetEnvironmentVariable(HfMirrorEndpointEnvironmentVariable))
+        // 环境变量更名于 v0.63：新名优先，旧 MDEXPLORER_* 名继续读取，不悄悄断掉存量脚本。
+        AiModelSource.HfMirror => FirstEnvironmentOverride(HfMirrorEndpointEnvironmentVariable, "MDEXPLORER_HF_MIRROR_ENDPOINT")
                                   ?? HfMirrorEndpoint,
-        AiModelSource.ModelScope => Trim(Environment.GetEnvironmentVariable(ModelscopeEndpointEnvironmentVariable))
+        AiModelSource.ModelScope => FirstEnvironmentOverride(ModelscopeEndpointEnvironmentVariable, "MDEXPLORER_MODELSCOPE_ENDPOINT")
                                     ?? ModelScopeEndpoint,
-        _ => Trim(Environment.GetEnvironmentVariable(HfEndpointEnvironmentVariable)) ?? HuggingFaceEndpoint,
+        _ => FirstEnvironmentOverride(HfEndpointEnvironmentVariable, "MDEXPLORER_HF_ENDPOINT") ?? HuggingFaceEndpoint,
     };
+
+    /// <summary>按顺序取第一个非空环境变量值（新名优先，旧名兼容）。</summary>
+    private static string? FirstEnvironmentOverride(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var value = Trim(Environment.GetEnvironmentVariable(name));
+            if (value is not null)
+                return value;
+        }
+        return null;
+    }
 
     private static string? Trim(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.TrimEnd('/');

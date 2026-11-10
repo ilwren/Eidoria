@@ -31,12 +31,26 @@ public sealed class FramePacingStats
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(targetFps, 0d);
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 8);
-        TargetFps = targetFps;
+        Retarget(targetFps);
         _capacity = capacity;
         _intervalsMs = new List<double>(capacity);
     }
 
-    public double TargetFps { get; }
+    // double 读写在 32 位进程里不保证原子，而这里一边在取帧线程写、一边在 UI 线程读；
+    // 用位模式的 Interlocked 读写拿到原子性。
+    private long _targetFpsBits;
+
+    public double TargetFps => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _targetFpsBits));
+
+    /// <summary>
+    /// 运行时调整目标帧率（v0.63：Windows 取帧路线在解码持续跟不上时降档）。
+    /// 掉帧判据随新目标立刻生效，已记的历史数字不改写。
+    /// </summary>
+    public void Retarget(double fps)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(fps, 0d);
+        Interlocked.Exchange(ref _targetFpsBits, BitConverter.DoubleToInt64Bits(fps));
+    }
 
     /// <summary>接受一帧时的时间戳（<see cref="Stopwatch.GetTimestamp"/>）。</summary>
     public void Record(long timestamp)

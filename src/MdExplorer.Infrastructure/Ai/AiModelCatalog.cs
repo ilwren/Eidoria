@@ -137,7 +137,10 @@ public static class AiModelManifest
 public sealed class AiModelCatalog
 {
     /// <summary>覆盖模型目录的环境变量；与下载脚本共用。</summary>
-    public const string DirectoryEnvironmentVariable = "MDEXPLORER_MODELS";
+    public const string DirectoryEnvironmentVariable = "EIDORIA_MODELS";
+
+    /// <summary>更名前（v0.62 之前）使用的环境变量名；只继续读取，不再出现在新文档里。</summary>
+    public const string LegacyDirectoryEnvironmentVariable = "MDEXPLORER_MODELS";
 
     private readonly IReadOnlyList<AiModelDefinition> _models;
 
@@ -158,6 +161,8 @@ public sealed class AiModelCatalog
     public static string ResolveDirectory(string dataDirectory)
     {
         var overridePath = Environment.GetEnvironmentVariable(DirectoryEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(overridePath))
+            overridePath = Environment.GetEnvironmentVariable(LegacyDirectoryEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(overridePath))
             return Path.GetFullPath(overridePath);
         return Path.Combine(dataDirectory, "models");
